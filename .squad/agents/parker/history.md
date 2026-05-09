@@ -29,3 +29,25 @@
 - Auth: Entra ID JWT validation; bypass with `TALENTIQ_AUTH_DISABLED=true` for local dev
 - Lazy imports: Kane's tools.py and search.py use lazy `from talent_backend.data_access import ...` — no startup crash
 - Agent tool dispatch in `tools.py` calls data_access functions by name
+
+### 2026-05-09: MCP Server Created
+- **Path:** `talent_backend/talent_backend/mcp_server/` — 4 files (__init__, pg_age_helper, server, run_server)
+- **Architecture:** Standalone FastMCP process on port 3002 (env: `MCP_PORT`), separate from FastAPI backend
+- **Transport:** `streamable-http` — agent connects via `MCPStreamableHTTPTool`
+- **Tools exposed:** `fetch_ontology`, `save_ontology`, `query_using_sql_cypher`, `discover_nodes`, `search_graph`, `resolve_entity_ids`, `build_query_context`, `analyze_graph_statistics`
+- **Pre-loaded ontology:** Full talent_graph schema (14 node labels, 12 edge labels) hardcoded in `_TALENT_GRAPH_ONTOLOGY` — eliminates discovery round-trip
+- **PGAgeHelper:** Async psycopg3 `AsyncConnectionPool`, sets AGE search_path on every query, parses agtype results
+- **Name verification:** FTS results are name-verified via Cypher follow-up to filter false positives
+- **FTS dependency:** Uses `public.search_graph_nodes()` SQL function — must exist in DB
+- **Existing data_access layer preserved:** Still used by `/api/v1/search/*` structured endpoints — MCP server is additive for agent workflow
+- **Windows compat:** `WindowsSelectorEventLoopPolicy` + `PSYCOPG_IMPL=python` fallback for Windows dev
+- **CORS:** Permissive CORS middleware for local dev (origins=*, expose Mcp-Session-Id header)
+- **SQL sanitization:** `_sanitize_sql_string()` helper escapes single quotes for f-string SQL interpolation
+
+### 2026-05-09 — Cross-agent: Kane's Agent Framework rewrite
+- Kane rewrote `talent_agent.py` to use Agent Framework SDK (`agent_framework>=1.3.0`) with `MCPStreamableHTTPTool`
+- Agent now connects to this MCP server at `MCP_ENDPOINT` (default `http://localhost:3002/mcp`)
+- All 9 manual tool definitions removed from agent side — MCP server is the sole tool provider for agent queries
+- `tools.py` retained only `generate_embedding()` for search endpoints
+- Chat history added via Cosmos DB — new endpoints: `GET/DELETE /sessions`, `POST /chat` returns `message_id`
+- Existing data_access layer still powers structured search endpoints (`/api/v1/search/*`)

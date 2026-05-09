@@ -5,6 +5,26 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-09: Agent Framework rewrite — replacing raw OpenAI function calling
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+**What:** Rewrote `TalentAgent` to use Microsoft Agent Framework (`agent_framework` package) with `MCPStreamableHTTPTool` instead of raw OpenAI function calling with manual tool definitions. The agent now delegates all data queries to the MCP graph server rather than dispatching to the data_access layer directly.
+**Why:** Aligns with the reference architecture. MCP-based tooling is the project's standard pattern — eliminates 400+ lines of manual tool schemas and dispatch code.
+**Impact:** `azure-ai-projects` removed, `agent-framework>=1.3.0` added. `tools.py` reduced to just `generate_embedding()`. `MCP_ENDPOINT` config var added (default: `http://localhost:3002/mcp`). Chat endpoint unchanged.
+
+### 2026-05-09: Chat history persistence via Azure Cosmos DB
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+**What:** Full chat history support using Azure Cosmos DB async SDK. Partition key `/session_id`, two document types (`message`, `session_meta`). User ID enforced on all ops. Graceful degradation if Cosmos unavailable. History capped at 20 messages.
+**New endpoints:** `GET /sessions`, `GET /sessions/{id}`, `DELETE /sessions/{id}`. `POST /api/v1/chat` now returns `message_id`.
+**Why:** Multi-turn conversation support required. Cosmos DB already exists in the Azure subscription.
+
+### 2026-05-09: MCP Server Architecture — implemented
+**By:** Parker (Data Engineer)
+**Status:** Implemented
+**What:** Standalone FastMCP server at `talent_backend/talent_backend/mcp_server/` (port 3002, `streamable-http` transport). 8 tools: `fetch_ontology`, `save_ontology`, `query_using_sql_cypher`, `discover_nodes`, `search_graph`, `resolve_entity_ids`, `build_query_context`, `analyze_graph_statistics`. Pre-loaded talent_graph ontology eliminates discovery round-trip. Existing data_access layer preserved for structured API endpoints.
+**Dependencies:** `fastmcp`, `psycopg[binary]`, `psycopg-pool`, `starlette`. Requires `public.search_graph_nodes()` SQL function.
+
 ### 2026-05-09: Backend API & Agent architecture — implemented
 **By:** Kane (Backend Dev)
 **Status:** Implemented
