@@ -5,6 +5,55 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-10: Tech spec decisions — Infrastructure & Architecture
+**By:** Ripley (Lead Architect)
+**Status:** Documented
+**What:**
+1. Co-host Backend API + MCP Server on same App Service — MCP stays on localhost, simpler ops. Separate only when scaling demands it.
+2. PostgreSQL uses delegated subnet, not private endpoint — simpler, lower latency, native VNet integration for Flex Server.
+3. NAT Gateway over Azure Firewall for egress — sufficient for current needs, fraction of the cost. Add Firewall only if compliance mandates egress filtering.
+4. OpenTelemetry SDK (not App Insights Python SDK) for backend — vendor-neutral, richer auto-instrumentation, same Azure Monitor backend.
+5. Structured JSON logging with OTel correlation — enables trace stitching between frontend App Insights and backend spans.
+**Artifacts:** `docs/specs/backend-architecture.md`, `docs/specs/vnet-integration.md`, `docs/specs/telemetry.md`
+**Impact:** All agents — specs are canonical reference for infrastructure, deployment, and observability.
+
+### 2026-05-10: Tech spec decisions — Backend Sessions & Auth
+**By:** Kane (Backend Dev)
+**Status:** Proposed
+**What:**
+1. `SESSION_PROVIDER` env var (`in_memory` | `cosmos`) controls history provider — phased migration, no big-bang cutover.
+2. Chat history and session state use separate Cosmos containers — different TTL, access patterns, consumers.
+3. ChatHistoryStore must migrate to async Cosmos SDK — sync calls block the event loop under concurrent load.
+4. RBAC via Entra ID app roles + `require_role()` decorator — Manager, PreSales, Admin, Viewer roles from JWT claims.
+5. JWKS should retry on `kid` mismatch before rejecting — handles Microsoft key rotation during 1-hour cache window.
+6. All agents share one HistoryProvider instance — enables cross-agent context continuity within a session.
+**Artifacts:** `docs/specs/agent-orchestration.md`, `docs/specs/mcp-server-tools.md`, `docs/specs/session-management.md`, `docs/specs/chat-history.md`, `docs/specs/authentication.md`
+**Impact:** Kane, Dallas — session and auth behavior changes.
+
+### 2026-05-10: Tech spec decisions — Frontend Production Readiness
+**By:** Dallas (Frontend Dev)
+**Status:** Proposed
+**What:**
+1. SSE via POST + ReadableStream (not EventSource) — EventSource lacks auth headers and JSON body support.
+2. Token cache: switch to `localStorage` for production — enables cross-tab SSO (requires CSP headers for XSS mitigation).
+3. Add AbortController + "Stop generating" button for stream cancellation.
+4. Proactive token refresh (5-minute window) — prevents mid-stream auth failures.
+5. Fluent UI v9 for production components — Phase 3, ~80-100KB bundle addition.
+6. i18n via react-i18next for ES/EN/FR/PT — Phase 3, ~130 UI chrome strings.
+7. Performance budgets: LCP < 2.5s, FID < 100ms, CLS < 0.1, bundle < 350KB gzip.
+**Artifacts:** `docs/specs/ui-sse-auth.md`, `docs/specs/ui-agentic-production.md`
+**Impact:** Dallas — frontend implementation targets. No immediate backend changes.
+
+### 2026-05-10: Tech spec decisions — Database Architecture
+**By:** Parker (Data Engineer)
+**Status:** Documented
+**What:**
+1. Comprehensive database architecture spec — 14 node labels, 12 edge labels, vector/FTS/relational layers documented.
+2. Three production gaps: (a) `search_graph_nodes()` SQL function not in pipeline, (b) `employee_ageid` always 0, (c) `pg_trgm` extension availability on Azure.
+**Artifacts:** `docs/specs/database-architecture.md`
+**Impact:** Kane + Parker — gaps must be resolved before staging deployment.
+**Note:** AGE query rules and vector search single-call pattern previously captured in "Architecture patterns established" entry.
+
 ### 2026-05-10: Architecture patterns established
 **By:** Team (session work)
 **Status:** Implemented

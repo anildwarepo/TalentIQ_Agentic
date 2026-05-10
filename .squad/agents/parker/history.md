@@ -51,3 +51,21 @@
 - `tools.py` retained only `generate_embedding()` for search endpoints
 - Chat history added via Cosmos DB — new endpoints: `GET/DELETE /sessions`, `POST /chat` returns `message_id`
 - Existing data_access layer still powers structured search endpoints (`/api/v1/search/*`)
+
+### 2026-05-10: Database Architecture Spec Written
+- **Path:** `docs/specs/database-architecture.md` — comprehensive technical spec covering all 4 query paradigms
+- **Key patterns documented:**
+  - AGE `ag_catalog.cypher()` wrapping with search_path management, agtype parsing rules
+  - 14 node labels, 12 edge labels, ~130K nodes, ~1.87M edges — full property schemas
+  - DiskANN/HNSW auto-detection: pipeline checks `pg_extension` for vectorscale/pg_diskann, falls back to HNSW
+  - Vector column whitelist (`_VALID_COLUMNS`) prevents injection — only `resume_embedding` or `skills_embedding` allowed
+  - FTS preprocessing: title stripping, progressive retry with shorter terms, name verification post-filter
+  - AGE property indexes use `agtype_access_operator()` — 19 indexes on key lookup properties
+  - Checkpoint system: JSON file with per-phase + per-batch tracking, atomic writes via tempfile+replace
+- **Security assessment:** MCP `query_using_sql_cypher` is medium risk (agent-constructed SQL), mitigated by internal-only caller. All relational queries properly parameterised.
+- **Production gaps identified:** `search_graph_nodes()` SQL function must exist in DB but is not created by pipeline; `employee_ageid` columns always 0 (AGE vertex ID cross-ref not wired); `pg_trgm` not guaranteed on Azure
+
+### 2026-05-10: Cross-agent — Tech spec decisions affecting Parker
+- **Ripley:** PostgreSQL uses delegated subnet (not private endpoint) in VNet design. NAT Gateway for egress.
+- **Kane:** ChatHistoryStore async SDK migration planned — no impact on Parker's data layer. Session management feature flag does not affect DB schema.
+- **Parker production gaps acknowledged by team:** Must resolve `search_graph_nodes()`, `employee_ageid`, and `pg_trgm` before staging.

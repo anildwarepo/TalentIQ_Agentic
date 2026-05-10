@@ -64,3 +64,14 @@
 - After upload, auto-send with original user question from chat history (not hardcoded message)
 - `sendMessage` already attaches `uploadedFile` as `file_context`
 - Removed hardcoded template selector UI — CV template selection is agent-driven
+
+### 2026-05-10: Technical specs — SSE/Auth and Production Agentic UI
+- Wrote `docs/specs/ui-sse-auth.md` — documents current SSE streaming (NDJSON for graph-search, SSE for agent-framework), token lifecycle, state management (19 useState vars), and API client patterns. Key gaps: no AbortController, no proactive token refresh, no auto-retry on 401.
+- Wrote `docs/specs/ui-agentic-production.md` — future vision for multi-agent visibility, structured tool execution views, shortlist management, dashboards, i18n (ES/EN/FR/PT), WCAG 2.1 AA, Fluent UI v9 alignment, responsive breakpoints, performance budgets.
+- Key architectural decisions documented: POST-based SSE (not EventSource) is correct because we need POST bodies with auth headers; `localStorage` recommended for prod token cache (cross-tab SSO); WebSocket not needed until server-initiated notifications are required; Fluent UI adds ~80-100KB but covers accessibility out of the box.
+- Migration roadmap: 4 phases from production hardening (AbortController, token refresh) through agentic workspace (agent cards, dashboards, i18n) to performance (virtual scrolling, service worker).
+
+### 2026-05-10: Cross-agent — Tech spec decisions affecting Dallas
+- **Ripley:** Structured JSON logging with OTel correlation — frontend App Insights already correct, add `session_id` correlation.
+- **Kane:** RBAC via Entra ID app roles — no immediate frontend changes (token already contains roles claim). Session migration via `SESSION_PROVIDER` flag — no frontend impact.
+- **Parker:** No direct frontend impact from DB architecture spec.

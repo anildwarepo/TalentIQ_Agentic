@@ -118,6 +118,19 @@
 - Streams NDJSON with `response_message` wrappers matching Dallas's frontend SSE parser
 - Frontend proxies `/af` → `http://localhost:8000` via Vite config
 
+### 2026-05-10 — Technical spec documents authored
+- Wrote 5 specs under `docs/specs/`: agent-orchestration, mcp-server-tools, session-management, chat-history, authentication.
+- Key patterns documented:
+  - Agent-as-tool handoff: triage → specialists via `.as_tool(propagate_session=True)`. Each specialist gets its own `InMemoryHistoryProvider` (target: shared CosmosHistoryProvider).
+  - MCP tools use `ctx.info()` with `[QUERY]`/`[RESULT]` tags for run log. API layer captures these via custom log handler (`_AgentLogHandler`).
+  - Vector search uses column whitelist for injection prevention — only `resume` and `skills` accepted.
+  - ChatHistoryStore uses **sync** Cosmos SDK — needs migration to async for production.
+  - Chat and session history are separate concerns: chat = permanent user-visible record, session = volatile agent working memory.
+  - Auth dual-audience pattern: accept both `https://ai.azure.com` (Foundry scope) and app client ID.
+  - JWKS `kid` mismatch should trigger one retry with forced refresh before rejecting.
+  - RBAC target: app roles in Entra ID manifest, `require_role()` decorator for endpoint guards.
+  - Session management migration: feature flag `SESSION_PROVIDER` to switch between `in_memory` and `cosmos`.
+
 ### 2026-05-09 — pyproject.toml build-system fix
 - `talent_backend/pyproject.toml` was missing `[build-system]` and `[tool.hatch.build.targets.wheel]`
 - Without these, `uv` couldn't build it as a proper package — resolved as namespace package to outer directory
@@ -159,3 +172,8 @@
 - `_drain_log_events()` classifies: handoffs, structured tags, legacy tool messages
 - Suppress duplicate `Function name: X` / `Function X succeeded` for MCP tools that emit their own structured tags
 - Frontend classifies by prefix: `[QUERY]` → badge CYPHER/SQL/FTS/VECTOR/STATS, `[RESULT]` → green, `[HANDOFF]` → purple
+
+### 2026-05-10: Cross-agent — Tech spec decisions affecting Kane
+- **Ripley:** Co-host backend+MCP on same App Service (localhost). OpenTelemetry SDK for backend observability. Structured JSON logging with correlation IDs.
+- **Dallas:** SSE via POST+ReadableStream confirmed. ProactIve token refresh (5-min window) to prevent mid-stream auth failures. AbortController for stream cancellation.
+- **Parker:** 3 production gaps require Kane+Parker coordination: (a) `search_graph_nodes()` SQL function not in pipeline, (b) `employee_ageid` always 0, (c) `pg_trgm` availability on Azure.
