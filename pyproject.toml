@@ -1,0 +1,22 @@
+[project]
+name = "talentiq"
+version = "0.1.0"
+description = "TalentIQ — Talent Matching/Searching Platform"
+requires-python = ">=3.11"
+dependencies = [
+    "pytest>=8.0",
+    "psycopg2-binary>=2.9",
+    "python-dotenv>=1.0",
+]
+
+[tool.uv.workspace]
+members = [
+    "talent_data_pipeline",
+    "talent_backend",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest-asyncio>=1.3.0",
+]

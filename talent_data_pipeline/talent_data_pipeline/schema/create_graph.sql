@@ -1,0 +1,41 @@
+-- TalentIQ AGE Graph — Node and Edge Label Creation
+-- Run AFTER connectivity_test.py has created the graph.
+-- These are executed via ag_catalog.create_vlabel / create_elabel calls in Python.
+
+-- This file documents the intended schema. The actual creation is done
+-- programmatically in create_relational_tables.py because AGE requires
+-- function calls, not DDL statements.
+
+-- ============================================================
+-- NODE LABELS (14)
+-- ============================================================
+-- Employee         — 130,000 nodes (central entity)
+-- Location         — 46 nodes
+-- Country          — 19 nodes
+-- Subregion        — 15 nodes
+-- Skill            — 96 nodes
+-- SkillDomain      — 13 nodes
+-- Certification    — 39 nodes
+-- Language          — 18 nodes
+-- ServiceLine      — 8 nodes
+-- Offering         — 8 nodes
+-- Manager          — 80 nodes
+-- University       — 75 nodes
+-- Client           — 36 nodes
+-- Project          — 22 nodes
+
+-- ============================================================
+-- EDGE LABELS (12)
+-- ============================================================
+-- LOCATED_IN        Employee → Location       (no props)
+-- IN_COUNTRY        Location → Country        (no props)
+-- SPECIALIZES_IN    Employee → SkillDomain    (no props)
+-- HAS_SKILL         Employee → Skill          (level, years_of_experience, active, is_primary)
+-- HOLDS_CERT        Employee → Certification  (issue_date, expiry_date, status, credential_id, has_evidence)
+-- SPEAKS            Employee → Language        (level, is_native)
+-- BELONGS_TO_SL     Employee → ServiceLine    (no props)
+-- WORKS_IN_OFFERING Employee → Offering       (no props)
+-- REPORTS_TO        Employee → Manager         (no props)
+-- STUDIED_AT        Employee → University      (degree, field, graduation_year, eqf_level, meces_level)
+-- WORKED_FOR        Employee → Client          (role, project, start_date, end_date, is_current)
+-- WORKED_ON         Employee → Project         (role, start_date, end_date)

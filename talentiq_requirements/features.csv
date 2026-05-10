@@ -1,0 +1,49 @@
+ID,Feature,Category
+M05-01,AI scoring dimension: skills match (direct keyword matching),Scoring
+M05-02,AI scoring dimension: skills match (semantic similarity scoring),Scoring
+M05-03,AI scoring dimension: availability (hours/allocation in requested period),Scoring
+M05-04,AI scoring dimension: location match (delivery location compatibility),Scoring
+M05-05,AI scoring dimension: cost optimization (resource cost vs bill rate),Scoring
+M05-06,AI scoring dimension: job level alignment,Scoring
+M05-07,AI scoring dimension: engagement history (past performance on similar projects),Scoring
+M05-08,AI scoring dimension: client familiarity (previous work with same client),Scoring
+M05-09,AI scoring dimension: bench duration (longer bench = higher priority),Scoring
+M05-10,"GDN (offshore/nearshore) vs location-specific (onshore) matching constraint",Matching Constraints
+M05-11,Language as hard filter: must-speak requirements enforced pre-scoring,Matching Constraints
+M05-12,Match Readiness Level: High → auto-recommend to RM,Match Readiness
+M05-13,Match Readiness Level: Medium → RM validation required,Match Readiness
+M05-14,Match Readiness Level: Low → manual review required,Match Readiness
+M05-15,Match Readiness Level: Developable → training pathway recommendation,Match Readiness
+M05-16,Mandatory internal search before external (with audit trail proof),Governance
+M05-17,Bench-first priority: bench resources weighted higher in scoring,Scoring
+M05-18,Bench aging weighting: longer bench duration = higher match score boost,Scoring
+M05-19,Shortlist: first-class persistent object per RR,Shortlist
+M05-20,Shortlist: ranked candidate list with AI scores,Shortlist
+M05-21,"Shortlist: shareable between RM, PM, and hiring manager",Shortlist
+M05-22,Shortlist: add/remove candidates manually,Shortlist
+M05-23,Shortlist: Career Navigator self-nominations auto-added if criteria met,Shortlist
+M05-24,Shortlist: comparison view (side-by-side candidate comparison),Shortlist
+M05-25,Shortlist: RM notes per candidate,Shortlist
+M05-26,"Shortlist: status tracking per candidate (considering, interviewing, selected, rejected)",Shortlist
+M05-27,Career Navigator integration: employee-facing opportunity browser,Career Navigator
+M05-28,Career Navigator: self-nomination with justification,Career Navigator
+M05-29,Career Navigator: skill gap visibility (what's needed vs what you have),Career Navigator
+M05-30,Skill adjacency matching: related skills considered in scoring,Scoring
+M05-31,Semantic affinity matching: skills in same domain cluster scored,Scoring
+M05-32,Match explainability: breakdown of score by dimension,Explainability
+M05-33,Match explainability: distinguish direct vs semantic match contributions,Explainability
+M05-34,Match confidence indicator: visual confidence level per candidate,Explainability
+M05-35,Feedback loop: capture acceptance reason (why this candidate was chosen),Feedback Loop
+M05-36,Feedback loop: capture rejection reason (why candidate was passed),Feedback Loop
+M05-37,Feedback loop: reasons feed back into model weighting adjustments,Feedback Loop
+M05-38,AI matching configuration: admin-tunable dimension weights,Configuration
+M05-39,AI matching: offering-specific weight profiles,Configuration
+M05-40,"Matching scope: search within ARPG first, then broaden",Matching Constraints
+M05-41,Matching scope: cross-region search for hard-to-fill roles,Matching Constraints
+M05-42,Match result caching: avoid re-scoring unchanged candidate pools,Performance
+M05-43,"Match performance metrics: accuracy, acceptance rate, time-to-fill impact",Analytics
+M05-44,AI model versioning: track which model version produced each match,Governance
+M05-45,Phased AI adoption: Assist mode (suggestions only),Adoption
+M05-46,Phased AI adoption: Recommend mode (ranked with auto-shortlist),Adoption
+M05-47,Phased AI adoption: Auto-assign mode (high-confidence auto-assignment),Adoption
+M05-48,Matching audit trail: every match decision logged with score breakdown,Governance

@@ -1,0 +1,1 @@
+"""TalentIQ MCP Server package."""

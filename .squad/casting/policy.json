@@ -1,0 +1,5 @@
+{
+  "allowed_universes": ["Alien", "The Usual Suspects", "Firefly", "The Matrix", "Blade Runner", "Ghost in the Shell", "Star Wars OT", "Star Trek TOS", "Dune", "Mad Max Fury Road", "The Expanse", "Battlestar Galactica", "Westworld", "Arrival", "Interstellar"],
+  "default_capacity": 8,
+  "overflow_strategy": "diegetic_expansion"
+}
