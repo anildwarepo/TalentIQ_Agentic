@@ -98,5 +98,64 @@
 - MCP server at `talent_backend/talent_backend/mcp_server/` — port 3002, streamable-http
 - 8 tools available via MCP: fetch_ontology, query_using_sql_cypher, search_graph, resolve_entity_ids, build_query_context, discover_nodes, analyze_graph_statistics, save_ontology
 - Pre-loaded ontology eliminates discovery round-trip
+
+### 2026-05-09 — Entra ID token audience & issuer fixes
+- Entra ID v1 vs v2 token issuers: when scope targets a v1 resource like `https://ai.azure.com`, Azure AD issues v1 tokens with issuer `https://sts.windows.net/{tenant}/`. Backend must accept both.
+- `AZURE_TOKEN_AUDIENCE` config var added — defaults to `https://ai.azure.com` for Foundry-scoped tokens.
+- Auth validation chain: JWKS fetch → key match → RS256 signature → expiration → audience (Foundry scope + app client ID) → issuer (v1 + v2).
 - Agent connects via `MCPStreamableHTTPTool(name="talent_graph_mcp", url=MCP_ENDPOINT)`
 - Existing data_access layer still powers `/api/v1/search/*` structured endpoints
+
+### 2026-05-09 — Entra ID JWT validation module
+- `talent_backend/talent_backend/auth.py` — validates JWT signature, exp, iss, aud against Microsoft JWKS
+- JWKS cached 1 hour for performance
+- Dev mode: if `AZURE_TENANT_ID` not set, auth bypassed with warning log
+- `Depends(get_current_user)` applied to all endpoints except `/health`
+- Added `PyJWT[crypto]` and `httpx` to `talent_backend/pyproject.toml`
+
+### 2026-05-09 — NDJSON streaming endpoint for graph responses
+- Added `POST /af/graph/responses` to `talent_backend/talent_backend/api.py`
+- Streams NDJSON with `response_message` wrappers matching Dallas's frontend SSE parser
+- Frontend proxies `/af` → `http://localhost:8000` via Vite config
+
+### 2026-05-09 — pyproject.toml build-system fix
+- `talent_backend/pyproject.toml` was missing `[build-system]` and `[tool.hatch.build.targets.wheel]`
+- Without these, `uv` couldn't build it as a proper package — resolved as namespace package to outer directory
+- Fix: added hatchling build-system config with `packages = ["talent_backend"]`
+- After any build config change, must run `uv sync --all-packages`
+
+### 2026-05-10: Session architecture — AgentSession + InMemoryHistoryProvider
+- Agent Framework's `InMemoryHistoryProvider` middleware gives each agent per-session chat history
+- `AgentSession(session_id=X)` passed to `run()` keys the history
+- `propagate_session=True` on `as_tool()` passes session to child agents
+- BUT: agent-as-tool calls are independent — child agents DON'T inherit parent's history. Each call is fresh.
+- The triage agent CAN see its own history (including tool call results) across user turns
+- Session ID must flow: UI → API request body → `_build_chat_history()` → `AgentSession` → agent middleware
+- Critical bug fixed: UI's graph response handler wasn't storing `session_id` from `done` events — every request created a new session
+
+### 2026-05-10: Agent-as-tool handoff limitations
+- Agent-as-tool pattern: child agent runs to completion in ONE call, returns text. Cannot pause for user input.
+- Two-phase flows (list options → wait → act) require the PARENT (triage) to manage state, not the child
+- The triage agent reads its own chat history to reconstruct context for the second handoff
+- For reliable mapping (e.g., "1" → template filename), code-level augmentation in the API layer is more reliable than LLM instructions
+- `_augment_cv_template_choice()` in api.py rewrites short user replies to full handoff messages before they enter chat history
+
+### 2026-05-10: CV generation with python-docx templates
+- python-docx `Document(template_path)` + clearing body elements: MUST preserve `w:sectPr` elements or `sections[-1]` crashes with IndexError
+- PDF templates cannot be used for generation — docx only. Mark PDFs as "preview only" in the template list
+- OpenAI ada-002 does NOT support the `dimensions` parameter — that's only for text-embedding-3-* models
+
+### 2026-05-10: Vector search MCP tool
+- Created `vector_search` tool using pgvector cosine similarity against `employee_embeddings` table
+- DiskANN or HNSW index depending on availability
+- psycopg3 uses `%s` placeholders (not PostgreSQL-native `$1`/$2`)
+- `DefaultAzureCredential` pre-warm: call `credential.get_token()` once at client creation to cache the credential provider — prevents 10 parallel IMDS timeout probes (5s each)
+- Sync OpenAI `embeddings.create` must be wrapped in `loop.run_in_executor()` for async MCP tools
+- For RFP matching: ONE combined vector search call (limit=50) instead of per-role calls (10x latency)
+
+### 2026-05-10: Run log streaming architecture
+- MCP tools emit structured `[QUERY] TYPE: ...` and `[RESULT] TYPE: ...` via `ctx.info()`
+- `_AgentLogHandler` in api.py captures `agent_framework` logger, pushes to queue
+- `_drain_log_events()` classifies: handoffs, structured tags, legacy tool messages
+- Suppress duplicate `Function name: X` / `Function X succeeded` for MCP tools that emit their own structured tags
+- Frontend classifies by prefix: `[QUERY]` → badge CYPHER/SQL/FTS/VECTOR/STATS, `[RESULT]` → green, `[HANDOFF]` → purple

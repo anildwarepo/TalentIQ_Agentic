@@ -5,6 +5,107 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-10: Architecture patterns established
+**By:** Team (session work)
+**Status:** Implemented
+**What:** 
+1. Session ID flow: UI stores session_id from graph responses, sends on subsequent requests. Enables chat history continuity.
+2. Agent-as-tool two-phase flows managed via API-layer message augmentation (not LLM instructions) for reliability.
+3. Vector search tool added — single combined call for RFP matching, not per-role.
+4. Run log streaming: MCP tools emit structured [QUERY]/[RESULT] tags, frontend shows typed badges (CYPHER/FTS/VECTOR/HANDOFF).
+5. CV generation: dedicated agent with MCP tools, PDF templates marked preview-only, sectPr preserved in DOCX templates.
+6. AGE query rules expanded from 13 to 19 — WITH property forwarding, 3-WITH chain, cartesian product prevention.
+**Impact:** All agents, all future development.
+
+### 2026-05-09: User directive — reference_code is pattern-only
+**By:** Anil (via Copilot)
+**What:** `talentiq_requirements/reference_code/` is for reference patterns only. Never import from it or point paths to it directly. Study the pattern, then copy relevant content into the actual implementation location under `talent_backend/` (or wherever the code lives). All shipped code must be self-contained.
+**Why:** User request — captured for team memory
+
+### 2026-05-09: User directive — query architecture flow
+**By:** Anil (via Copilot)
+**What:** User queries must flow through: UI → Backend API → AI Agent (Agent Framework) → MCP Server → Cypher/SQL queries → Data access model. The agent is the query orchestrator — it interprets NL, calls MCP tools, and the MCP server executes against PostgreSQL/AGE. The data access layer provides the query implementations that the MCP server uses.
+**Why:** User request — captured for team memory
+
+### 2026-05-09: MCP Server entry point created
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+**What:** Created `talent_backend/talent_backend/mcp_server/__main__.py` with Windows compat, argparse for transport/port/host, PGAgeHelper eager init, CORS middleware. Run: `uv run python -m talent_backend.mcp_server`
+**Why:** MCP server had tools but no runnable entry point.
+
+### 2026-05-09: React/Vite frontend scaffolded under `talent_ui/`
+**By:** Dallas (Frontend Dev)
+**Status:** Implemented
+**What:** Full React + Vite SPA under `talent_ui/`. Faithful port of reference implementation with MSAL auth, chat interface, sidebar, run log panel, chart visualization, App Insights telemetry. Dark-theme CSS with brand accent #E8845A.
+**Impact:** Run with `cd talent_ui && npm run dev`. Proxies `/af` to backend.
+
+### 2026-05-09: Entra ID token issuer fix — accept both v1 and v2 issuers
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+**What:** Backend auth was rejecting tokens with "Invalid token issuer" because the `https://ai.azure.com/user_impersonation` scope is a v1 resource, so Azure AD issues tokens with v1 issuer format (`https://sts.windows.net/{tenant}/`) instead of v2.0 format (`https://login.microsoftonline.com/{tenant}/v2.0`). Fixed by:
+- Added `_issuers()` function returning both v1 and v2 issuer URLs
+- Changed JWT validation to skip built-in issuer check and validate manually against both formats
+**Why:** Microsoft's token issuance uses v1 format when the resource (scope) is registered as a v1 app (like `https://ai.azure.com`). Both formats must be accepted.
+**Key learning:** When using `https://ai.azure.com/user_impersonation` as the scope, tokens will always have v1 issuer format. This is a Microsoft platform behavior, not a configuration issue.
+
+### 2026-05-09: Entra ID token audience fix — accept Foundry API scope
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+**What:** Backend auth was rejecting tokens because `AZURE_CLIENT_ID` was commented out in `app_config/.env` and the token audience (`https://ai.azure.com`) didn't match the empty string validation. Fixed by:
+- Set `AZURE_CLIENT_ID=48449491-8390-4af0-8121-da7af091ad56` in `app_config/.env`
+- Added `AZURE_TOKEN_AUDIENCE` config var (default: `https://ai.azure.com`)
+- Backend auth now accepts both `https://ai.azure.com` (Foundry scope) and the app client ID as valid audiences
+**Why:** The frontend acquires tokens with scope `https://ai.azure.com/user_impersonation`, so the token audience is `https://ai.azure.com`, not the app's client ID.
+
+### 2026-05-09: FAQ categories expanded to cover all user stories
+**By:** Dallas (Frontend Dev)
+**Status:** Implemented
+**What:** Expanded FAQ sidebar from 7→15 categories and 21→35 questions. New categories: Data Provenance, Resume & CV Generation, Export & Reporting, Notifications & Reminders, Tender & RFP, Candidate Management, Pre-Sales & CPQ. Each category annotated with US-xxx user story references.
+**Why:** Original FAQ set only covered core search. Expanded to give users guided access to all platform capabilities.
+**Impact:** All agents: FAQ list in `talent_ui/src/App.jsx` is the canonical prompt catalogue.
+
+### 2026-05-09: Graph responses NDJSON endpoint added
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+**What:** Added `POST /af/graph/responses` to backend API. Streams NDJSON with `response_message` wrappers matching the frontend's SSE parser. Vite proxy rule: `/af` → `http://localhost:8000` (no path rewrite needed since route includes `/af`).
+**Why:** Frontend run-log panel requires structured streaming events (orchestrator, agent, query, result) for real-time visibility.
+**Impact:** Dallas: frontend wired to this endpoint for graph-search backend. Kane: endpoint lives in `talent_backend/talent_backend/api.py`.
+
+### 2026-05-09: Single-terminal launcher `run_all.py`
+**By:** Squad (Coordinator)
+**Status:** Implemented
+**What:** `run_all.py` at repo root starts all three services as child processes: MCP Server (port 3002), Backend API (port 8000), Frontend UI (port 5173). Uses `uv run --package talent_backend` for Python services, `npm run dev` for UI. Staggered startup (2s between services). Ctrl+C shuts all down cleanly.
+**Why:** Eliminates need for 3 separate terminals during local dev.
+**Impact:** All agents: `uv run python run_all.py` is the single command to start the full stack.
+
+### 2026-05-09: Backend package build fix — pyproject.toml
+**By:** Squad (Coordinator)
+**Status:** Implemented
+**What:** `talent_backend/pyproject.toml` was missing `[build-system]` and `[tool.hatch.build.targets.wheel]` sections. Without these, `uv` resolved it as a namespace package pointing to the outer directory. Fix: added hatchling build-system config with `packages = ["talent_backend"]`. Must run `uv sync --all-packages` after this change.
+**Why:** `import talent_backend` was resolving to the wrong directory, causing `ModuleNotFoundError` on all sub-modules.
+**Impact:** All agents: if you modify `pyproject.toml` build config, run `uv sync --all-packages` to rebuild.
+
+### 2026-05-09: Entra ID JWT validation on backend
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+**What:** `talent_backend/talent_backend/auth.py` validates JWT signature, exp, iss, aud against Microsoft JWKS endpoint. JWKS cached 1 hour. Dev mode: if `AZURE_TENANT_ID` not set, auth bypassed with warning. `Depends(get_current_user)` applied to all endpoints except `/health`. Added `PyJWT[crypto]` and `httpx` to dependencies.
+**Why:** Entra ID auth required for production; dev bypass needed for local iteration.
+**Impact:** Kane/Dallas: all API calls must include `Authorization: Bearer <token>`. Dev mode auto-activates when `AZURE_TENANT_ID` is unset.
+
+### 2026-05-09: Entra ID authentication — frontend sends Bearer tokens
+**By:** Dallas (Frontend Dev)
+**Status:** Implemented
+**What:** All API calls from the React frontend include `Authorization: Bearer <token>` via MSAL. MSAL config: clientId `48449491-8390-4af0-8121-da7af091ad56`, tenant `150305b3-cc4b-46dd-9912-425678db1498`. Scope: `https://ai.azure.com/user_impersonation`. SPA redirect URI: `http://localhost:5173`. Config at `talent_ui/src/authConfig.js`.
+**Why:** Backend validates Entra ID JWTs; frontend must acquire and attach tokens.
+**Impact:** All agents: MSAL values are currently hardcoded for dev. Production will use env vars via `VITE_*` prefix.
+
+### 2026-05-09: Frontend UI scaffolded at `talent_ui/`
+**By:** Dallas (Frontend Dev)
+**Status:** Implemented
+**What:** Full React 18 + Vite SPA. MSAL auth, react-markdown, recharts, Application Insights telemetry. Entry: `talent_ui/src/main.jsx` → `App.jsx`. Dark theme with #E8845A accent. Start: `cd talent_ui && npm run dev` (port 5173).
+**Why:** UI implementation for TalentIQ v2 chat-based search interface.
+**Impact:** All agents: frontend exists at `talent_ui/`. Backend endpoints must match routes in `vite.config.js` proxy.
+
 ### 2026-05-09: Agent Framework rewrite — replacing raw OpenAI function calling
 **By:** Kane (Backend Dev)
 **Status:** Implemented
