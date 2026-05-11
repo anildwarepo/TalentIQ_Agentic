@@ -5,6 +5,21 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-11: Workday Integration Architecture
+**By:** Ripley (Lead Architect)
+**Status:** Proposed
+**What:**
+1. Container Apps Jobs for pipeline scheduling — no timeout limits (full load ~2.5h), same VNet, supports CRON + manual trigger. Preferred over Functions (10-min timeout), WebJobs (resource contention), K8s CronJobs (no cluster).
+2. RaaS for bulk extraction, REST API for documents — six custom RaaS reports needed (Workers, Skills, Certifications, Education, Languages, Organizations). Must be created by Workday admin team.
+3. Delta reports (RaaS with date range) for incremental sync — daily cadence at 02:00 UTC. Webhooks deferred to Phase 4.
+4. Soft delete for terminations — terminated employees marked `employment_status='Terminated'` but not removed from graph. Search layer filters them out.
+5. Dual-graph swap for zero-downtime full loads — load into `talent_graph_staging`, validate, rename to `talent_graph`. Old graph kept for rollback.
+6. Workday credentials in Key Vault only — ISU client ID/secret via managed identity. Dev uses env vars for sandbox credentials only.
+7. CV storage in Azure Blob (private endpoint) — path `cvs/{workday_id}/{filename}`. Managed identity RBAC. Local filesystem fallback for dev.
+8. Synthetic pipeline as permanent fallback — `WORKDAY_ENABLED=false` (default) keeps synthetic pipeline operational. Rollback = flip flag + restore old graph.
+**Artifacts:** `docs/specs/workday-integration.md`
+**Impact:** Parker (delta upsert loaders, pipeline tables), Kane (future admin API), Dallas (future data freshness badge), DevOps (Container Apps Job, Key Vault, Blob Storage), Workday Admin (6 RaaS reports + ISU security group).
+
 ### 2026-05-10: Tech spec decisions — Infrastructure & Architecture
 **By:** Ripley (Lead Architect)
 **Status:** Documented
