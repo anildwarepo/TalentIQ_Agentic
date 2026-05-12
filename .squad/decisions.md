@@ -5,6 +5,35 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-12T02:30:00Z: Deployment smoke test suite — contracts and strategy
+**By:** Lambert (Tester)
+**Status:** Implemented
+
+**What:**
+Created `tests/deployment/` — an ordered, fail-fast smoke test suite that gates go/no-go after `azd up`.
+
+**Test order (earlier failures block later tests):**
+1. Entra auth (DefaultAzureCredential token, principal ID match, 3 UAMIs exist)
+2. PostgreSQL (connect via Brett's `db.connect()`, extensions, AGE graph, Cypher count, vector search, FTS)
+3. Backend Container App (running status, Foundry gpt-5.4 chat completion)
+4. MCP Container App (running status, UAMI in pg_roles)
+5. Frontend Container App (running status, SPA served, `/af/health` proxy to backend)
+
+**Infra contracts the tests assume (env var names from Bishop's Pass 3):**
+- `AZURE_ENV_NAME`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP` — from `azd env`
+- `PGHOST`/`POSTGRES_HOST`, `PGDATABASE`/`POSTGRES_DB`, `PGUSER`/`POSTGRES_USER` — PG connection
+- `FOUNDRY_ENDPOINT`, `FOUNDRY_DEPLOYMENT_NAME` — Foundry model
+- `AZURE_PRINCIPAL_ID` (optional) — deploying user OID sanity check
+- Container App names default to `ca-talentiq-{backend|frontend|mcp}-{env}` — overridable via `BACKEND_CONTAINER_APP_NAME`, `MCP_CONTAINER_APP_NAME`, `FRONTEND_CONTAINER_APP_NAME`
+- UAMI names: `uami-talentiq-{backend|frontend|mcp}-{env}`
+
+**Design choice — no `az containerapp exec`:**
+Container exec requires TTY + running replica + VNet access. Instead: `az containerapp show` for status, deployer-credential Foundry check for AI connectivity. Cypher/vector/FTS validated via Brett's `db.connect()` (same path the pipeline uses). Documents the future requirement for a `/health/foundry` backend endpoint.
+
+**Why:** Deployment verification must be deterministic, fast, and require zero manual inspection. Fail-fast ensures the first broken layer is immediately visible.
+
+**Impact:** All agents — Container App names, UAMI names, and azd env var names are now tested contracts. Changing them requires updating the smoke suite (or the overridable env vars).
+
 ### 2026-05-12T01:35:00Z: Frontend runtime config strategy
 **By:** Dallas (Frontend Dev)
 **What:** Runtime configuration for the talent_ui production container image uses a `window.__ENV__` pattern injected at container start, not baked at build time.

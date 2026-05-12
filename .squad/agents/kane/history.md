@@ -199,3 +199,9 @@
   - **Application Insights:** Send telemetry to `APPLICATIONINSIGHTS_CONNECTION_STRING` env var.
 - **Action required:** Create `Dockerfile` under `talent_backend/`, refactor DB connection for passwordless auth, update `config.py` to read env vars (`POSTGRES_HOST`, `POSTGRES_DB`, `COSMOS_ENDPOINT`, `FOUNDRY_ENDPOINT`, `FOUNDRY_DEPLOYMENT_NAME`, `KEY_VAULT_URI`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, `AZURE_CLIENT_ID`), and apply same pattern to MCP server.
 - **Infrastructure contract:** These env vars passed to Container App at deployment time. Backend responsible for using them with `DefaultAzureCredential`.
+
+### 2026-05-12 — Cross-agent: Lambert's smoke test expectations for backend
+**From Lambert (Tester):**
+- test_03_backend_foundry.py validates Foundry chat completion using deployer credentials (`azd auth context`). This is a temporary workaround.
+- **Future improvement (low-risk follow-on):** Backend should expose a `/health/foundry` endpoint that uses UAMI-acquired token (not deployer creds). This enables production-safe health checks without exposing Azure credentials to test runners. The endpoint would do a minimal Foundry API call (e.g., list models or a dummy completion) and return 200 on success.
+- Current test documents this gap; blocking production deployment is not necessary — the smoke suite gates deployment readiness, and the `/health/foundry` endpoint is a polish improvement for the next iteration.
