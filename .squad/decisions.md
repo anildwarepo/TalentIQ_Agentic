@@ -5,6 +5,52 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-12T03:00:00Z: VNet-aware smoke suite — Mechanism A/B/C strategy
+**By:** Lambert (Tester)
+**Status:** Implemented
+
+**What:**
+Refactored `tests/deployment/` smoke suite so every test that touches a private
+resource runs INSIDE the VNet.  The laptop is not on the VNet — direct Postgres /
+Cosmos / Foundry / KV connections from the laptop would time out.
+
+**Three mechanisms (A + B cover everything, C not needed):**
+
+| Mechanism | Description | Used by |
+|-----------|-------------|---------|
+| **A — Container App exec** | `az containerapp exec` runs a probe module (`talent_backend.probes.*`) inside a running CA.  The CA is on-VNet with its UAMI. | test_02 (Postgres), test_03 (Foundry), test_04 (MCP→PG) |
+| **B — Control plane CLI** | `az` commands against ARM (public API, works from anywhere) | test_01 (Entra/UAMI), test_03 (CA status), test_04 (CA status, PG Entra admin), test_05 (CA status) |
+| **C — Dedicated probe CA** | NOT USED.  A + B cover all checks.  Documented as fallback. | — |
+
+**Probe modules added** (`talent_backend/talent_backend/probes/`):
+- `smoke_pg.py` — Postgres connect, extensions, AGE graph, Cypher count, vector top-K, FTS
+- `smoke_foundry.py` — Foundry gpt-5.4 chat completion via UAMI
+- `smoke_mcp_pg.py` — MCP→Postgres connect, AGE, Cypher count
+
+**Why probes-in-the-app (not inline `python -c`):**
+- Inline strings are quoting nightmares across PowerShell/bash
+- Probes are versioned with the app code (release-correct)
+- Reusable by future health endpoints (`/health/pg`, `/health/foundry`)
+- Debuggable: `az containerapp exec --command "python -m talent_backend.probes.smoke_pg"`
+
+**Bicep output mapping fixed:**
+- Old: `BACKEND_CONTAINER_APP_NAME` / `MCP_CONTAINER_APP_NAME` / `FRONTEND_CONTAINER_APP_NAME`
+- New: `AZURE_CONTAINER_APP_BACKEND_NAME` / `AZURE_CONTAINER_APP_MCP_NAME` / `AZURE_CONTAINER_APP_FRONTEND_NAME` (matches actual main.bicep outputs)
+- Convention fallback retained for backward compat.
+
+**MCP UAMI Entra admin check (test_04):**
+Switched from `SELECT rolname FROM pg_roles` (requires VNet) to
+`az postgres flexible-server ad-admin list` (Mechanism B, works from laptop).
+Uses `POSTGRES_FQDN` to derive server name.
+
+**Impact:** All agents — Container App name env vars are now tested via the
+Bicep output names.  Probes are a new package in the backend image — no Docker
+image change needed (they ship with the existing `talent_backend` wheel).
+
+**Open items / follow-on for Bishop:**
+None critical.  All required Bicep outputs already exist: `AZURE_CONTAINER_APP_BACKEND_NAME`,
+`AZURE_CONTAINER_APP_MCP_NAME`, `AZURE_CONTAINER_APP_FRONTEND_NAME`, `POSTGRES_FQDN`.
+
 ### 2026-05-12T02:30:00Z: Deployment smoke test suite — contracts and strategy
 **By:** Lambert (Tester)
 **Status:** Implemented

@@ -1,4 +1,6 @@
-# Project Context
+# Kane — History
+
+## Project Context
 
 - **Owner:** Anil
 - **Project:** TalentIQ — Talent Matching/Searching platform. Find people with skills, generate resumes based on RFPs, show metrics visuals.
@@ -16,7 +18,49 @@
 
 ## Learnings
 
-<!-- Append new learnings below. Each entry is something lasting about the project. -->
+<!-- Recent learnings (2026-05-12 and current sprint). Older entries archived to history-archive.md. -->
+
+### 2026-05-12 — Cross-agent: Bishop's infrastructure Pass 3 — Container App deployment
+**From Bishop (Deployment Engineer):**
+- Backend Container App is now provisioned with User-Assigned Managed Identity (UAMI). Backend code MUST authenticate using `DefaultAzureCredential` with the `AZURE_CLIENT_ID` env var to specify which UAMI to use.
+- Passwordless authentication now available for:
+  - **PostgreSQL:** Connect via `POSTGRES_HOST` env var using `DefaultAzureCredential` to acquire Entra ID token. No SQL password in connection string.
+  - **Cosmos DB:** RBAC only. Backend UAMI has Built-in Data Contributor role assigned.
+  - **Azure AI Foundry:** Backend UAMI has Cognitive Services OpenAI User role assigned. Use `FOUNDRY_ENDPOINT` env var.
+  - **Key Vault:** Backend UAMI has Key Vault Secrets User role assigned. Use `KEY_VAULT_URI` env var.
+  - **Application Insights:** Send telemetry to `APPLICATIONINSIGHTS_CONNECTION_STRING` env var.
+- **Action required:** Create `Dockerfile` under `talent_backend/`, refactor DB connection for passwordless auth, update `config.py` to read env vars (`POSTGRES_HOST`, `POSTGRES_DB`, `COSMOS_ENDPOINT`, `FOUNDRY_ENDPOINT`, `FOUNDRY_DEPLOYMENT_NAME`, `KEY_VAULT_URI`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, `AZURE_CLIENT_ID`), and apply same pattern to MCP server.
+
+### 2026-05-12 — Cross-agent: Lambert's probes module — Available for use
+**From Lambert (Tester):**
+- Created `talent_backend/talent_backend/probes/` package with three reusable probe modules:
+  - `smoke_pg.py` — Postgres connectivity, extensions (age, vector, pg_trgm), AGE graph, Cypher count, vector top-K, full-text search
+  - `smoke_foundry.py` — Foundry gpt-5.4 chat completion via UAMI (Mechanism A: `az containerapp exec`)
+  - `smoke_mcp_pg.py` — MCP→Postgres connectivity, AGE, Cypher count
+- Each probe prints JSON output, runs inside Container App via `az containerapp exec`
+- **Positioned for future use:** These probes can be wrapped as `/health/pg`, `/health/foundry`, `/health/mcp` endpoints in the backend API
+- **No action needed:** Probes ship with the existing `talent_backend` wheel — no Docker image changes required
+- **Infrastructure contract:** These env vars passed to Container App at deployment time. Backend responsible for using them with `DefaultAzureCredential`.
+
+### 2026-05-12 — Cross-agent: Lambert's smoke test expectations for backend
+**From Lambert (Tester):**
+- test_03_backend_foundry.py validates Foundry chat completion using deployer credentials (`azd auth context`). This is a temporary workaround.
+- **Future improvement (low-risk follow-on):** Backend should expose a `/health/foundry` endpoint that uses UAMI-acquired token (not deployer creds). This enables production-safe health checks without exposing Azure credentials to test runners. The endpoint would do a minimal Foundry API call (e.g., list models or a dummy completion) and return 200 on success.
+- Current test documents this gap; blocking production deployment is not necessary — the smoke suite gates deployment readiness, and the `/health/foundry` endpoint is a polish improvement for the next iteration.
+
+---
+
+## Archived Entries
+
+Earlier learnings from 2026-05-09 and 2026-05-10 have been summarized and moved to [kane/history-archive.md](history-archive.md) to keep this file focused on recent context. Topics archived:
+- Backend API & Agent Framework build (full implementation notes)
+- Cosmos DB chat history persistence
+- Session architecture (InMemoryHistoryProvider)
+- Technical specs & architecture decisions
+- Build system configuration
+- Vector search + CV generation patterns
+- Run log streaming architecture
+- Cross-agent tech spec decisions (Ripley, Dallas, Parker)
 
 ### 2026-05-09 — Backend API & Agent build
 
@@ -198,6 +242,16 @@
   - **Key Vault:** Backend UAMI has Key Vault Secrets User role assigned. Use `KEY_VAULT_URI` env var.
   - **Application Insights:** Send telemetry to `APPLICATIONINSIGHTS_CONNECTION_STRING` env var.
 - **Action required:** Create `Dockerfile` under `talent_backend/`, refactor DB connection for passwordless auth, update `config.py` to read env vars (`POSTGRES_HOST`, `POSTGRES_DB`, `COSMOS_ENDPOINT`, `FOUNDRY_ENDPOINT`, `FOUNDRY_DEPLOYMENT_NAME`, `KEY_VAULT_URI`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, `AZURE_CLIENT_ID`), and apply same pattern to MCP server.
+
+### 2026-05-12 — Cross-agent: Lambert's probes module — Available for use
+**From Lambert (Tester):**
+- Created `talent_backend/talent_backend/probes/` package with three reusable probe modules:
+  - `smoke_pg.py` — Postgres connectivity, extensions (age, vector, pg_trgm), AGE graph, Cypher count, vector top-K, full-text search
+  - `smoke_foundry.py` — Foundry gpt-5.4 chat completion via UAMI (Mechanism A: `az containerapp exec`)
+  - `smoke_mcp_pg.py` — MCP→Postgres connectivity, AGE, Cypher count
+- Each probe prints JSON output, runs inside Container App via `az containerapp exec`
+- **Positioned for future use:** These probes can be wrapped as `/health/pg`, `/health/foundry`, `/health/mcp` endpoints in the backend API
+- **No action needed:** Probes ship with the existing `talent_backend` wheel — no Docker image changes required
 - **Infrastructure contract:** These env vars passed to Container App at deployment time. Backend responsible for using them with `DefaultAzureCredential`.
 
 ### 2026-05-12 — Cross-agent: Lambert's smoke test expectations for backend
