@@ -48,6 +48,10 @@
 - MSAL authConfig hardcoded: clientId `48449491-8390-4af0-8121-da7af091ad56`, tenant `150305b3-cc4b-46dd-9912-425678db1498`, scope `https://ai.azure.com/user_impersonation`. SPA redirect `http://localhost:5173`.
 - When `user_impersonation` scope is used, the Bearer token audience will be `https://ai.azure.com`, NOT the app client ID. Backend must be configured to accept this.
 
+### 2026-05-12: Cross-agent — Bishop's infrastructure scaffolding complete
+- **Bishop completed:** VNet 10.0.0.0/16, single CAE with Consumption profile, private DNS zones, naming convention established.
+- **Dallas action:** Frontend deployment hooks coming — configure Container App environment, ingress.external: true, app service plan. Files: `talent_infra/main.bicep`, `talent_infra/modules/container-app-env.bicep`.
+
 ### 2026-05-10: Session ID fix — graph response handler
 - Critical bug: `callGraphBackendApi` processed `msg.type === "done"` but never stored `msg.session_id` → every request created a new session
 - Fix: `if (msg.session_id) setAfSessionId(msg.session_id)` in the done handler

@@ -5,6 +5,42 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-12: Charter clarification — talentiq_requirements READ-ONLY
+**By:** Bishop (Deployment Engineer)
+**Status:** Documented
+**What:** `talentiq_requirements/` is READ-ONLY reference material. Bishop never edits, moves, or deletes anything under `talentiq_requirements/`. All deployment artifacts go in `talent_infra/`, `azure.yaml` (root), and `docs/deployment/`.
+**Why:** User directive clarification. Keep requirements separate from implementation.
+
+### 2026-05-12: All infra under talent_infra/
+**By:** Bishop (Deployment Engineer)
+**Status:** Documented
+**What:** ALL deployment/infra components live under `talent_infra/` at the repo root. This includes Bicep (`talent_infra/main.bicep`, `talent_infra/modules/`), `talent_infra/azure.yaml`, parameters, and deployment docs. No `infra/` folder, no root-level `azure.yaml`.
+**Why:** Centralized infrastructure location. Aligns with `talent_` prefix convention.
+
+### 2026-05-12: VNet CIDR Plan — 10.0.0.0/16
+**By:** Bishop (Deployment Engineer)
+**Status:** Implemented
+**What:** VNet address space 10.0.0.0/16 with three subnets:
+- `snet-aca` (10.0.0.0/23) — Container Apps Environment, delegated to Microsoft.App/environments
+- `snet-pe` (10.0.2.0/24) — Private endpoints for all PaaS services
+- `snet-db` (10.0.3.0/24) — PostgreSQL Flexible Server, delegated to Microsoft.DBforPostgreSQL/flexibleServers
+**Why:** Aligns with architecture spec in `docs/specs/vnet-integration.md`. /23 for ACA is Azure-recommended production minimum. Leaves 10.0.4.0/24+ free for NAT Gateway or future subnets.
+**Impact:** All future modules reference subnet IDs from vnet module outputs (acaSubnetId, peSubnetId, dbSubnetId).
+
+### 2026-05-12: Resource Naming Convention
+**By:** Bishop (Deployment Engineer)
+**Status:** Implemented
+**What:** All Azure resources follow `{abbreviation}-talentiq-{environmentName}-{resourceToken}` where resourceToken = `toLower(uniqueString(subscription().id, resourceGroup().id, location))`. Standard Azure abbreviations: vnet, cae, nsg, ca, pep, pdnsz, etc.
+**Why:** Deterministic, collision-free, azd-friendly. The `resourceToken` ensures uniqueness across subscriptions while keeping names human-readable. Matches patterns in `talentiq_requirements/foundy-managed-vnet-setup/`.
+**Impact:** All future modules must accept `environmentName` and `resourceToken` params and follow this convention.
+
+### 2026-05-12: ACA Environment — Single External with Consumption Profile
+**By:** Bishop (Deployment Engineer)
+**Status:** Implemented
+**What:** Single Container Apps Environment with `internal: false` and Consumption workload profile. Frontend Container App will use `ingress.external: true` for public access; backend and MCP will use `ingress.external: false` (VNet-only). No Application Gateway needed.
+**Why:** Simplest approach for mixed ingress (public frontend + internal backend/MCP). Two-environment or internal-with-AppGW approaches add cost and complexity with no benefit at this scale.
+**Impact:** All Container App modules must set ingress.external correctly. If WAF is required later, can layer Application Gateway or Front Door in front without changing the CAE.
+
 ### 2026-05-11: Workday Integration Architecture
 **By:** Ripley (Lead Architect)
 **Status:** Proposed

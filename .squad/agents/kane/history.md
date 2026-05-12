@@ -48,6 +48,10 @@
 - Pool singleton: `init_pool()` / `close_pool()` — call from FastAPI lifespan
 - Key imports: `from talent_backend.data_access.cypher_queries import ...`, same for `sql_queries`, `vector_queries`, `fts_queries`, `hybrid_queries`
 - Models: `EmployeeResult`, `SearchFilters`, `SearchRequest`, `TeamHierarchy`, `SkillGapResult`, `DashboardMetrics`, `FTSResult`, `VectorSearchResult`
+
+### 2026-05-12: Cross-agent — Bishop's infrastructure scaffolding complete
+- **Bishop completed:** VNet 10.0.0.0/16, single CAE with Consumption profile, private DNS zones, naming convention established.
+- **Kane action:** Backend deployment hooks coming — configure Azure Container App environment, Cosmos DB endpoints, NAT Gateway egress. Files: `talent_infra/main.bicep`, `talent_infra/modules/container-app-env.bicep`.
 - Hybrid search: `multi_criteria_search()` with configurable weights dict
 - AGE graph name from `connection.GRAPH_NAME` (env var `GRAPH_NAME`, default `talent_graph`)
 
