@@ -98,6 +98,12 @@
 - `openai_client` retained in `main.py` for search endpoints that call `generate_embedding()` directly
 - `process_message()` signature unchanged — chat endpoint needs no changes
 
+### 2026-05-12 — Cross-agent: Bishop's infrastructure Pass 2
+- **Bishop completed:** Azure AI Foundry (AIServices kind) with Cognitive Services OpenAI User RBAC, gpt-5.4 model deployment (GlobalStandard, 30K TPM)
+- **For Kane:** Foundry endpoint will be available via environment variable once Container App passes wires the `principalId` array. Agent Framework OpenAI client uses `DefaultAzureCredential` (Managed Identity from Container App), so no API keys needed
+- **Deployment hook:** Next pass (Pass 3) will wire Container App MI RBAC for Foundry access. Update backend config to consume Foundry endpoint from environment variable
+- **Model ready:** gpt-5.4 is deployed and ready — backend can target this model for agent inference
+
 ### 2026-05-09 — Cross-agent: Parker's MCP server is live
 - MCP server at `talent_backend/talent_backend/mcp_server/` — port 3002, streamable-http
 - 8 tools available via MCP: fetch_ontology, query_using_sql_cypher, search_graph, resolve_entity_ids, build_query_context, discover_nodes, analyze_graph_statistics, save_ontology

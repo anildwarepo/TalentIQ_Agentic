@@ -69,3 +69,8 @@
 - **Ripley:** PostgreSQL uses delegated subnet (not private endpoint) in VNet design. NAT Gateway for egress.
 - **Kane:** ChatHistoryStore async SDK migration planned — no impact on Parker's data layer. Session management feature flag does not affect DB schema.
 - **Parker production gaps acknowledged by team:** Must resolve `search_graph_nodes()`, `employee_ageid`, and `pg_trgm` before staging.
+
+### 2026-05-12 — Cross-agent: Bishop's infrastructure Pass 2
+- **Bishop completed:** PostgreSQL Flexible Server (PG 16) provisioned with Entra ID-only auth, delegated subnet integration, extensions allowlisted (age, vector, pg_trgm, pg_stat_statements)
+- **For Parker:** `pg_trgm` extension is now in the allowlist and will be available on Azure deployment. Continue resolving production gaps: `search_graph_nodes()` SQL function creation, `employee_ageid` wiring, `pg_trgm` extension availability confirmation on Azure PG
+- **Deployment hook:** Once `azd up` runs, PostgreSQL will be live. Data pipeline can connect via connection string + Entra ID token auth

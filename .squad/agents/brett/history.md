@@ -98,6 +98,14 @@ Replaced local `all-MiniLM-L6-v2` (384-dim) with Azure OpenAI `text-embedding-ad
 Added batch-level checkpointing to `EmbeddingGenerator.generate_embeddings()` so that completed Azure OpenAI API calls are saved to disk incrementally. On restart, cached batches are loaded from disk and their API calls are skipped.
 - `embedding_generator.py` — new `_EMBEDDING_CHECKPOINT_DIR` at `talent_synthetic_data/.embedding_gen_checkpoint/`, per-batch `.npz` files with atomic writes (tempfile + os.replace), corrupt-file detection with auto-removal and re-generation
 - `load.py` — `--reset` now also calls `EmbeddingGenerator.clear_checkpoint()`, and checkpoint dir is cleaned up after successful DB load of embeddings
+
+### 2026-05-12 — Cross-agent: Bishop's infrastructure Pass 2
+- **Bishop completed:** PostgreSQL Flexible Server (PG 16) with Entra ID-only auth, extensions allowlisted
+- **For Brett:** Azure PostgreSQL is now provisioned. When `azd up` runs, data pipeline can connect via connection string from environment. Ensure migration code handles:
+  - Entra ID token authentication (already supported via `DefaultAzureCredential`)
+  - Extensions: `age`, `vector`, `pg_trgm`, `pg_stat_statements` — all allowlisted
+  - VNet integration: Connection will be from Container Apps environment within the same VNet (delegated subnet `snet-db`)
+- **Next:** Once Container App deployment is wired (Pass 3), the data pipeline will run as a job or init task within Azure
 - Outer stub file kept in sync (3-level `_REPO_ROOT` vs 4-level in inner package)
 - Same public interface preserved: `generate_embeddings(employees, skill_edges, batch_size)` returns `list[dict]`
 

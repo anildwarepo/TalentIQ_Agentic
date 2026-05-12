@@ -5,6 +5,29 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-12T00:00:00Z: Data + supporting service modules deployed
+**By:** Bishop (Deployment Engineer)
+**Status:** Implemented
+
+**What:**
+1. **Cosmos DB** — SQL API, `publicNetworkAccess: 'Disabled'`, `disableLocalAuth: true` (RBAC-only via Cosmos SQL role assignments, not Azure RBAC). Built-in Data Contributor role `00000000-0000-0000-0000-000000000002`. Default database `talentiq` with `sessions` container (autoscale 1000 RU/s, partition key `/sessionId`).
+
+2. **PostgreSQL Flexible Server** — PG 16, VNet-integrated via delegated subnet `snet-db` (NOT private endpoint). Entra ID-only auth (`passwordAuth: 'Disabled'`, `activeDirectoryAuth: 'Enabled'`). Extensions allowlisted: `age`, `vector`, `pg_trgm`, `pg_stat_statements`. Burstable B2ms SKU for dev. `entraAdmins` array param for server-level Entra admins (empty by default — wire MIs in Container Apps pass).
+
+3. **Azure AI Foundry** — Cognitive Services account kind `AIServices`, system-assigned MI, `publicNetworkAccess: 'Disabled'`, `disableLocalAuth: true`. Single PE with dual DNS zones (cognitive + openai). `gpt-5.4` model deployment (GlobalStandard, 30K TPM default). `principalIds` array for Cognitive Services OpenAI User role.
+
+4. **App Insights** — Log Analytics workspace + workspace-based Application Insights. Workspace shared key passed to Container Apps Environment via module output with `#disable-next-line outputs-should-not-contain-secrets` (no secrets in files, deployment-time only).
+
+5. **Key Vault** — RBAC authorization mode, soft-delete + purge protection, `publicNetworkAccess: 'disabled'`. Name truncated to 24 chars via `take()`. `principalIds` for Key Vault Secrets User role.
+
+6. **ACR** — Premium SKU, `adminUserEnabled: false`, `publicNetworkAccess: 'Disabled'`. Alphanumeric name (no hyphens). `principalIds` for AcrPull role.
+
+**All modules:** Private endpoints (or VNet integration for PG) + private DNS zone linking. All `principalIds` arrays empty — wired when Container App MIs land.
+
+**Why:** Pass 2 of the infra build-out. Networking foundation (Pass 1) is in place; data + supporting services now deployed. Container App workloads are next (Pass 3).
+
+**Impact:** All agents — Bicep template is now a complete infrastructure-minus-apps deployment. `azd up` will provision networking + all PaaS services. Container App modules + MI RBAC wiring are the remaining gap.
+
 ### 2026-05-12: Charter clarification — talentiq_requirements READ-ONLY
 **By:** Bishop (Deployment Engineer)
 **Status:** Documented
