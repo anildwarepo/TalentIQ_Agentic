@@ -34,3 +34,10 @@
 ### 2026-05-12: Cross-agent — Bishop's infrastructure scaffolding complete
 - **Bishop completed:** VNet 10.0.0.0/16 with 3 delegated subnets (ACA, private endpoints, DB). Single CAE with Consumption workload profile. Private DNS zones + naming convention.
 - **Ripley action:** Review VNet subnet allocation, CIDR delegation choices for scalability. Decisions documented in `.squad/decisions.md` — "VNet CIDR Plan 10.0.0.0/16".
+
+### 2026-05-12T02:00:00Z: Cross-agent — Full deployment stack now in place
+- **Bishop:** 8-section azd-up.md runbook (~420 lines, mermaid flowchart). Infrastructure passes 1-3 complete: VNet + data/AI services + Container Apps with UAMI. Fixed azure.yaml to route Dockerfile.mcp to MCP service.
+- **Kane:** Backend + MCP dockerfiles (multi-stage), centralized azure_clients.py for credential lifecycle, refactored auth/vector/chat layers to use singletons.
+- **Dallas:** Frontend dockerfile (multi-stage nginx), nginx.conf with SSE streaming support, runtime env injection pattern (config.js.template + envsubst).
+- **Brett:** Data pipeline dual-mode auth (db.py with token caching), now works against both local PG (password) and Azure PG (Entra token).
+- **Ripley pending:** Architecture review of full deployment stack (infra + containerization + auth). Confirm readiness for `azd up && azd deploy` cycle. Test containerization end-to-end (health probes, log streaming, RBAC verification).

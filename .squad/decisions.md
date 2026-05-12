@@ -5,6 +5,116 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-12T01:35:00Z: Frontend runtime config strategy
+**By:** Dallas (Frontend Dev)
+**What:** Runtime configuration for the talent_ui production container image uses a `window.__ENV__` pattern injected at container start, not baked at build time.
+
+#### Decision
+
+The Vite SPA is built once (static `dist/`) and shipped in a multi-stage Docker image. Runtime environment values (backend URL, MSAL client ID, App Insights connection string) vary per deployment target and cannot be baked into the Vite bundle with `VITE_*` vars.
+
+**Pattern chosen:** `envsubst` templating at container start.
+
+1. `config.js.template` lives at `/etc/talentiq/config.js.template` inside the image (outside the nginx `root`, so never served raw).
+2. `entrypoint.sh` runs `envsubst '${BACKEND_URL} ${AZURE_CLIENT_ID} ${APPLICATIONINSIGHTS_CONNECTION_STRING}'` to write `/usr/share/nginx/html/config.js`.
+3. `index.html` loads `/config.js` via a plain `<script src="/config.js">` **before** the main ESM bundle, so `window.__ENV__` is set before any React code executes.
+
+Container App injects: `BACKEND_URL`, `KEY_VAULT_URI`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, `AZURE_CLIENT_ID`.
+
+#### Caveats / Follow-on work
+
+- `telemetry.js` currently reads `import.meta.env.VITE_APPINSIGHTS_CONNECTION_STRING` (baked at build). Future pass: change to `window.__ENV__.APPLICATIONINSIGHTS_CONNECTION_STRING`.
+- `authConfig.js` has hardcoded clientId and tenantId. Future pass: change to read from `window.__ENV__.AZURE_CLIENT_ID` (tenantId can come from MSAL authority metadata or a separate env var).
+- The `/config.js` endpoint will return a 404 in local Vite dev mode (no nginx, no entrypoint.sh). Wrap reads with `window.__ENV__ ?? {}` in source to degrade gracefully.
+
+#### Nginx proxy path
+
+Proxied prefix is `/af/` (not `/api/`). The frontend codebase routes all backend calls under `/af/`. The task spec mentioned `/api/*` — this was not applied to avoid breaking existing API calls.
+**Why:** `proxy_buffering off` + `proxy_read_timeout 300s` on the `/af/` location ensures NDJSON SSE streaming (run-log panel) is not buffered or prematurely closed by nginx.
+
+### 2026-05-12T01:30:00Z: Passwordless auth pattern — azure_clients.py
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+
+**What:**
+- Created `talent_backend/talent_backend/azure_clients.py` as the single source of truth for all Azure service connections.
+- `get_credential()` — process-wide `DefaultAzureCredential` singleton with pre-warm. In Azure: `AZURE_CLIENT_ID` env var auto-selects the UAMI. Locally: falls back to `az login`.
+- `PostgresPoolManager` — async psycopg3 pool with Entra token-as-password refresh. Gets token from scope `https://ossrdbms-aad.database.windows.net/.default`. Recreates the pool 5 minutes before token expiry (~1h TTL). Thread-safe with asyncio.Lock.
+- `get_cosmos_client()` — singleton `CosmosClient` with `DefaultAzureCredential`. RBAC-only (no key).
+- `get_keyvault_client()` / `get_secret()` — lazy `SecretClient` with `DefaultAzureCredential`.
+- `configure_app_insights()` — idempotent OTel setup via `azure-monitor-opentelemetry`. No-op if `APPLICATIONINSIGHTS_CONNECTION_STRING` unset.
+- `get_foundry_token_provider()` — returns a bearer-token callable for `AzureOpenAI(azure_ad_token_provider=...)`.
+
+**Why:** Centralizes credential management. Eliminates duplicate `DefaultAzureCredential()` instantiations (pre-existing in vector_tools.py, chat_history.py). Enables token rotation without changing callers.
+
+**Impact:**
+- `pg_age_helper.py` — delegates to `PostgresPoolManager` when `IS_AZURE_DEPLOY`. Local dev path unchanged.
+- `chat_history.py` — uses `get_cosmos_client()` instead of its own `CosmosClient(credential=DefaultAzureCredential())`.
+- `vector_tools.py` — uses `get_credential()` singleton instead of creating a new `DefaultAzureCredential()`.
+- `api.py` lifespan + `mcp_server/__main__.py` — call `configure_app_insights()` at startup.
+
+### 2026-05-12T01:30:00Z: Dockerfile strategy — backend + MCP
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+
+**What:**
+- `talent_backend/Dockerfile` — backend service (port 8000, `python -m talent_backend`).
+- `talent_backend/Dockerfile.mcp` — MCP service (port 3002, `python -m talent_backend.mcp_server`).
+- Both use multi-stage build: `python:3.11-slim` builder + runtime, uv-based install.
+- Build pattern: `uv venv /opt/venv && . /opt/venv/bin/activate && uv pip install --no-cache .` using pyproject.toml as the manifest.
+- Non-root `app` user in runtime stage.
+- `talent_backend/.dockerignore` excludes .venv, __pycache__, *.env, tests, logs, docs.
+- HEALTHCHECK left as TODO comment — needs curl/wget in image or Python urllib check against `/health`.
+
+**Why:**
+- azure.yaml `project: ../talent_backend` for both backend and mcp services → build context is `talent_backend/`. Both Dockerfiles live there.
+- `uv pip install .` (not `uv sync`) avoids needing the workspace-root `uv.lock` inside the `talent_backend/` build context.
+
+**Outstanding action for Bishop/infra:**
+- `talent_infra/azure.yaml` mcp service needs `docker.dockerfile: Dockerfile.mcp` added so azd uses the correct Dockerfile for the MCP Container App. Without it, azd defaults to `Dockerfile` and starts the backend entrypoint for both services.
+
+### 2026-05-12T01:30:00Z: azure_clients module — shape and import contract
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+
+**What:**
+- Module: `talent_backend/talent_backend/azure_clients.py`
+- Public API:
+  - `get_credential()` → `DefaultAzureCredential` singleton
+  - `get_pg_pool_manager()` → `PostgresPoolManager` singleton (Azure Postgres token rotation)
+  - `get_cosmos_client()` → `CosmosClient` singleton
+  - `get_keyvault_client()` → `SecretClient` singleton (lazy)
+  - `get_secret(name)` → `str` (on-demand Key Vault read)
+  - `configure_app_insights()` → void (OTel setup, idempotent)
+  - `get_foundry_token_provider()` → `Callable[[], str]` (for AzureOpenAI SDK)
+- `IS_AZURE_DEPLOY` in `config.py`: `True` when `AZURE_CLIENT_ID` + `POSTGRES_HOST` env vars are both present.
+- `config.py` env var aliases: `FOUNDRY_ENDPOINT` → `AZURE_OPENAI_ENDPOINT`, `COSMOS_ENDPOINT` → `COSMOS_CHAT_ENDPOINT`, `POSTGRES_HOST` → `PGHOST`, etc. All old names still work for local dev.
+- No passwords are logged or committed. Token values are ephemeral (only in conninfo strings, never stored).
+
+**Why:** Single place for Azure credential lifecycle. Prevents duplicate `DefaultAzureCredential` instantiations and redundant IMDS probe races.
+
+**Import pattern for all new code:**
+```python
+from talent_backend.azure_clients import get_credential, get_cosmos_client, get_keyvault_client, configure_app_insights, get_foundry_token_provider
+```
+
+### 2026-05-12T01:30:00Z: Data pipeline Entra ID token auth for Azure PostgreSQL
+**By:** Brett (Data Generator & Loader)
+**Status:** Implemented
+
+**What:**
+1. Created `talent_data_pipeline/talent_data_pipeline/db.py` — centralized connection helper with dual-mode auth (password vs Entra ID token). Auto-detects Azure target via `IS_AZURE_DEPLOY=true` or `PGHOST` suffix `.postgres.database.azure.com`.
+2. Token caching: Entra access tokens cached in-process with thread-safe refresh 5 minutes before expiry. `DefaultAzureCredential` is only imported when Entra mode is active (zero overhead for local dev).
+3. `ManagedConnectionPool` wrapper: rebuilds the `ThreadedConnectionPool` when the underlying token nears expiry, ensuring fresh connections get valid tokens during long parallel loads.
+4. Refactored all 6 connection call sites (connectivity_test, validate, create_relational_tables, create_indexes, base_loader) to use `db.connect()` or `ManagedConnectionPool` instead of raw `psycopg2.connect(**db_config.connection_dict)`.
+5. Connectivity test now prints auth mode ("Entra ID (passwordless)" or "Password") at the top of its output.
+6. Both outer stub files and inner package files updated and kept in sync.
+7. `AZURE.md` added with 30-line usage note.
+
+**Why:** Bishop's infra Pass 3 provisions PostgreSQL in Entra-only mode (no password auth). Pipeline must use Entra tokens against Azure PG while preserving local password-based dev flow.
+
+**Impact:** All pipeline operations (connectivity test, schema creation, index creation, data loading, validation) now work against both local PG (password) and Azure PG (Entra token). No changes to `talent_backend/`, `talent_infra/`, or `talent_ui/`.
+
 ### 2026-05-12T01:00:00Z: Container App workloads + UAMI + RBAC wiring (Pass 3)
 **By:** Bishop (Deployment Engineer)
 **Status:** Implemented

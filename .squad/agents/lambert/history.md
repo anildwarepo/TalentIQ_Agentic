@@ -27,3 +27,13 @@
 - **FTS indexes:** GIN on `fts_vector`, pg_trgm GIN on `name`, `job_title`, `skills_text`.
 - **Ontology constants validated:** 14 node labels, 12 edge types, 13 SkillDomains, CEFR levels, cert statuses, seniority tiers.
 - **User preferences (Anil):** Wants tests grouped by query type (Graph/FTS/Vector/Combined/Dashboard/Filter), each test docstring referencing the user story ID.
+
+### 2026-05-12T02:00:00Z: Cross-agent — Deployment readiness assessment needed
+- **Bishop:** azd-up.md runbook complete (~420 lines, 8 sections). Full deployment stack ready: VNet + data services + Container Apps + MCP + Dockerfiles.
+- **Lambert pending:** Test strategy for deployment-readiness verification. Consider:
+  - Connectivity test: verify Entra token flow against Azure PG
+  - Container startup: health probe on /health endpoint (backend + MCP)
+  - RBAC verification: list role assignments for each UAMI
+  - Log streaming: check Container App logs via `az containerapp logs show`
+  - End-to-end flow: ping backend → MCP → graph query → response
+- **Pattern:** Deployment tests should be separate from data layer tests. Likely belongs in `tests/test_deployment_readiness.py` covering infrastructure assumptions (network connectivity, RBAC, credential flow).
