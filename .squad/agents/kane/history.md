@@ -187,3 +187,15 @@
 - **Ripley:** Co-host backend+MCP on same App Service (localhost). OpenTelemetry SDK for backend observability. Structured JSON logging with correlation IDs.
 - **Dallas:** SSE via POST+ReadableStream confirmed. ProactIve token refresh (5-min window) to prevent mid-stream auth failures. AbortController for stream cancellation.
 - **Parker:** 3 production gaps require Kane+Parker coordination: (a) `search_graph_nodes()` SQL function not in pipeline, (b) `employee_ageid` always 0, (c) `pg_trgm` availability on Azure.
+
+### 2026-05-12 — Cross-agent: Bishop's infrastructure Pass 3 — Container App deployment
+**From Bishop (Deployment Engineer):**
+- Backend Container App is now provisioned with User-Assigned Managed Identity (UAMI). Backend code MUST authenticate using `DefaultAzureCredential` with the `AZURE_CLIENT_ID` env var to specify which UAMI to use.
+- Passwordless authentication now available for:
+  - **PostgreSQL:** Connect via `POSTGRES_HOST` env var using `DefaultAzureCredential` to acquire Entra ID token. No SQL password in connection string.
+  - **Cosmos DB:** RBAC only. Backend UAMI has Built-in Data Contributor role assigned.
+  - **Azure AI Foundry:** Backend UAMI has Cognitive Services OpenAI User role assigned. Use `FOUNDRY_ENDPOINT` env var.
+  - **Key Vault:** Backend UAMI has Key Vault Secrets User role assigned. Use `KEY_VAULT_URI` env var.
+  - **Application Insights:** Send telemetry to `APPLICATIONINSIGHTS_CONNECTION_STRING` env var.
+- **Action required:** Create `Dockerfile` under `talent_backend/`, refactor DB connection for passwordless auth, update `config.py` to read env vars (`POSTGRES_HOST`, `POSTGRES_DB`, `COSMOS_ENDPOINT`, `FOUNDRY_ENDPOINT`, `FOUNDRY_DEPLOYMENT_NAME`, `KEY_VAULT_URI`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, `AZURE_CLIENT_ID`), and apply same pattern to MCP server.
+- **Infrastructure contract:** These env vars passed to Container App at deployment time. Backend responsible for using them with `DefaultAzureCredential`.

@@ -79,3 +79,14 @@
 - **Ripley:** Structured JSON logging with OTel correlation — frontend App Insights already correct, add `session_id` correlation.
 - **Kane:** RBAC via Entra ID app roles — no immediate frontend changes (token already contains roles claim). Session migration via `SESSION_PROVIDER` flag — no frontend impact.
 - **Parker:** No direct frontend impact from DB architecture spec.
+
+### 2026-05-12 — Cross-agent: Bishop's infrastructure Pass 3 — Container App deployment
+**From Bishop (Deployment Engineer):**
+- Frontend Container App is now provisioned with User-Assigned Managed Identity (UAMI). Ingress is **external** (public, port 80).
+- Frontend env vars:
+  - `BACKEND_URL` — internal FQDN to backend Container App (e.g., `http://backend-ca.xxx.azurecontainerapps.io:8000`). Use to proxy API calls.
+  - `KEY_VAULT_URI` — if frontend needs to fetch secrets (e.g., telemetry config).
+  - `APPLICATIONINSIGHTS_CONNECTION_STRING` — send telemetry to Application Insights.
+  - `AZURE_CLIENT_ID` — UAMI client ID for `DefaultAzureCredential` (may be needed if frontend calls Azure services directly).
+- **Action required:** Create `Dockerfile` under `talent_ui/` that builds Vite production bundle and serves via HTTP server on port 80, update frontend to read `BACKEND_URL` from env (not hardcoded), update proxy rules in dev (`vite.config.js`), ensure telemetry sends to injected connection string.
+- **Deployment flow:** `azd up` provisions Container App. `azd deploy` builds Vite bundle inside Docker image and pushes to ACR. Frontend starts on port 80.

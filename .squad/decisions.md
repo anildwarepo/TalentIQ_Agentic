@@ -5,6 +5,33 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-12T01:00:00Z: Container App workloads + UAMI + RBAC wiring (Pass 3)
+**By:** Bishop (Deployment Engineer)
+**Status:** Implemented
+
+**What:**
+1. **User-Assigned Managed Identities** — 3 UAMIs created per environment: `uami-talentiq-backend-{env}`, `uami-talentiq-frontend-{env}`, `uami-talentiq-mcp-{env}`. Created before Container Apps so RBAC assignments propagate before app startup.
+
+2. **RBAC assignments wired into existing data modules:**
+   - Cosmos DB: Built-in Data Contributor (`00000000-0000-0000-0000-000000000002`) → backend + MCP UAMIs
+   - Foundry: Cognitive Services OpenAI User (`5e0bd9bd-7b93-4f28-af87-19fc36ad61bd`) → backend + MCP UAMIs
+   - Key Vault: Key Vault Secrets User (`4633458b-17de-408a-b874-0445c86b69e6`) → all 3 UAMIs
+   - ACR: AcrPull (`7f951dda-4ed3-4680-a7ca-43fe172d538d`) → all 3 UAMIs
+   - PostgreSQL: Entra Admin (server-level) → backend UAMI + MCP UAMI + deploying user (principalType: 'User')
+
+3. **Container App module** — Generic `container-app.bicep` used 3 times. UAMI-only identity, ACR pull via UAMI, configurable external/internal ingress, env vars with KV secret reference support, bootstrap image `mcr.microsoft.com/k8se/quickstart:latest`.
+
+4. **Env var contract:**
+   - Backend (8000) & MCP (3002): POSTGRES_HOST, POSTGRES_DB, COSMOS_ENDPOINT, FOUNDRY_ENDPOINT, FOUNDRY_DEPLOYMENT_NAME, KEY_VAULT_URI, APPLICATIONINSIGHTS_CONNECTION_STRING, AZURE_CLIENT_ID
+   - Frontend (80): BACKEND_URL, KEY_VAULT_URI, APPLICATIONINSIGHTS_CONNECTION_STRING, AZURE_CLIENT_ID
+   - Apps use `DefaultAzureCredential` with `AZURE_CLIENT_ID` set to UAMI clientId — NO passwords.
+
+5. **azure.yaml** — `resourceName` activated for all 3 services. Dockerfiles marked TODO (not in Bishop's scope).
+
+**Why:** Pass 3 completes the infrastructure stack. `azd up` now provisions the entire topology: networking + data + supporting services + container apps. Apps start with quickstart placeholder; `azd deploy` builds + pushes real images.
+
+**Impact:** All agents — env var names above are the contract between infra and app code. Kane/Dallas/Brett must implement `DefaultAzureCredential` in backend, frontend, and MCP using `AZURE_CLIENT_ID` for identity selection. Dockerfiles are the remaining blocker before a full `azd up && azd deploy` cycle works end to end.
+
 ### 2026-05-12T00:00:00Z: Data + supporting service modules deployed
 **By:** Bishop (Deployment Engineer)
 **Status:** Implemented

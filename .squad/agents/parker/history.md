@@ -74,3 +74,10 @@
 - **Bishop completed:** PostgreSQL Flexible Server (PG 16) provisioned with Entra ID-only auth, delegated subnet integration, extensions allowlisted (age, vector, pg_trgm, pg_stat_statements)
 - **For Parker:** `pg_trgm` extension is now in the allowlist and will be available on Azure deployment. Continue resolving production gaps: `search_graph_nodes()` SQL function creation, `employee_ageid` wiring, `pg_trgm` extension availability confirmation on Azure PG
 - **Deployment hook:** Once `azd up` runs, PostgreSQL will be live. Data pipeline can connect via connection string + Entra ID token auth
+
+### 2026-05-12 — Cross-agent: Bishop's infrastructure Pass 3 — PostgreSQL extensions confirmed
+**From Bishop (Deployment Engineer):**
+- PostgreSQL extensions are **confirmed in Bicep:** `age`, `vector`, `pg_trgm`, `pg_stat_statements` are all allowlisted in `talent_infra/modules/postgres.bicep`.
+- When `azd up` runs, these extensions will be created on PostgreSQL server.
+- **For Parker:** Data pipeline can now assume all 4 extensions are available on Azure deployment. No fallback logic needed for production.
+- **MCP Server:** Confirmed using `public.search_graph_nodes()` SQL function — schema setup will run after `azd up` provisions PostgreSQL. This function must be created as part of schema initialization step (not yet wired; will be part of separate `azd postprovision` hook or manual schema migration).

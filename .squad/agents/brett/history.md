@@ -109,6 +109,17 @@ Added batch-level checkpointing to `EmbeddingGenerator.generate_embeddings()` so
 - Outer stub file kept in sync (3-level `_REPO_ROOT` vs 4-level in inner package)
 - Same public interface preserved: `generate_embeddings(employees, skill_edges, batch_size)` returns `list[dict]`
 
+### 2026-05-12 — Cross-agent: Bishop's infrastructure Pass 3 — PostgreSQL Entra ID auth for pipeline
+**From Bishop (Deployment Engineer):**
+- PostgreSQL deployment is now **Entra ID-only** — no SQL admin password.
+- Data pipeline must authenticate using Entra ID tokens, NOT SQL passwords.
+- **Action required for data pipeline:**
+  1. When running locally (dev): Deploying user (Anil) is PostgreSQL Entra admin — local runs work automatically via `DefaultAzureCredential` + Azure CLI auth.
+  2. When running in Azure (Container Apps Job/init task): Job's UAMI will be Entra admin → passwordless auth via `DefaultAzureCredential` + `AZURE_CLIENT_ID`.
+  3. Update connection code: Construct Entra ID token and use as password in connection string (instead of `password=` from env var).
+  4. Document this pattern in data pipeline README so future runs know to expect no password prompt.
+- **Note:** Pipeline's outer stub (`config.py`) still has `PGPASSWORD` env var support for backward compat — but won't be used when connecting to Azure PostgreSQL. Token auth is mandatory.
+
 ### Learnings (2026-05-09, embedding checkpointing)
 - `np.savez` auto-appends `.npz` to filenames that don't already end with it — use `.npz` suffix in `tempfile.mkstemp()` to avoid double extension
 - `np.load(path, allow_pickle=False)` is safer for checkpoint files — embeddings are pure numeric arrays, no need for pickle
