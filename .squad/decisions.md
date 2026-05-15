@@ -5,6 +5,41 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-15: Chat history thread management — backend endpoints
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+
+**What:**
+Added thread management endpoints that the frontend (App.jsx) is already calling:
+- `GET /api/threads?limit=20` — list user's threads
+- `GET /api/threads/{id}` — get thread messages
+- `DELETE /api/threads/{id}` — soft delete thread
+- `PATCH /api/threads/{id}` — rename thread (body: `{"title": "..."}`)
+
+**Key decisions:**
+1. **session_meta co-located with messages** — The `session_meta` document lives in the same Cosmos container and partition as messages (keyed by `session_id`). A `type` field (`session_meta` vs `message`) distinguishes them. Avoids a second container; single-partition reads stay fast.
+2. **Ownership = 404** — Wrong user gets 404 (not 403) to avoid leaking thread IDs.
+3. **Soft delete** — `DELETE /api/threads/{id}` sets `is_deleted=true` on the meta doc. Messages retained for future retention/export features.
+4. **Cross-partition query for list_threads** — `list_threads()` uses `enable_cross_partition_query=True` since user_id spans partitions. Acceptable for a user's thread list (low cardinality, limited to 20 results).
+5. **Legacy endpoints preserved** — `/api/sessions/*` endpoints still exist alongside new `/api/threads/*` endpoints. Frontend should migrate to threads.
+6. **CORS updated** — `allow_methods` now includes `DELETE` and `PATCH`.
+
+**Impact:** Dallas (Frontend) — The four endpoints the frontend is already calling now exist. No frontend changes needed. Lambert (Tester) — 16 tests written and passing.
+
+### 2026-05-12T21:40:00Z: HARD RULE — Reference code patterns are authoritative
+**By:** Anil Dwarakanath (via Copilot Coordinator)
+**Status:** Documented
+
+**What:** The patterns in `talentiq_requirements/reference_code/` (and the mirror at `C:\repos\TalentIQFoundry\af-backend`) are the canonical implementation reference. When implementing or fixing any feature that has a corresponding pattern in `reference_code/` (Azure OpenAI / Foundry client construction, MCP client, telemetry, Cosmos service, AGE/MCP server, etc.), agents MUST replicate the reference pattern as-is — same env var names, same precedence order, same audience scopes, same client class, same constructor kwargs.
+
+**Specifically:** Azure OpenAI client uses `AZURE_OPENAI_ENDPOINT` (Cognitive Services route, `*.openai.azure.com`), NOT the Foundry project URL. Do not invent new env var names, alternative audiences, or wrapper token providers when the reference pattern already works.
+
+**Enforcement:** Before any agent writes or modifies Foundry/OpenAI/MCP/Cosmos/telemetry client code, they must first read the corresponding file in `talentiq_requirements/reference_code/` and mirror it. Deviations require explicit user approval.
+
+**Why:** Divergence from the reference code caused Foundry client 401 audience mismatch and Cosmos endpoint precedence inversion. Reference code is battle-tested.
+
+**Note:** Supersedes and strengthens the earlier "2026-05-09: User directive — reference_code is pattern-only" entry.
+
 ### 2026-05-12T03:00:00Z: VNet-aware smoke suite — Mechanism A/B/C strategy
 **By:** Lambert (Tester)
 **Status:** Implemented

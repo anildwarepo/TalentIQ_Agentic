@@ -90,3 +90,15 @@
   - `AZURE_CLIENT_ID` — UAMI client ID for `DefaultAzureCredential` (may be needed if frontend calls Azure services directly).
 - **Action required:** Create `Dockerfile` under `talent_ui/` that builds Vite production bundle and serves via HTTP server on port 80, update frontend to read `BACKEND_URL` from env (not hardcoded), update proxy rules in dev (`vite.config.js`), ensure telemetry sends to injected connection string.
 - **Deployment flow:** `azd up` provisions Container App. `azd deploy` builds Vite bundle inside Docker image and pushes to ACR. Frontend starts on port 80.
+
+### 2026-05-15 — Cross-agent: Kane's thread management endpoints are live
+**From Kane (Backend Dev):**
+- The 4 thread endpoints the frontend is already calling now exist and return real data:
+  - `GET /api/threads?limit=20` — list user's threads
+  - `GET /api/threads/{id}` — get thread messages
+  - `DELETE /api/threads/{id}` — soft delete thread
+  - `PATCH /api/threads/{id}` — rename thread (body: `{"title": "..."}`)
+- CORS updated to allow `DELETE` and `PATCH` methods.
+- Legacy `/api/sessions/*` endpoints still work but frontend should migrate to `/api/threads/*`.
+- **No frontend changes needed** — endpoints match what App.jsx already calls.
+- 16 tests passing (Lambert).

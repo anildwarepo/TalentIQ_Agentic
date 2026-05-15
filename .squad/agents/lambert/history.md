@@ -37,3 +37,17 @@
   - Log streaming: check Container App logs via `az containerapp logs show`
   - End-to-end flow: ping backend → MCP → graph query → response
 - **Pattern:** Deployment tests should be separate from data layer tests. Likely belongs in `tests/test_deployment_readiness.py` covering infrastructure assumptions (network connectivity, RBAC, credential flow).
+
+### 2026-05-15 — Chat History Thread Management Test Suite
+
+- **Test file:** `tests/test_chat_history.py` — 16 test cases covering ChatHistoryStore methods and API endpoints.
+- **Architecture decision:** Tests run against the in-memory fallback path only (no Cosmos DB). The `_fallback` module-level dict is cleared between tests via autouse fixture.
+- **Key patterns:**
+  - `ChatHistoryStore` instantiated with `COSMOS_CHAT_ENDPOINT` patched to empty string → forces in-memory mode.
+  - API tests use FastAPI `dependency_overrides` to mock `get_current_user` → returns a fixed test user dict with `oid`.
+  - `api_mod._history` is replaced with a fresh in-memory store per API test to avoid cross-test contamination.
+  - Kane's new methods expected: `add_message(session_id, role, text, user_id=)`, `list_threads(user_id)`, `get_thread_messages(session_id)`, `soft_delete_thread(session_id)`, `rename_thread(session_id, title)`.
+  - Thread ownership enforced by returning 404 (not 403) to prevent enumeration — per spec §3.
+  - Auto-title: first user message truncated to 50 chars.
+- **Backward compat tests:** `get_history()` and `delete_session()` still work after thread management additions.
+- **API test coverage:** GET/DELETE/PATCH on `/api/threads`, 404 for missing threads, ownership isolation between users.
