@@ -5,6 +5,73 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-16: Infrastructure rebuild complete
+**By:** Bishop (Deployment Engineer)
+**Status:** Implemented
+**What:** Rebuilt all 17 `talent_infra/` files from history blueprint after prior passes were lost to disk. Full Bicep IaC validated with zero errors. Architecture unchanged — VNet, 3 Container Apps (frontend public, backend+MCP internal), Cosmos DB + PostgreSQL + Foundry + KV + ACR all with private endpoints/delegated subnets, RBAC-only auth, Entra ID-only on PostgreSQL. Ready for `azd up`.
+**Why:** Files from Passes 1-3 did not survive to disk. History.md served as complete blueprint for faithful recreation.
+**Impact:** All team members can now reference `talent_infra/` for infrastructure. Lambert's smoke tests should pass against the Bicep outputs unchanged.
+
+### 2026-05-16: Role added as canonical entity to data model
+**By:** Brett (Data Generator & Loader)
+**Status:** Implemented
+**What:** Added `Role` as a first-class graph node (17 roles with name/code/aliases) and `HAS_ROLE` as a 1:1 edge from Employee → Role. Previously, job roles were free-text strings hardcoded in multiple generators.
+**Key decisions:**
+1. **17 canonical roles** — Unified from three separate hardcoded lists.
+2. **`role_name` field on Employee** — Added alongside existing `job_title`.
+3. **`HAS_ROLE` edge is 1:1** — Each employee has exactly one role.
+4. **ROLES in ENTITY_SOURCES** — Roles get FTS + vector embeddings via entity_search.
+5. **AGE property indexes** — `idx_role_name` and `idx_role_code` added.
+**Impact:** Kane/MCP agents can now query `MATCH (e:Employee)-[:HAS_ROLE]->(r:Role) WHERE r.code = 'PM'`. Ontology now has 15 node labels (was 14) and 13 edge types (was 12). Backward compatible — `job_title` property unchanged.
+
+### 2026-05-16: Resolve-first query architecture — MCP tool descriptions cleaned
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+**What:** Updated all MCP tool descriptions to enforce the resolve-first query pattern. `resolve_entities` docstring says "CALL THIS FIRST". `query_using_sql_cypher` mandates `v.code = 'RESOLVED_CODE'` matching. `search_graph` narrowed to employee name lookup only. `vector_search` narrowed to resume/skills semantic matching only. Tool implementations unchanged — only descriptions/docstrings updated.
+**Why:** The agent was calling wrong tools for entity lookups (search_graph, vector_search instead of resolve_entities), degrading result quality.
+**Impact:** All agents using MCP tools — follow pattern: `resolve_entities → Cypher with .code = 'X'`, only vector_search for semantic resume/skills matching.
+
+### 2026-05-16: Batch embeddings in resolve_entities — performance optimization
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+**What:** Restructured `resolve_entities` into a two-pass architecture: Pass 1 (fast, no HTTP) runs exact-code, exact-name, and FTS checks for ALL queries in a single DB cursor pass. Pass 2 (one HTTP call) batches all unresolved terms into a single Azure OpenAI embeddings API call. Previously ~28 seconds for 47 entities (sequential HTTP per term), now estimated ~3-5 seconds.
+**Why:** Sequential embedding calls (~30 × 300ms) dominated resolution latency.
+**Impact:** All MCP tool consumers — resolve_entities is significantly faster. Resolution priority, thresholds, and confidence scoring unchanged.
+
+### 2026-05-16: Agent instructions rewritten — resolve-first, no hardcoded rules
+**By:** Parker (Data Engineer)
+**Status:** Implemented
+**What:** Rewrote `TALENT_GRAPH_QUERY_GENERATION_AGENT_v1.md` to enforce clean resolve-first architecture. All hardcoded entity values removed. Instructions teach patterns, not specific values. Workflow: parse → resolve_entities → build Cypher with codes → execute → format. The `resolve_entities` tool is the sole source of truth for entity→code mapping. All 19 AGE Query Rules, RFP Multi-Role Matching Workflow, Response Format, and Graph Ontology sections preserved.
+**Why:** Hardcoded entity names and regex patterns in instructions were brittle and caused mismatches.
+
+### 2026-05-15: Entity search table and reference data enrichment
+**By:** Brett (Data Generator & Loader)
+**Status:** Implemented
+**What:** Added `code` and `aliases` fields to all 10 reference entity types in reference_data.py. Created `entity_search` relational table for unified FTS + vector search across all reference/dimension entities. Updated SKILLS_BY_DOMAIN from `list[str]` to `list[dict]` format, updated edge_generator for compatibility, added entity_search_loader.py, wired into pipeline main.py as step 4g.
+**Why:** Enables fast code-based lookups, alias resolution, and unified entity search across all reference data types.
+**Impact:** Breaking change to SKILLS_BY_DOMAIN API (str→dict); all consumers updated. Entity search table schema added with GIN + B-tree indexes.
+
+### 2026-05-15: Per-question pipeline logging
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+**What:** Added `PipelineLogger` — per-question trace logger capturing the full request pipeline (triage, handoffs, MCP tool calls, queries, errors, final response) and writing structured logs to disk. Folder structure: `query_logs/{timestamp}_{session_short}_{question_hash}/`. Toggle: `ENABLE_PIPELINE_LOGGING=true`. Non-blocking flush via thread pool. PII sanitization (email masking). Hooked into both `POST /api/chat` (SSE) and `POST /af/graph/responses` (NDJSON).
+**Why:** Enables detailed per-question debugging and analysis without impacting response streaming.
+**Impact:** Lambert — new module needs tests. Dallas — no impact, backend-only.
+
+### 2026-05-15: resolve_entities MCP tool — entity resolution via entity_search table
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+**What:** Added `resolve_entities` MCP tool. Resolves user-supplied terms to canonical entity names and codes from the `entity_search` PostgreSQL table. Resolution cascade: exact code match (1.0) → exact name match (1.0) → FTS via plainto_tsquery → alias substring ILIKE (0.7) → not found (0.0). Shared pool, entity type whitelist, graceful degradation if table missing, all queries parameterized.
+**Why:** Enables fuzzy-to-canonical entity resolution before building Cypher queries, improving accuracy.
+**Impact:** Agent orchestration can now resolve fuzzy user input to canonical entities before Cypher.
+
+### 2026-05-15: Agent instructions updated for entity resolution workflow
+**By:** Parker (Data Engineer)
+**Status:** Implemented
+**What:** Updated `TALENT_GRAPH_QUERY_GENERATION_AGENT_v1.md` to integrate `resolve_entities` MCP tool. Entity resolution required before Cypher for all canonical entity references. Code-based matching (`entity.code = 'RESOLVED_CODE'`) instead of regex. Three-tier classification: enum values (direct), free text (regex/vector), canonical entities (resolve first). Batch resolution for all entities in single call.
+**Why:** Code-based matching is faster (index hit) and deterministic vs regex approximation.
+**Impact:** All agents using Talent Graph Query Agent instructions.
+
 ### 2026-05-15: Chat history thread management — backend endpoints
 **By:** Kane (Backend Dev)
 **Status:** Implemented
