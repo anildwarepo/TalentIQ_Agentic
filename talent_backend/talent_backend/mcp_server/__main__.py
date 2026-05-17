@@ -59,6 +59,14 @@ def main() -> None:
     app.pg_helper = PGAgeHelper.create_deferred()
     logger.info("PGAgeHelper created (deferred open)")
 
+    # ── Pre-warm Azure OpenAI client (moves credential cost to startup) ──
+    try:
+        from .vector_tools import _get_openai_client
+        _get_openai_client()
+        logger.info("Azure OpenAI client pre-warmed")
+    except Exception as exc:
+        logger.warning("Azure OpenAI pre-warm failed (will retry on first use): %s", exc)
+
     # ── Run FastMCP ──────────────────────────────────────────
     logger.info(
         "Starting MCP server  transport=%s  host=%s  port=%d",

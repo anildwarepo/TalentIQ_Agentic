@@ -14,6 +14,7 @@ from typing import Annotated
 from fastmcp import Context
 
 from .app import mcp, _pg
+from .cypher_rewriter import optimize_sql
 from .helpers import (
     strip_agtype,
     strip_titles_for_search,
@@ -31,11 +32,34 @@ logger = logging.getLogger("talent_mcp")
 
 @mcp.tool
 async def query_using_sql_cypher(
-    sql_query: Annotated[str, "SQL Query (may wrap ag_catalog.cypher calls)"],
+    sql_query: Annotated[str, "SQL Query (may wrap ag_catalog.cypher calls). Entity matching in Cypher MUST use exact code match (e.g. v.code = 'PMP') from resolve_entities — do NOT use regex on names."],
     graph_name: Annotated[str, "Graph name for AGE cypher calls"],
     ctx: Context = None,
 ) -> list[dict]:
-    """Execute a SQL/Cypher query against PostgreSQL+AGE and return the result rows."""
+    """Execute a SQL/Cypher query against PostgreSQL+AGE and return the result rows.
+
+    IMPORTANT — Entity matching in Cypher:
+    - Call resolve_entities FIRST to get canonical codes
+    - Use exact code match: WHERE v.code = 'RESOLVED_CODE'
+    - Do NOT use regex (~) or CONTAINS on entity names
+    - Do NOT fall back to search_graph or vector_search for entity lookup
+    """
+    # ── Deterministic rewrite for known AGE perf anti-patterns ────────
+    # Pushes ORDER BY+LIMIT before OPTIONAL MATCH enrichment when safe.
+    try:
+        rewritten_sql, rewrite_reason = optimize_sql(sql_query)
+    except ValueError as exc:
+        # Unsupported construct detected (e.g. count(CASE WHEN ...))
+        logger.warning("[query] rejected: %s", exc)
+        if ctx:
+            await ctx.info(f"[REJECTED] {exc}")
+        return [{"error": str(exc)}]
+    if rewrite_reason:
+        logger.info("[query] rewrite=%s applied", rewrite_reason)
+        if ctx:
+            await ctx.info(f"[REWRITE] {rewrite_reason}: optimized Cypher for AGE compatibility")
+        sql_query = rewritten_sql
+
     # Detect query type from SQL content
     sql_lower = sql_query.lower()
     if "ag_catalog.cypher" in sql_lower:
@@ -67,13 +91,18 @@ async def query_using_sql_cypher(
 
 @mcp.tool
 async def search_graph(
-    search_term: Annotated[str, "Text to search for (person name, skill, etc.)"],
+    search_term: Annotated[str, "Person name to search for (e.g. 'Jane Smith'). For entity lookups (skills, certs, etc.) use resolve_entities instead."],
     graph_name: Annotated[str, "Graph name"],
-    label_filter: Annotated[str, "Optional: filter to a specific node label. Empty string for all."] = "",
+    label_filter: Annotated[str, "Optional: filter to a specific node label (typically 'Employee'). Empty string for all."] = "",
     max_results: Annotated[int, "Maximum results to return (default 10)"] = 10,
     ctx: Context = None,
 ) -> dict:
-    """Full-text search across graph nodes using public.search_graph_nodes()."""
+    """Full-text search for finding employees by name in the graph.
+
+    Use ONLY for looking up a specific person by name (e.g. 'Jane Smith').
+    Do NOT use for entity resolution (skills, certifications, countries, etc.)
+    — use resolve_entities for that instead.
+    """
     logger.info("[search] term=%s label=%s max=%d", search_term, label_filter or "(all)", max_results)
     if ctx:
         await ctx.info(f"[QUERY] FTS: Searching for '{search_term}' (label: {label_filter or 'all'})")

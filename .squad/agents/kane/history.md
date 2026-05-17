@@ -20,6 +20,58 @@
 
 <!-- Recent learnings (2026-05-12 and current sprint). Older entries archived to history-archive.md. -->
 
+### 2026-05-16 — Clean MCP tool descriptions for resolve-first query architecture
+
+**Files modified:**
+- `talent_backend/talent_backend/mcp_server/graph_tools.py` — Updated `query_using_sql_cypher` docstring to mandate `v.code = 'X'` matching (no regex on names). Updated `search_graph` description to clarify it's for **employee name lookup only**, not entity resolution.
+- `talent_backend/talent_backend/mcp_server/vector_tools.py` — Updated `vector_search` description to state it's for **resume/skills semantic matching only** (RFP role matching, capability search). Explicit "do NOT use for entity lookups."
+- `talent_backend/talent_backend/mcp_server/entity_tools.py` — Updated `resolve_entities` docstring: "CALL THIS FIRST", use returned `code` in Cypher WHERE clauses, do not fall back to regex/vector_search after resolution.
+
+**Architecture pattern (decided by Anil):**
+- `User question → resolve_entities() → clean Cypher with codes → execute`
+- Vector search is ONLY for fuzzy resume/skill description matching (RFP, "someone good with X"), NOT for entity lookup.
+- The resolve logic itself is unchanged (exact code → exact name → FTS → RRF → alias → not-found). Only descriptions/docstrings changed.
+
+### 2026-05-15 — resolve_entities MCP tool
+
+**Files created/modified:**
+- `talent_backend/talent_backend/mcp_server/entity_tools.py` — NEW. `resolve_entities` MCP tool that resolves user terms to canonical entity names/codes via the `entity_search` PostgreSQL table.
+- `talent_backend/talent_backend/mcp_server/server.py` — Added `entity_tools` import for tool registration.
+
+**Architecture decisions:**
+- Uses the SAME connection pool as all other MCP tools (`_pg()._pool`) — no separate pool.
+- Cascading resolution strategy: exact code → exact name → FTS → alias substring → not-found. Priority order gives deterministic, highest-confidence matches first.
+- All SQL uses parameterized queries (`%s` placeholders) — no f-strings with user input.
+- Gracefully handles missing `entity_search` table by checking `information_schema.tables` and returning all not-found results.
+- Entity type validated against a frozen set whitelist before querying.
+- Processes queries sequentially within a single DB connection to avoid pool exhaustion on large batches.
+- Confidence scores: 1.0 for exact matches, min(0.9, ts_rank) for FTS, 0.7 for alias substring.
+
+**Patterns:**
+- Followed `vector_tools.py` pattern for raw pool access: `pg._ensure_open()` → `pg._pool.connection()` → parameterized `cur.execute()`.
+- `ctx.info()` logging mirrors existing tools.
+- `_resolve_single()` helper keeps the main tool function clean.
+
+### 2026-05-15 — Per-question pipeline logging
+
+**Files created/modified:**
+- `talent_backend/talent_backend/pipeline_logger.py` — NEW. `PipelineLogger` class that collects events during a request lifecycle and writes structured JSON to disk. `parse_log_event()` parses the existing `_AgentLogHandler` messages into pipeline events.
+- `talent_backend/talent_backend/config.py` — Added `ENABLE_PIPELINE_LOGGING` and `PIPELINE_LOG_DIR` env vars.
+- `talent_backend/talent_backend/api.py` — Hooked `PipelineLogger` into both `_stream_agent` (SSE) and `_stream_graph` (NDJSON). The `_AgentLogHandler.emit()` in `_stream_graph` now also feeds `parse_log_event()`.
+- `.gitignore` — Added `query_logs/`.
+
+**Architecture decisions:**
+- Pipeline logger is instantiated per-request in the endpoint handler, passed into the streaming generator, and flushed after the `done` event. This keeps it scoped to a single question.
+- File I/O is non-blocking via `asyncio.run_in_executor`. Logging never delays the response.
+- Integration uses the existing `[QUERY]`/`[RESULT]`/handoff log messages — no changes to Agent Framework or MCP tools needed.
+- Email PII masked with regex. User OIDs kept (internal Azure AD identifiers).
+- Output folder: `query_logs/{timestamp}_{session_short}_{question_hash}/` — sortable by time, groupable by session.
+- Each query saved as separate file in `queries/` subfolder: `.sql` for Cypher/SQL/FTS, `.json` for vector searches.
+
+**Patterns:**
+- For non-blocking async file writes: `loop.run_in_executor(None, self._write_files)` keeps the sync Path.write_text off the event loop.
+- To avoid breaking existing streaming generators, the logger is an additive parameter — old call signatures are updated but all existing behavior preserved.
+
 ### 2026-05-15 — Thread management endpoints (chat history Phase 2)
 
 **Files modified:**

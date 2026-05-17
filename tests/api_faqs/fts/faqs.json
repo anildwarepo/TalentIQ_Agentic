@@ -1,0 +1,14 @@
+{
+  "category": "fts",
+  "description": "FAQs that should hit the full-text-search MCP tool — keyword/phrase lookup over resume_text and similar long-form fields.",
+  "faqs": [
+    "Find employees with Kubernetes in their resume",
+    "Find employees whose resume mentions 'GDPR compliance'",
+    "Find employees whose resume mentions 'SAP S/4HANA migration'",
+    "Find employees whose resume mentions 'zero-trust architecture'",
+    "Find employees who have written about Databricks in their resume",
+    "Find employees with PCI-DSS experience mentioned in their resume",
+    "Search resumes for 'Snowflake data warehouse'",
+    "Search resumes for 'OpenAI' or 'LLM fine-tuning'"
+  ]
+}

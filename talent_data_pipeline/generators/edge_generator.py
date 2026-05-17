@@ -17,6 +17,7 @@ from talent_data_pipeline.generators.reference_data import (
     MANAGERS,
     OFFERINGS,
     PROJECTS,
+    ROLES,
     SERVICE_LINES,
     SKILLS_BY_DOMAIN,
 )
@@ -33,7 +34,7 @@ class EdgeGenerator(BaseGenerator):
         self._skill_to_domain: dict[str, str] = {}
         for domain, skills in SKILLS_BY_DOMAIN.items():
             for s in skills:
-                self._skill_to_domain[s] = domain
+                self._skill_to_domain[s["name"]] = domain
 
         # All skill names
         self._all_skill_names = [s["name"] for s in ALL_SKILLS]
@@ -77,7 +78,7 @@ class EdgeGenerator(BaseGenerator):
 
         for emp in tqdm(self.employees, desc="HAS_SKILL edges", miniters=10000):
             domain = emp["_domain"]
-            domain_skills = SKILLS_BY_DOMAIN.get(domain, [])
+            domain_skill_names = [s["name"] for s in SKILLS_BY_DOMAIN.get(domain, [])]
 
             # Number of skills: normal distribution avg 5.5, range 1-12
             n_skills = self.normal_int(5.5, 2.0, 1, 12)
@@ -85,8 +86,8 @@ class EdgeGenerator(BaseGenerator):
             # Pick skills: prefer domain skills
             chosen_skills: list[str] = []
             # Always include 1-3 from primary domain
-            n_domain = min(len(domain_skills), self.rng.randint(1, 3))
-            chosen_skills.extend(self.rng.sample(domain_skills, n_domain))
+            n_domain = min(len(domain_skill_names), self.rng.randint(1, 3))
+            chosen_skills.extend(self.rng.sample(domain_skill_names, n_domain))
 
             # Fill remaining from all skills
             remaining = n_skills - len(chosen_skills)
@@ -260,12 +261,7 @@ class EdgeGenerator(BaseGenerator):
         ~2.6 client engagements per employee avg.
         """
         edges = []
-        roles = [
-            "Software Engineer", "Lead Developer", "Solutions Architect",
-            "Data Engineer", "DevOps Engineer", "Project Manager",
-            "Business Analyst", "Cloud Architect", "Security Consultant",
-            "Full Stack Developer", "Lead ML Engineer", "Platform Engineer",
-        ]
+        role_names = [r["name"] for r in ROLES]
 
         for emp in tqdm(self.employees, desc="WORKED_FOR edges", miniters=10000):
             n = self.normal_int(2.6, 1.2, 1, 6)
@@ -280,7 +276,7 @@ class EdgeGenerator(BaseGenerator):
                     "from_key": ("workday_id", emp["workday_id"]),
                     "to_key": ("name", client),
                     "props": {
-                        "role": self.rng.choice(roles),
+                        "role": self.rng.choice(role_names),
                         "project": self.rng.choice(self._project_names),
                         "start_date": self.date_between(start_year, start_year),
                         "end_date": "" if is_current else self.date_between(end_year, end_year),
@@ -294,11 +290,7 @@ class EdgeGenerator(BaseGenerator):
     def generate_worked_on(self) -> list[dict[str, Any]]:
         """WORKED_ON: Employee → Project (~336K edges)."""
         edges = []
-        roles = [
-            "Software Engineer", "Lead Developer", "Solutions Architect",
-            "Data Engineer", "DevOps Engineer", "Project Manager",
-            "Business Analyst", "Cloud Architect", "Security Consultant",
-        ]
+        role_names = [r["name"] for r in ROLES]
 
         for emp in tqdm(self.employees, desc="WORKED_ON edges", miniters=10000):
             n = self.normal_int(2.6, 1.2, 1, 6)
@@ -312,7 +304,7 @@ class EdgeGenerator(BaseGenerator):
                     "from_key": ("workday_id", emp["workday_id"]),
                     "to_key": ("name", project),
                     "props": {
-                        "role": self.rng.choice(roles),
+                        "role": self.rng.choice(role_names),
                         "start_date": self.date_between(start_year, start_year),
                         "end_date": "" if is_current else self.date_between(
                             self.rng.randint(start_year + 1, 2026),
@@ -322,4 +314,20 @@ class EdgeGenerator(BaseGenerator):
                 })
 
         print(f"Generated {len(edges):,} WORKED_ON edges")
+        return edges
+
+    def generate_has_role(self) -> list[dict[str, Any]]:
+        """HAS_ROLE: Employee → Role (130K edges, 1:1).
+
+        Each employee gets a single HAS_ROLE edge based on their role_name field.
+        """
+        edges = []
+        for emp in tqdm(self.employees, desc="HAS_ROLE edges", miniters=10000):
+            edges.append({
+                "from_key": ("workday_id", emp["workday_id"]),
+                "to_key": ("name", emp["role_name"]),
+                "props": {},
+            })
+
+        print(f"Generated {len(edges):,} HAS_ROLE edges")
         return edges

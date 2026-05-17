@@ -1,0 +1,13 @@
+{
+  "question": "Find French speakers at B2 level or higher",
+  "started_at": "2026-05-15T05:35:09.089215+00:00",
+  "elapsed_ms": 2290,
+  "error": "ConnectError: All connection attempts failed",
+  "strategies_invoked": [],
+  "queries": [],
+  "results": [],
+  "handoffs": [],
+  "rows_total": 0,
+  "final_answer": "",
+  "other_events": []
+}

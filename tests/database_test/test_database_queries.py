@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from tests.conftest import cypher_query, cypher_query_cols
+from tests.database_test.conftest import cypher_query, cypher_query_cols
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Constants derived from ontology

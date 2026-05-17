@@ -90,6 +90,22 @@ def create_btree_indexes(cur) -> None:
           "B-tree on employee_fts.workday_id")
 
 
+def create_entity_search_indexes(cur) -> None:
+    """GIN + B-tree indexes for entity_search table."""
+    _exec(cur,
+          "CREATE INDEX IF NOT EXISTS idx_entity_search_fts "
+          "ON entity_search USING gin (fts_vector);",
+          "GIN index on entity_search.fts_vector")
+    _exec(cur,
+          "CREATE UNIQUE INDEX IF NOT EXISTS idx_entity_search_type_name "
+          "ON entity_search (entity_type, name);",
+          "Unique index on entity_search(entity_type, name)")
+    _exec(cur,
+          "CREATE INDEX IF NOT EXISTS idx_entity_search_type_code "
+          "ON entity_search (entity_type, code);",
+          "B-tree on entity_search(entity_type, code)")
+
+
 def create_age_graph_indexes(cur) -> None:
     """Indexes on AGE graph internal tables for query performance.
 
@@ -110,16 +126,27 @@ def create_age_graph_indexes(cur) -> None:
         # Reference node lookups by name
         (f"{graph}.\"Location\"", "properties->>'city'", "idx_loc_city"),
         (f"{graph}.\"Skill\"", "properties->>'name'", "idx_skill_name"),
+        (f"{graph}.\"Skill\"", "properties->>'code'", "idx_skill_code"),
         (f"{graph}.\"SkillDomain\"", "properties->>'name'", "idx_skilldomain_name"),
+        (f"{graph}.\"SkillDomain\"", "properties->>'code'", "idx_skilldomain_code"),
         (f"{graph}.\"Certification\"", "properties->>'name'", "idx_cert_name"),
+        (f"{graph}.\"Certification\"", "properties->>'code'", "idx_cert_code"),
         (f"{graph}.\"Language\"", "properties->>'name'", "idx_lang_name"),
+        (f"{graph}.\"Language\"", "properties->>'code'", "idx_lang_code"),
         (f"{graph}.\"ServiceLine\"", "properties->>'name'", "idx_sl_name"),
+        (f"{graph}.\"ServiceLine\"", "properties->>'code'", "idx_sl_code"),
         (f"{graph}.\"Offering\"", "properties->>'name'", "idx_offering_name"),
+        (f"{graph}.\"Offering\"", "properties->>'code'", "idx_offering_code"),
         (f"{graph}.\"Manager\"", "properties->>'employee_id'", "idx_mgr_empid"),
         (f"{graph}.\"University\"", "properties->>'name'", "idx_uni_name"),
+        (f"{graph}.\"University\"", "properties->>'code'", "idx_uni_code"),
         (f"{graph}.\"Client\"", "properties->>'name'", "idx_client_name"),
+        (f"{graph}.\"Client\"", "properties->>'code'", "idx_client_code"),
         (f"{graph}.\"Project\"", "properties->>'name'", "idx_project_name"),
+        (f"{graph}.\"Project\"", "properties->>'code'", "idx_project_code"),
         (f"{graph}.\"Country\"", "properties->>'code'", "idx_country_code"),
+        (f"{graph}.\"Role\"", "properties->>'name'", "idx_role_name"),
+        (f"{graph}.\"Role\"", "properties->>'code'", "idx_role_code"),
     ]
 
     for table, expr, idx_name in property_indexes:
@@ -148,6 +175,9 @@ def run_index_creation() -> None:
 
     print("B-tree indexes...")
     create_btree_indexes(cur)
+
+    print("Entity search indexes...")
+    create_entity_search_indexes(cur)
 
     print("AGE graph property indexes...")
     create_age_graph_indexes(cur)

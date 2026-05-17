@@ -1,0 +1,13 @@
+{
+  "question": "Show me Anita Desai's team members",
+  "started_at": "2026-05-15T05:35:13.672162+00:00",
+  "elapsed_ms": 2281,
+  "error": "ConnectError: All connection attempts failed",
+  "strategies_invoked": [],
+  "queries": [],
+  "results": [],
+  "handoffs": [],
+  "rows_total": 0,
+  "final_answer": "",
+  "other_events": []
+}

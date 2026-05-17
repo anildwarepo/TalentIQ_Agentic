@@ -16,6 +16,26 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
 )
+
+# Silence noisy Azure SDK / HTTP loggers — they dump full request+response
+# headers at INFO which floods the console on every Cosmos / AOAI call.
+for _noisy in (
+    "azure",
+    "azure.core.pipeline.policies.http_logging_policy",
+    "azure.cosmos",
+    "azure.cosmos._cosmos_http_logging_policy",
+    "azure.identity",
+    "azure.identity._credentials",
+    "azure.identity.aio",
+    "azure.identity.aio._credentials",
+    "azure.identity.aio._internal",
+    "httpx",
+    "httpcore",
+    "openai",
+    "mcp.client.streamable_http",
+):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
+
 logger = logging.getLogger("talent_backend")
 
 

@@ -101,6 +101,15 @@ function RunLogBlock({ run, index, total }) {
             } else if (entry.kind === "handoff") {
               badge = "HANDOFF";
               displayText = text.replace(/^\[HANDOFF\]\s*/i, "");
+            } else if (entry.kind === "api") {
+              badge = "API";
+              displayText = text.replace(/^\[API\]\s*/i, "");
+            } else if (entry.kind === "agent") {
+              badge = "AGENT";
+              displayText = text.replace(/^\[AGENT\]\s*/i, "");
+            } else if (entry.kind === "final") {
+              badge = "FINAL";
+              displayText = text.replace(/^\[FINAL\]\s*/i, "");
             } else if (entry.kind === "error") {
               badge = "ERROR";
               displayText = text.replace(/^\[ERROR\]\s*/i, "");
@@ -737,10 +746,16 @@ export default function App() {
           } else if (msg.type === "AgentEvent" || msg.type === "MagenticAgentMessageEvent") {
             const delta = (msg.delta || "").trim();
             if (delta) {
-              const kind = delta.startsWith("[QUERY]") ? "query" : delta.startsWith("[RESULT]") ? "result" : delta.startsWith("[HANDOFF]") ? "handoff" : "orch";
+              const kind = delta.startsWith("[QUERY]") ? "query"
+                : delta.startsWith("[RESULT]") ? "result"
+                : delta.startsWith("[HANDOFF]") ? "handoff"
+                : delta.startsWith("[API]") ? "api"
+                : delta.startsWith("[AGENT]") ? "agent"
+                : delta.startsWith("[FINAL]") ? "final"
+                : "orch";
               pushLogEntry({ kind, text: delta });
               trackWorkflowEvent(
-                kind === "query" ? "cypher_query" : kind === "result" ? "query_result" : kind === "handoff" ? "handoff" : "agent",
+                kind === "query" ? "cypher_query" : kind === "result" ? "query_result" : kind === "handoff" ? "handoff" : kind,
                 { message: delta.substring(0, 200) }
               );
             }

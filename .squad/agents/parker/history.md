@@ -81,3 +81,27 @@
 - When `azd up` runs, these extensions will be created on PostgreSQL server.
 - **For Parker:** Data pipeline can now assume all 4 extensions are available on Azure deployment. No fallback logic needed for production.
 - **MCP Server:** Confirmed using `public.search_graph_nodes()` SQL function — schema setup will run after `azd up` provisions PostgreSQL. This function must be created as part of schema initialization step (not yet wired; will be part of separate `azd postprovision` hook or manual schema migration).
+
+### 2026-05-15: Agent instructions updated for entity resolution workflow
+- **Path:** `talent_backend/talent_backend/agent/instructions/TALENT_GRAPH_QUERY_GENERATION_AGENT_v1.md`
+- **What changed:**
+  - Added `resolve_entities` MCP tool to Tools section — resolves user terms to canonical names/codes before Cypher
+  - Updated NODE LABELS: 10 reference entities (Certification, Skill, Country, SkillDomain, ServiceLine, Offering, University, Client, Language, Project) now show `code` and `aliases` properties
+  - Rewrote Workflow section: new 7-step entity-resolution-first flow — parse → classify → resolve → build Cypher → execute → format
+  - Added Entity Resolution Example section showing complete worked example (BA + Poland + PMP)
+  - Updated rule #10 (string matching): replaced "always use regex for entity matching" with "use `resolve_entities` to get codes, match with `entity.code = 'X'`"
+  - Updated Common Query Patterns: certification example uses `cert.code = 'PMP'`, country example uses `c.code = 'ES'` and `s.code = 'PYTHON'`
+- **Key principle:** Canonical entities (Certification, Skill, Country, etc.) are resolved via `resolve_entities` tool BEFORE Cypher is built. Free-text fields (job_title, employee name) still use regex. Enum values (skill_level, status, region) used directly.
+- **All 19 AGE Query Rules preserved.** RFP Multi-Role workflow preserved. Response Format preserved.
+
+### 2026-05-16: Agent instructions rewritten for clean resolve-first architecture
+- **Path:** `talent_backend/talent_backend/agent/instructions/TALENT_GRAPH_QUERY_GENERATION_AGENT_v1.md`
+- **What changed:**
+  - **Tools section rewritten:** `resolve_entities` is now listed FIRST with "ALWAYS call this first" directive. `search_graph` scoped to employee name lookups only. `vector_search` scoped to RFP/semantic matching only. Tool descriptions teach purpose, not mechanics.
+  - **Rule #10 simplified:** Removed all specific entity examples (cert names, country names). Now states: "Entities have `code` properties. Always use `resolve_entities` to find the code." Regex rules kept for free-text fields only.
+  - **Workflow section rewritten:** Reduced from 7 steps to 5 clean steps: parse → resolve → build Cypher → execute → format. Removed the classify step (resolver handles type discovery). Entity Type → MATCH Pattern table extracted as a standalone reference.
+  - **Example replaced:** Old BA/Poland/PMP example replaced with "show 5 people with Google Cloud data in Poland" — demonstrates fuzzy term resolution ("Google Cloud data" → GCP-DE).
+  - **Common Query Patterns updated:** All 6 examples now use `.code` matching. Bench employee example uses `s.code = 'JAVA'`. Multi-relationship example uses `s.code IN ['PYTHON', 'FASTAPI']`. Added resolve_entities comments showing the resolution step.
+  - **Removed all hardcoded values:** No specific cert names, country names, or skill names appear as rules. Examples use codes as teaching patterns, not as hardcoded mappings.
+- **Key principle:** Instructions teach PATTERNS, not specific values. The resolver is the single source of truth for entity→code mapping. Agent never needs to know entity codes itself.
+- **Preserved:** All 19 AGE Query Rules, RFP Multi-Role Matching Workflow, Response Format, Graph Ontology.

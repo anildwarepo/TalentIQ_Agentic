@@ -50,3 +50,39 @@ def pg_conninfo() -> str:
     if PGSSLMODE:
         base += f" sslmode={PGSSLMODE}"
     return base
+
+
+# ── Azure credential helper ──────────────────────────────────
+
+def _is_azure_hosted() -> bool:
+    return any(
+        os.getenv(v)
+        for v in (
+            "WEBSITE_INSTANCE_ID",
+            "CONTAINER_APP_NAME",
+            "KUBERNETES_SERVICE_HOST",
+            "IDENTITY_ENDPOINT",
+            "MSI_ENDPOINT",
+            "AZURE_CLIENT_ID_FEDERATED_TOKEN_FILE",
+        )
+    )
+
+
+def get_azure_credential(*, aio: bool = False):
+    """Return an Azure credential tuned for the current environment.
+
+    On Azure-hosted compute → full DefaultAzureCredential.
+    Locally → DefaultAzureCredential with IMDS / managed-identity probes
+    excluded so we don't pay a ~5s timeout per token acquisition.
+    """
+    if aio:
+        from azure.identity.aio import DefaultAzureCredential as _Cred
+    else:
+        from azure.identity import DefaultAzureCredential as _Cred
+
+    if _is_azure_hosted() or os.getenv("AZURE_FORCE_FULL_CREDENTIAL_CHAIN") == "1":
+        return _Cred()
+    return _Cred(
+        exclude_managed_identity_credential=True,
+        exclude_workload_identity_credential=True,
+    )

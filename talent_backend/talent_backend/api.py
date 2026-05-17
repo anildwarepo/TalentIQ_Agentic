@@ -273,6 +273,7 @@ async def graph_responses(req: ChatRequest, user: dict = Depends(get_current_use
 
     user_input = req.input
     if req.file_context:
+        logger.info("File context present: filename=%s, content_len=%d", req.file_context.filename, len(req.file_context.content))
         # Embed document content in the user message so it enters chat history
         user_input = (
             f"[Document context from '{req.file_context.filename}']\n"

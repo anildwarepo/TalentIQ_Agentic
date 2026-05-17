@@ -28,11 +28,11 @@ def create_vector_indexes(cur) -> None:
     if has_diskann:
         _exec(cur,
               "CREATE INDEX IF NOT EXISTS idx_emb_resume_diskann "
-              "ON employee_embeddings USING diskann (resume_embedding vector_cosine_ops);",
+              "ON employee_embeddings USING diskann (resume_embedding);",
               "DiskANN index on resume_embedding")
         _exec(cur,
               "CREATE INDEX IF NOT EXISTS idx_emb_skills_diskann "
-              "ON employee_embeddings USING diskann (skills_embedding vector_cosine_ops);",
+              "ON employee_embeddings USING diskann (skills_embedding);",
               "DiskANN index on skills_embedding")
     else:
         # Fallback to HNSW
@@ -57,16 +57,12 @@ def create_fts_indexes(cur) -> None:
 
 
 def create_trigram_indexes(cur) -> None:
-    """pg_trgm GIN indexes for fuzzy/trigram search.
-
-    pg_trgm is not allow-listed on Azure Database for PostgreSQL,
-    so we check availability first and skip gracefully.
-    """
+    """pg_trgm GIN indexes for fuzzy/trigram search."""
+    # Ensure pg_trgm extension
     try:
         cur.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
     except psycopg2.Error:
-        print("  ⚠️  pg_trgm extension not available — skipping trigram indexes")
-        return
+        pass
 
     _exec(cur,
           "CREATE INDEX IF NOT EXISTS idx_fts_name_trgm "
@@ -94,6 +90,22 @@ def create_btree_indexes(cur) -> None:
           "B-tree on employee_fts.workday_id")
 
 
+def create_entity_search_indexes(cur) -> None:
+    """GIN + B-tree indexes for entity_search table."""
+    _exec(cur,
+          "CREATE INDEX IF NOT EXISTS idx_entity_search_fts "
+          "ON entity_search USING gin (fts_vector);",
+          "GIN index on entity_search.fts_vector")
+    _exec(cur,
+          "CREATE UNIQUE INDEX IF NOT EXISTS idx_entity_search_type_name "
+          "ON entity_search (entity_type, name);",
+          "Unique index on entity_search(entity_type, name)")
+    _exec(cur,
+          "CREATE INDEX IF NOT EXISTS idx_entity_search_type_code "
+          "ON entity_search (entity_type, code);",
+          "B-tree on entity_search(entity_type, code)")
+
+
 def create_age_graph_indexes(cur) -> None:
     """Indexes on AGE graph internal tables for query performance.
 
@@ -103,36 +115,43 @@ def create_age_graph_indexes(cur) -> None:
     graph = pipeline_config.graph_name
 
     # Employee indexes — most-queried node
-    # AGE stores properties as agtype, not jsonb. Use agtype_access_operator
-    # to extract individual property values for indexing.
     property_indexes = [
-        ("Employee", "workday_id", "idx_emp_workday_id"),
-        ("Employee", "email", "idx_emp_email"),
-        ("Employee", "is_bench", "idx_emp_is_bench"),
-        ("Employee", "employment_status", "idx_emp_status"),
-        ("Employee", "skill_level", "idx_emp_skill_level"),
-        ("Employee", "job_level", "idx_emp_job_level"),
-        ("Employee", "delivery_model", "idx_emp_delivery_model"),
+        (f"{graph}.\"Employee\"", "properties->>'workday_id'", "idx_emp_workday_id"),
+        (f"{graph}.\"Employee\"", "properties->>'email'", "idx_emp_email"),
+        (f"{graph}.\"Employee\"", "properties->>'is_bench'", "idx_emp_is_bench"),
+        (f"{graph}.\"Employee\"", "properties->>'employment_status'", "idx_emp_status"),
+        (f"{graph}.\"Employee\"", "properties->>'skill_level'", "idx_emp_skill_level"),
+        (f"{graph}.\"Employee\"", "properties->>'job_level'", "idx_emp_job_level"),
+        (f"{graph}.\"Employee\"", "properties->>'delivery_model'", "idx_emp_delivery_model"),
         # Reference node lookups by name
-        ("Location", "city", "idx_loc_city"),
-        ("Skill", "name", "idx_skill_name"),
-        ("SkillDomain", "name", "idx_skilldomain_name"),
-        ("Certification", "name", "idx_cert_name"),
-        ("Language", "name", "idx_lang_name"),
-        ("ServiceLine", "name", "idx_sl_name"),
-        ("Offering", "name", "idx_offering_name"),
-        ("Manager", "employee_id", "idx_mgr_empid"),
-        ("University", "name", "idx_uni_name"),
-        ("Client", "name", "idx_client_name"),
-        ("Project", "name", "idx_project_name"),
-        ("Country", "code", "idx_country_code"),
+        (f"{graph}.\"Location\"", "properties->>'city'", "idx_loc_city"),
+        (f"{graph}.\"Skill\"", "properties->>'name'", "idx_skill_name"),
+        (f"{graph}.\"Skill\"", "properties->>'code'", "idx_skill_code"),
+        (f"{graph}.\"SkillDomain\"", "properties->>'name'", "idx_skilldomain_name"),
+        (f"{graph}.\"SkillDomain\"", "properties->>'code'", "idx_skilldomain_code"),
+        (f"{graph}.\"Certification\"", "properties->>'name'", "idx_cert_name"),
+        (f"{graph}.\"Certification\"", "properties->>'code'", "idx_cert_code"),
+        (f"{graph}.\"Language\"", "properties->>'name'", "idx_lang_name"),
+        (f"{graph}.\"Language\"", "properties->>'code'", "idx_lang_code"),
+        (f"{graph}.\"ServiceLine\"", "properties->>'name'", "idx_sl_name"),
+        (f"{graph}.\"ServiceLine\"", "properties->>'code'", "idx_sl_code"),
+        (f"{graph}.\"Offering\"", "properties->>'name'", "idx_offering_name"),
+        (f"{graph}.\"Offering\"", "properties->>'code'", "idx_offering_code"),
+        (f"{graph}.\"Manager\"", "properties->>'employee_id'", "idx_mgr_empid"),
+        (f"{graph}.\"University\"", "properties->>'name'", "idx_uni_name"),
+        (f"{graph}.\"University\"", "properties->>'code'", "idx_uni_code"),
+        (f"{graph}.\"Client\"", "properties->>'name'", "idx_client_name"),
+        (f"{graph}.\"Client\"", "properties->>'code'", "idx_client_code"),
+        (f"{graph}.\"Project\"", "properties->>'name'", "idx_project_name"),
+        (f"{graph}.\"Project\"", "properties->>'code'", "idx_project_code"),
+        (f"{graph}.\"Country\"", "properties->>'code'", "idx_country_code"),
+        (f"{graph}.\"Role\"", "properties->>'name'", "idx_role_name"),
+        (f"{graph}.\"Role\"", "properties->>'code'", "idx_role_code"),
     ]
 
-    cur.execute("SET search_path = ag_catalog, public;")
-    for label, prop, idx_name in property_indexes:
+    for table, expr, idx_name in property_indexes:
         _exec(cur,
-              f'CREATE INDEX IF NOT EXISTS {idx_name} ON {graph}."{label}" '
-              f"((ag_catalog.agtype_access_operator(properties, '\"{prop}\"'::agtype)));",
+              f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table} (({expr}));",
               f"AGE index {idx_name}")
 
 
@@ -156,6 +175,9 @@ def run_index_creation() -> None:
 
     print("B-tree indexes...")
     create_btree_indexes(cur)
+
+    print("Entity search indexes...")
+    create_entity_search_indexes(cur)
 
     print("AGE graph property indexes...")
     create_age_graph_indexes(cur)

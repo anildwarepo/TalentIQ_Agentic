@@ -1,0 +1,33 @@
+{
+  "question": "Find Python developers in India",
+  "started_at": "2026-05-15T05:31:29.545363+00:00",
+  "elapsed_ms": 67641,
+  "error": null,
+  "strategies_invoked": [
+    "CYPHER"
+  ],
+  "queries": [
+    {
+      "strategy": "CYPHER",
+      "raw": "[QUERY] CYPHER (find_employees): SELECT * FROM ag_catalog.cypher('talent_graph_dev', $$\n  MATCH (e:Employee),\n        (e)-[:HAS_SKILL]->(s:Skill),\n        (e)-[:LOCATED_IN]->(l:Location)-[:IN_COUNTRY]->(c:Country)\n  WHERE s.name =~ '(?i).*(python).*' AND c.name = 'India'\n  WITH e, l, c, collect(DISTINCT s.name) AS skills_\n  ORDER BY e.years_of_experience DESC\n  LIMIT 25\n  OPTIONAL MATCH (e)-[hc:HOLDS_CERT]->(cert:Certification)\n  WHERE hc.status = 'Valid'\n  WITH e, l, c, skills_, collect(DISTINCT cert.name) AS certs_\n  WITH e, l, c, skills_, certs_, [] AS langs_\n  WITH e.name AS name_, e.email AS email_, e.job_title AS title_, e.years_of_experience AS yoe, e.bench_duration_days AS bench_days_, l.city AS city_, c.name AS country_, skills_, certs_, langs_\n  RETURN name_, email_, title_, yoe, bench_days_, city_, country_, skills_, certs_, langs_\n  ORDER BY yoe DESC\n  LIMIT 25\n$$) AS (name_ ag_catalog.agtype, email_ ag_catalog.agtype, title_ ag_catalog.agtype, yoe ag_catalog.agtype, bench_days_ ag_catalog.agtype, city_ ag_catalog.agtype, country_ ag_catalog.agtype, skills_ ag_catalog.agtype, certs_ ag_catalog.agtype, langs_ ag_catalog.agtype);"
+    }
+  ],
+  "results": [
+    {
+      "strategy": "CYPHER",
+      "rows": 25,
+      "latency_ms": 1363,
+      "raw": "[RESULT] CYPHER returned 25 rows (1363ms)"
+    }
+  ],
+  "handoffs": [
+    "Query Agent",
+    "Query Agent"
+  ],
+  "rows_total": 25,
+  "final_answer": "Found 25 Python developers in India.\n\n| Name | Role | Location | Skills | Certifications | Bench days |\n|---|---|---|---|---|---:|\n| दमयंती चोधरी | Architect Developer | Mumbai, India | Python |  | 10 |\n| संजित Lanka | Architect Backend Engineer | Mumbai, India | Python |  | 0 |\n| Varenya Tandon | Architect Backend Engineer | Noida, India | Python |  | 106 |\n| Parth सेनगुप्ता | Architect Cloud Engineer | Hyderabad, India | Python |  | 0 |\n| Eesha Reddy | Architect Cloud Engineer | Pune, India | Python | Salesforce Certified Platform Developer II | 0 |\n| सुधीर Rajagopalan | Architect Security Analyst | Noida, India | Python | CISSP (Certified Information Systems Security Professional) | 0 |\n| Manbir खान | Architect Cloud Engineer | Hyderabad, India | Python | SAFe Agilist (SA) | 0 |\n| Jacob पाटिल | Architect Solutions Architect | Gurgaon, India | Python |  | 0 |\n| Christopher सिंह | Architect Business Analyst | Gurgaon, India | Python |  | 0 |\n| राज वर्मा | Architect Full Stack Developer | Noida, India | Python |  | 0 |\n| लीला तिवारी | Principal Cloud Engineer | Pune, India | Python | HashiCorp Terraform Associate | 0 |\n| Kiaan Sandhu | Principal Platform Engineer | Kolkata, India | Python |  | 0 |\n| Abhiram कदम | Architect Security Analyst | Hyderabad, India | Python |  | 0 |\n| सुलभा आचार्य | Architect DevOps Engineer | Hyderabad, India | Python | AWS Certified SysOps Administrator; ServiceNow Certified System Administrator | 0 |\n| अर्चना वेंकटएसन | Principal Consultant | Pune, India | Python |  | 0 |\n| अनन्‍त Sehgal | Principal Platform Engineer | Pune, India | Python | CEH (Certified Ethical Hacker); Microsoft Azure Administrator (AZ-104) | 168 |\n| Hemal Dhillon | Architect Business Analyst | Noida, India | Python | AWS Certified SysOps Administrator | 0 |\n| Dipta Shukla | Principal Backend Engineer | Hyderabad, India | Python | CISSP (Certified Information Systems Security Professional); Snowflake SnowPro Core Certification | 0 |\n| असीम Taneja | Principal Software Engineer | Mumbai, India | Python | SAP Certified Application Associate | 0 |\n| Omkaar चोपरा | Principal Backend Engineer | Mumbai, India | Python | SAP Certified Application Associate | 0 |\n| उषा चटर्जी | Principal Cloud Engineer | Gurgaon, India | Python | AWS Certified Solutions Architect – Associate | 0 |\n| प्रसन्न सेन | Architect Software Engineer | Pune, India | Python | Google Cloud Professional Cloud Architect | 121 |\n| शर्म Barad | Architect Solutions Architect | Pune, India | Python | AWS Certified SysOps Administrator | 0 |\n| Isaac Tiwari | Principal DevOps Engineer | Bangalore, India | Python |  | 163 |\n| Reyansh Bobal | Architect Business Analyst | Bangalore, India | Python |  | 0 |\n\nIf you want, I can also narrow this down by city, seniority, bench status, or add languages/team-related filters.",
+  "other_events": [
+    "[QUERY] Function name: find_employees",
+    "[RESULT] Function find_employees succeeded."
+  ]
+}

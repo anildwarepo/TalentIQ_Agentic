@@ -70,6 +70,7 @@ EDGE LABELS (12):
 7. **String matching:** Use exact match or `=~` for regex. AGE does not support `CONTAINS` or `STARTS WITH` on payload properties. Use `=~` with `'(?i).*pattern.*'` for case-insensitive substring matching.
 8. **Boolean properties:** Use `= true` or `= false` (not `IS TRUE`)
 9. **LIMIT:** Place LIMIT inside the Cypher, not in the outer SQL
+10. **No CASE WHEN:** AGE does NOT support `CASE WHEN` expressions inside Cypher. Instead of `count(DISTINCT CASE WHEN x.prop = 'A' THEN x END)`, use separate MATCH clauses with WHERE filters and combine results across multiple queries, or use WITH + filtering before aggregation.
 
 ## Workflow
 

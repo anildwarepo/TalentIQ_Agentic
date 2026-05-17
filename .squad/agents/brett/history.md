@@ -109,6 +109,24 @@ Added batch-level checkpointing to `EmbeddingGenerator.generate_embeddings()` so
 - Outer stub file kept in sync (3-level `_REPO_ROOT` vs 4-level in inner package)
 - Same public interface preserved: `generate_embeddings(employees, skill_edges, batch_size)` returns `list[dict]`
 
+### 2026-05-15 — Added code + aliases to all reference entities + entity_search table
+Added `code` and `aliases` fields to ALL reference entities for unified search:
+- **reference_data.py** — Updated 10 entity types: CERTIFICATIONS (39, added code+aliases), SKILLS (100 via SKILLS_BY_DOMAIN restructured from list[str] to list[dict]), SKILL_DOMAINS (13), COUNTRIES (19, added aliases), LANGUAGES (18, added ISO 639-1 code), SERVICE_LINES (8), OFFERINGS (8), UNIVERSITIES (74, added abbreviation codes), CLIENTS (36), PROJECTS (22)
+- **edge_generator.py** — Updated skill_to_domain mapping and domain_skills extraction to use `s["name"]` instead of bare strings since SKILLS_BY_DOMAIN values changed from `list[str]` to `list[dict]`
+- **create_relational_tables.py** — Added `entity_search` table (entity_type, name, code, aliases, search_text, fts_vector, embedding, unique on entity_type+name)
+- **create_indexes.py** — Added `create_entity_search_indexes()`: GIN on fts_vector, unique on (entity_type,name), B-tree on (entity_type,code)
+- **entity_search_loader.py** — New loader: reads all ref data, builds search_text (name+code+aliases), creates tsvector, UPSERTs into entity_search. No embeddings (separate step)
+- **graph_loader.py** — Updated `_cypher_escape()` to handle list values (for aliases property in Cypher)
+- **main.py** — Added step 4g: entity search loading after FTS
+- All changes applied to BOTH outer stubs and inner package copies
+
+### Learnings (2026-05-15, entity search)
+- SKILLS_BY_DOMAIN change from str→dict is a breaking API change — needed to update edge_generator's skill_to_domain mapping and domain_skills sampling
+- `_cypher_escape` must handle Python lists for AGE Cypher array properties — recursive call pattern: `[_cypher_escape(v) for v in value]`
+- Entity search table uses `UNIQUE (entity_type, name)` constraint for UPSERT idempotency
+- ALL_SKILLS flattened from SKILLS_BY_DOMAIN now preserves full dicts (code, aliases) rather than wrapping in `{"name": s}`
+- Azure Functions appears in both C#/.NET and Cloud (Azure) domains; Kafka appears in Java and Data Engineering — creates 100 total skills but 98 unique skill-to-domain mappings
+
 ### 2026-05-12 — Cross-agent: Bishop's infrastructure Pass 3 — PostgreSQL Entra ID auth for pipeline
 **From Bishop (Deployment Engineer):**
 - PostgreSQL deployment is now **Entra ID-only** — no SQL admin password.
@@ -125,3 +143,20 @@ Added batch-level checkpointing to `EmbeddingGenerator.generate_embeddings()` so
 - `np.load(path, allow_pickle=False)` is safer for checkpoint files — embeddings are pure numeric arrays, no need for pickle
 - Atomic writes on Windows: `tempfile.mkstemp()` + `os.close(fd)` + write + `os.replace()` — same pattern as `LoadCheckpoint._flush()`
 - For 130K employees at batch_size=100, this saves ~1,300 `.npz` files (~1.5GB total) — acceptable tradeoff for crash resilience on ~2,600 API calls
+
+### 2026-05-16 — Added Role as a canonical entity to the data model
+Unified 17 roles (previously hardcoded as strings in employee_generator and edge_generator) into a canonical `Role` entity with code + aliases:
+- **reference_data.py** — Added `ROLES` list (17 entries with name/code/aliases), added `"Role": ROLES` to `generate_all()` output
+- **create_relational_tables.py** — Added `"Role"` to `NODE_LABELS`, `"HAS_ROLE"` to `EDGE_LABELS`
+- **employee_generator.py** — Imported `ROLES`, replaced hardcoded role list with `self.rng.choice(ROLES)`, added `role_name` field to employee dict
+- **edge_generator.py** — Imported `ROLES`, replaced hardcoded `roles = [...]` in `generate_worked_for()` and `generate_worked_on()` with `role_names = [r["name"] for r in ROLES]`, added `generate_has_role()` method (1:1 Employee → Role edges)
+- **create_indexes.py** — Added AGE property indexes: `idx_role_name` on Role(name), `idx_role_code` on Role(code)
+- **entity_search_loader.py** — Added `ROLES` to imports and `("Role", ROLES)` to `ENTITY_SOURCES` for FTS + embeddings
+- **main.py** — Added `has_role = edge_gen.generate_has_role()` in generation phase, `("HAS_ROLE", "Employee", "Role", has_role, "workday_id", "name")` in edge loading config
+- All changes applied to BOTH outer stubs and inner package copies (14 files total)
+- `job_title` property on Employee preserved (composite "{Level} {Role}" string); `role_name` is the structured lookup key
+
+### Learnings (2026-05-16, role entity)
+- Deduplicating roles across generators: employee_generator had 12 roles, edge_generator WORKED_FOR had 12 (with 5 extras: PM, Cloud Architect, Security Consultant, Lead Developer, Lead ML Engineer), WORKED_ON had 9 (subset). Unified to 17 total
+- The `role_name` field on Employee serves dual purpose: edge generation metadata for HAS_ROLE, and a structured query alternative to regex on `job_title`
+- Inner package files are NOT always identical to outer stubs — employee_generator, edge_generator, create_relational_tables, create_indexes had diffs (different is_current logic, agtype_access_operator syntax). Must update each independently

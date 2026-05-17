@@ -1,0 +1,33 @@
+{
+  "question": "Find bench employees with Java skills in Spain",
+  "started_at": "2026-05-15T05:33:04.181667+00:00",
+  "elapsed_ms": 7424,
+  "error": null,
+  "strategies_invoked": [
+    "CYPHER"
+  ],
+  "queries": [
+    {
+      "strategy": "CYPHER",
+      "raw": "[QUERY] CYPHER (find_employees): SELECT * FROM ag_catalog.cypher('talent_graph_dev', $$\n  MATCH (e:Employee),\n        (e)-[:HAS_SKILL]->(s:Skill),\n        (e)-[:LOCATED_IN]->(l:Location)-[:IN_COUNTRY]->(c:Country)\n  WHERE s.name =~ '(?i).*(java).*' AND c.name = 'Spain' AND e.is_bench = true\n  WITH e, l, c, collect(DISTINCT s.name) AS skills_\n  ORDER BY e.years_of_experience DESC\n  LIMIT 25\n  WITH e, l, c, skills_, [] AS certs_\n  WITH e, l, c, skills_, certs_, [] AS langs_\n  WITH e.name AS name_, e.email AS email_, e.job_title AS title_, e.years_of_experience AS yoe, e.bench_duration_days AS bench_days_, l.city AS city_, c.name AS country_, skills_, certs_, langs_\n  RETURN name_, email_, title_, yoe, bench_days_, city_, country_, skills_, certs_, langs_\n  ORDER BY yoe DESC\n  LIMIT 25\n$$) AS (name_ ag_catalog.agtype, email_ ag_catalog.agtype, title_ ag_catalog.agtype, yoe ag_catalog.agtype, bench_days_ ag_catalog.agtype, city_ ag_catalog.agtype, country_ ag_catalog.agtype, skills_ ag_catalog.agtype, certs_ ag_catalog.agtype, langs_ ag_catalog.agtype);"
+    }
+  ],
+  "results": [
+    {
+      "strategy": "CYPHER",
+      "rows": 25,
+      "latency_ms": 597,
+      "raw": "[RESULT] CYPHER returned 25 rows (597ms)"
+    }
+  ],
+  "handoffs": [
+    "Query Agent",
+    "Query Agent"
+  ],
+  "rows_total": 25,
+  "final_answer": "Found 10 bench employees with Java skills in Spain.\n\n| Name | Title | Years | Bench Days | City | Country | Skills | Email |\n|---|---|---:|---:|---|---|---|---|\n| Dionisio Adán | Principal Full Stack Developer | 14 | 63 | Barcelona | Spain | Java | dionisio.adan@dxc.com |\n| Josefa Mariscal | Architect Consultant | 13 | 61 | Madrid | Spain | Java | josefa.mariscal@dxc.com |\n| Marisol Rivera | Principal Cloud Engineer | 13 | 129 | Madrid | Spain | Java | marisol.rivera@dxc.com |\n| Teodosio Iglesia | Principal Solutions Architect | 12 | 61 | Madrid | Spain | Java | teodosio.iglesia@dxc.com |\n| Pili Amor | Lead Consultant | 12 | 151 | Madrid | Spain | Java | pili.amor@dxc.com |\n| Anselma Castejón | Principal Solutions Architect | 12 | 73 | Madrid | Spain | Java | anselma.castejon@dxc.com |\n| Vasco Aznar | Architect Software Engineer | 12 | 155 | Madrid | Spain | Java | vasco.aznar@dxc.com |\n| Catalina Cabanillas | Lead Data Engineer | 12 | 46 | Madrid | Spain | Java | catalina.cabanillas@dxc.com |\n| Samanta Castellanos | Principal Consultant | 11 | 107 | Barcelona | Spain | Java | samanta.castellanos@dxc.com |\n| Clarisa Calvet | Architect Business Analyst | 11 | 157 | Barcelona | Spain | JavaScript | clarisa.calvet@dxc.com |",
+  "other_events": [
+    "[QUERY] Function name: find_employees",
+    "[RESULT] Function find_employees succeeded."
+  ]
+}

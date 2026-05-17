@@ -1,0 +1,71 @@
+{
+  "question": "Show expiring certifications that need renewal",
+  "started_at": "2026-05-15T05:34:18.044613+00:00",
+  "elapsed_ms": 35213,
+  "error": null,
+  "strategies_invoked": [
+    "CYPHER"
+  ],
+  "queries": [
+    {
+      "strategy": "CYPHER",
+      "raw": "[QUERY] CYPHER: SELECT * FROM ag_catalog.cypher('talent_graph_dev', $$\nMATCH (e:Employee)-[hc:HOLDS_CERT]->(c:Certification)\nRETURN e.name AS employee_name,\n       e.email AS employee_email,\n       c.name AS certification_name,\n       c.expiry_date AS expiry_date,\n       c.renewal_status AS renewal_status\nORDER BY expiry_date ASC NULLS LAST\nLIMIT 100\n$$) AS (employee_name ag_catalog.agtype, employee_email ag_catalog.agtype, certification_name ag_catalog.agtype, expiry_date ag_catalog.agtype, renewal_status ag_catalog.agtype);"
+    },
+    {
+      "strategy": "CYPHER",
+      "raw": "[QUERY] CYPHER: SELECT * FROM ag_catalog.cypher('talent_graph_dev', $$\nMATCH (e:Employee)-[hc:HOLDS_CERT]->(c:Certification)\nRETURN e.name AS employee_name,\n       e.email AS employee_email,\n       c.name AS certification_name,\n       c.expiry_date AS expiry_date,\n       c.renewal_status AS renewal_status\nORDER BY expiry_date ASC NULLS LAST\nLIMIT 100\n$$) AS (employee_name ag_catalog.agtype, employee_email ag_catalog.agtype, certification_name ag_catalog.agtype, expiry_date ag_catalog.agtype, renewal_status ag_catalog.agtype);"
+    },
+    {
+      "strategy": "CYPHER",
+      "raw": "[QUERY] CYPHER: SELECT * FROM ag_catalog.cypher('talent_graph_dev', $$\nMATCH (e:Employee)-[hc:HOLDS_CERT]->(c:Certification)\nRETURN e.name AS employee_name, e.email AS employee_email, c.name AS certification_name\nLIMIT 5\n$$) AS (employee_name ag_catalog.agtype, employee_email ag_catalog.agtype, certification_name ag_catalog.agtype);"
+    },
+    {
+      "strategy": "CYPHER",
+      "raw": "[QUERY] CYPHER: SELECT * FROM ag_catalog.cypher('talent_graph_dev', $$\nMATCH (e:Employee)-[hc:HOLDS_CERT]->(c:Certification)\nRETURN properties(hc) AS rel_props, properties(e) AS emp_props, properties(c) AS cert_props\nLIMIT 5\n$$) AS (rel_props ag_catalog.agtype, emp_props ag_catalog.agtype, cert_props ag_catalog.agtype);"
+    },
+    {
+      "strategy": "CYPHER",
+      "raw": "[QUERY] CYPHER: SELECT * FROM ag_catalog.cypher('talent_graph_dev', $$\nMATCH (e:Employee)-[hc:HOLDS_CERT]->(c:Certification)\nWHERE hc.expiry_date IS NOT NULL\n  AND (hc.status = 'Expired' OR hc.status = 'Valid' OR hc.status = 'Renewal Required' OR hc.status = 'Needs Renewal' OR hc.status = 'Expiring Soon')\nRETURN e.name AS employee_name,\n       e.email AS employee_email,\n       c.name AS certification_name,\n       hc.expiry_date AS expiry_date,\n       hc.status AS renewal_status\nORDER BY expiry_date ASC NULLS LAST\nLIMIT 100\n$$) AS (employee_name ag_catalog.agtype, employee_email ag_catalog.agtype, certification_name ag_catalog.agtype, expiry_date ag_catalog.agtype, renewal_status ag_catalog.agtype);"
+    },
+    {
+      "strategy": "CYPHER",
+      "raw": "[QUERY] CYPHER: SELECT * FROM ag_catalog.cypher('talent_graph_dev', $$\nMATCH (e:Employee)-[hc:HOLDS_CERT]->(c:Certification)\nRETURN e.name AS employee_name,\n       e.email AS employee_email,\n       c.name AS certification_name,\n       hc.expiry_date AS expiry_date,\n       hc.status AS renewal_status\nORDER BY expiry_date ASC NULLS LAST\nLIMIT 20\n$$) AS (employee_name ag_catalog.agtype, employee_email ag_catalog.agtype, certification_name ag_catalog.agtype, expiry_date ag_catalog.agtype, renewal_status ag_catalog.agtype);"
+    }
+  ],
+  "results": [
+    {
+      "strategy": "CYPHER",
+      "rows": 5,
+      "latency_ms": 220,
+      "raw": "[RESULT] CYPHER returned 5 rows (220ms)"
+    },
+    {
+      "strategy": "CYPHER",
+      "rows": 5,
+      "latency_ms": 537,
+      "raw": "[RESULT] CYPHER returned 5 rows (537ms)"
+    }
+  ],
+  "handoffs": [
+    "Query Agent",
+    "Validator Agent",
+    "Validator Agent",
+    "Validator Agent",
+    "Validator Agent",
+    "Validator Agent",
+    "Validator Agent",
+    "Query Agent"
+  ],
+  "rows_total": 10,
+  "final_answer": "No matching results were found for your query.",
+  "other_events": [
+    "[QUERY] Function name: get_graph_schema",
+    "[QUERY] SCHEMA: get_graph_schema(graph=talent_graph_dev)",
+    "[RESULT] SCHEMA: 14 nodes, 12 edges, 0 enums",
+    "[RESULT] Function get_graph_schema succeeded.",
+    "[QUERY] Function name: get_graph_schema",
+    "[QUERY] SCHEMA: get_graph_schema(graph=talent_graph_dev)",
+    "[RESULT] SCHEMA: 14 nodes, 12 edges, 0 enums",
+    "[RESULT] Function get_graph_schema succeeded."
+  ]
+}

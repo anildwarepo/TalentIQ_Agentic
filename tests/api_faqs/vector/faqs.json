@@ -1,0 +1,13 @@
+{
+  "category": "vector",
+  "description": "FAQs that should hit the vector_search MCP tool — semantic similarity over resume / skills embeddings rather than exact label matches.",
+  "faqs": [
+    "Find AI/ML experts in India with 8+ years experience",
+    "What skills has Rebecca Smith inferred from her project assignments?",
+    "Review skills and certifications for Vikram Patel's team",
+    "Find candidates similar to a senior cloud architect with Kubernetes and Terraform background",
+    "Find data engineers with experience building real-time streaming pipelines",
+    "Find consultants with strong customer-facing presentation skills",
+    "Find employees who have led large-scale digital transformation programs"
+  ]
+}

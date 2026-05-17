@@ -11,13 +11,14 @@ NODE_LABELS = [
     "Employee", "Location", "Country", "Subregion",
     "Skill", "SkillDomain", "Certification", "Language",
     "ServiceLine", "Offering", "Manager", "University",
-    "Client", "Project",
+    "Client", "Project", "Role",
 ]
 
 EDGE_LABELS = [
     "LOCATED_IN", "IN_COUNTRY", "SPECIALIZES_IN", "HAS_SKILL",
     "HOLDS_CERT", "SPEAKS", "BELONGS_TO_SL", "WORKS_IN_OFFERING",
     "REPORTS_TO", "STUDIED_AT", "WORKED_FOR", "WORKED_ON",
+    "HAS_ROLE",
 ]
 
 
@@ -105,6 +106,23 @@ def create_relational_tables() -> None:
         );
     """)
     print("  Table 'employee_fts' — OK")
+
+    # Entity search — unified FTS + vector for all reference/dimension entities
+    cur.execute(f"""
+        CREATE TABLE IF NOT EXISTS entity_search (
+            id              BIGSERIAL PRIMARY KEY,
+            entity_type     VARCHAR(30) NOT NULL,
+            name            TEXT NOT NULL,
+            code            VARCHAR(30),
+            aliases         TEXT,
+            search_text     TEXT NOT NULL,
+            fts_vector      tsvector,
+            embedding       vector({dim}),
+            updated_at      TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE (entity_type, name)
+        );
+    """)
+    print("  Table 'entity_search' — OK")
 
     cur.close()
     conn.close()

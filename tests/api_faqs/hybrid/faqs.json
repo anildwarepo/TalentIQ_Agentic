@@ -1,0 +1,14 @@
+{
+  "category": "hybrid",
+  "description": "FAQs that should require multiple strategies in one turn — typically a structured graph filter combined with vector / FTS, or a multi-position search that the agent breaks into several queries.",
+  "faqs": [
+    "Find a PM and 2 Java developers for a bid in Germany",
+    "Find AI/ML experts in India with 8+ years experience and active Azure certifications",
+    "Find bench Python developers in Spain whose resume mentions FastAPI",
+    "Find Kubernetes specialists in Poland with a CKA certification",
+    "Find senior cloud architects in India with 'multi-cloud migration' on their resume",
+    "Which skills are not covered by any bench candidate in Germany?",
+    "Find data scientists in the UK with both PyTorch and 'recommendation system' experience",
+    "Find consultants in France with B2 French and digital-transformation programme delivery experience"
+  ]
+}

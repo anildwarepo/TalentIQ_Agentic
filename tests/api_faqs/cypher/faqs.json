@@ -1,0 +1,25 @@
+{
+  "category": "cypher",
+  "description": "FAQs that should resolve to a single AGE/Cypher graph traversal — structured filters on labels, properties and relationships only.",
+  "faqs": [
+    "Find Python developers in India",
+    "Find 5 senior Java developers in Europe",
+    "Find .NET Core developers in Poland with Azure certifications",
+    "Find bench employees with Java skills in Spain",
+    "Show bench breakdown by delivery model",
+    "Who has valid PMP certification?",
+    "Show expiring certifications that need renewal",
+    "Show all certifications for barkha.garde@dxc.com",
+    "Find French speakers at B2 level or higher",
+    "How many employees per country?",
+    "Show me Anita Desai's team members",
+    "Employee count by service line",
+    "Who are the top 10 employees by impressiveness score?",
+    "EQF level distribution across the workforce",
+    "How many employees have CVs older than 1 year?",
+    "Find employees who worked for Telefónica",
+    "Which clients have the most employee engagements?",
+    "Which employees need to update their CV?",
+    "Show employees with CVs older than 2 years"
+  ]
+}

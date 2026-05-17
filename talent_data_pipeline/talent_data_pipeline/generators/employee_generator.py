@@ -14,6 +14,7 @@ from talent_data_pipeline.generators.reference_data import (
     COUNTRY_EMPLOYEE_COUNTS,
     DOMAIN_WEIGHTS,
     LOCATIONS,
+    ROLES,
     SKILL_DOMAINS,
     SERVICE_LINES,
     OFFERINGS,
@@ -214,12 +215,8 @@ class EmployeeGenerator(BaseGenerator):
                     "Junior": "Junior", "Mid": "", "Senior": "Senior",
                     "Lead": "Lead", "Principal": "Principal", "Architect": "Architect",
                 }.get(skill_level, "")
-                job_title_base = self.rng.choice([
-                    "Software Engineer", "Developer", "Consultant",
-                    "Cloud Engineer", "Data Engineer", "DevOps Engineer",
-                    "Solutions Architect", "Business Analyst", "Security Analyst",
-                    "Full Stack Developer", "Backend Engineer", "Platform Engineer",
-                ])
+                role = self.rng.choice(ROLES)
+                job_title_base = role["name"]
                 job_title = f"{job_title_prefix} {job_title_base}".strip()
 
                 emp = {
@@ -230,6 +227,7 @@ class EmployeeGenerator(BaseGenerator):
                     "phone": self._generate_phone(country),
                     "workday_id": workday_id,
                     "job_title": job_title,
+                    "role_name": role["name"],
                     "job_level": job_level,
                     "skill_level": skill_level,
                     "hire_date": hire_date,

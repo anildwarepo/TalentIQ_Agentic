@@ -1,0 +1,401 @@
+"""Typed employee-search MCP tool.
+
+`find_employees` is a deterministic SQL builder.  It owns the *shape* of
+the query (which edges to traverse, which scalars to return) but it
+does NOT own the value sets — those are read from the live graph schema
+(`schema.load_graph_schema`) at call time, so the database is the single
+source of truth for valid seniority levels, regions, cert statuses, etc.
+
+A free-form question that doesn't fit the parameter shape should go
+through `query_using_sql_cypher` (validator-protected path).
+"""
+
+from __future__ import annotations
+
+import logging
+import re
+import time
+from typing import Annotated
+
+from fastmcp import Context
+
+from .app import mcp, _pg
+from .pg_age_helper import _sanitize_sql_string
+from .schema import (
+    SchemaValidationError,
+    load_graph_schema,
+    refresh_graph_schema,
+    validate_enum,
+)
+
+logger = logging.getLogger("talent_mcp")
+
+
+# ── Regex term sanitisation ─────────────────────────────────────────────
+# We never let raw user text become a Postgres regex literal.  Each term
+# has its regex metachars wrapped in a `[c]` character class — this
+# sidesteps the `\.`, `\d`, `\w` InvalidEscapeSequence problem entirely.
+_REGEX_META = set(r".+*?()[]{}|^$\\")
+
+
+def _safe_regex_term(term: str) -> str:
+    out: list[str] = []
+    for ch in term.strip():
+        if ch in _REGEX_META:
+            out.append(f"[{ch}]" if ch != "\\" else "")  # drop bare backslash
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def _build_name_regex(terms: list[str]) -> str:
+    """Build a single case-insensitive regex from a list of terms."""
+    safe = [_safe_regex_term(t) for t in terms if t and t.strip()]
+    safe = [t for t in safe if t]
+    if not safe:
+        return ""
+    body = "|".join(safe)
+    pattern = f"(?i).*({body}).*"
+    return _sanitize_sql_string(pattern)
+
+
+# ── get_graph_schema MCP tool ──────────────────────────────────────────
+
+@mcp.tool
+async def get_graph_schema(
+    graph_name: Annotated[str, "AGE graph name."] = "talent_graph",
+    refresh: Annotated[bool, "Force re-discovery from the DB."] = False,
+    ctx: Context = None,
+) -> dict:
+    """Return the live graph schema (node labels, edge types, enum value sets).
+
+    The DB is the single source of truth.  Call this before guessing
+    valid values for parameters like `seniority_in`, `region`, or
+    `cert_status`.  The returned `enums` map keys are
+    ``"<Label>.<property>"`` (e.g. ``"Employee.skill_level"``).
+    """
+    if ctx:
+        await ctx.info(f"[QUERY] SCHEMA: get_graph_schema(graph={graph_name})")
+    schema = await (
+        refresh_graph_schema(graph_name) if refresh else load_graph_schema(graph_name)
+    )
+    if ctx:
+        await ctx.info(
+            f"[RESULT] SCHEMA: {len(schema.nodes)} nodes, "
+            f"{len(schema.edges)} edges, {len(schema.enums)} enums"
+        )
+    return schema.to_dict()
+
+
+# ── find_employees ─────────────────────────────────────────────────────
+
+@mcp.tool
+async def find_employees(
+    skills_any: Annotated[
+        list[str] | None,
+        "Match employees who have ANY of these skills (case-insensitive substring on Skill.name).",
+    ] = None,
+    min_skill_coverage: Annotated[
+        int,
+        "When skills_any is given, require at least this many distinct matches. Default 1.",
+    ] = 1,
+    certifications_any: Annotated[
+        list[str] | None,
+        "Match employees who hold ANY of these certifications (substring on Certification.name).",
+    ] = None,
+    cert_status: Annotated[
+        str | None,
+        "HOLDS_CERT.status. Use a value from get_graph_schema enum 'HOLDS_CERT.status' "
+        "(commonly 'Valid'). Pass null to skip the filter. Default 'Valid'.",
+    ] = "Valid",
+    languages_any: Annotated[
+        list[str] | None,
+        "Filter to employees who speak ANY of these languages (substring on Language.name).",
+    ] = None,
+    country: Annotated[
+        str | None,
+        "Country.name (exact). Use get_graph_schema enum 'Country.name' for valid values.",
+    ] = None,
+    region: Annotated[
+        str | None,
+        "Country.region (exact). Use get_graph_schema enum 'Country.region' for valid values.",
+    ] = None,
+    city: Annotated[str | None, "Location.city (exact)."] = None,
+    seniority_in: Annotated[
+        list[str] | None,
+        "Employee.skill_level values to include (e.g. ['Senior','Lead','Principal','Architect']). "
+        "Use get_graph_schema enum 'Employee.skill_level' for valid values.",
+    ] = None,
+    is_bench: Annotated[
+        bool | None,
+        "True = only bench employees, False = only non-bench, None = both.",
+    ] = None,
+    min_years_experience: Annotated[int | None, "Employee.years_of_experience >= N."] = None,
+    skill_domain: Annotated[
+        str | None,
+        "SkillDomain.name (exact). Use get_graph_schema for the list.",
+    ] = None,
+    service_line: Annotated[str | None, "ServiceLine.name (exact)."] = None,
+    include_skills: Annotated[bool, "Include matched skill list per row."] = True,
+    include_certs: Annotated[bool, "Include valid certifications per row."] = False,
+    include_languages: Annotated[bool, "Include languages per row."] = False,
+    order_by: Annotated[
+        str,
+        "Sort: 'years_desc' | 'skill_count_desc' | 'bench_days_desc' | 'name'.",
+    ] = "years_desc",
+    limit: Annotated[int, "Max rows (1-100). Default 25."] = 25,
+    graph_name: Annotated[str, "AGE graph name."] = "talent_graph",
+    ctx: Context = None,
+) -> list[dict]:
+    """Find employees by skills/certs/location/seniority — server builds safe SQL.
+
+    Validates string-enum parameters against the live graph schema, so the
+    DB is the single source of truth for what values are valid.
+    """
+
+    schema = await load_graph_schema(graph_name)
+
+    # ── Validate / clamp scalar inputs ─────────────────────────────────
+    limit = max(1, min(100, int(limit)))
+    min_skill_coverage = max(1, int(min_skill_coverage))
+    if order_by not in {"years_desc", "skill_count_desc", "bench_days_desc", "name"}:
+        raise ValueError(
+            f"order_by={order_by!r} invalid. "
+            "Use 'years_desc', 'skill_count_desc', 'bench_days_desc', or 'name'."
+        )
+
+    # ── Validate enum-typed params against DB schema ───────────────────
+    if cert_status:
+        try:
+            validate_enum(schema, "HOLDS_CERT", "status", cert_status)
+        except SchemaValidationError as ex:
+            raise ValueError(str(ex)) from None
+
+    if region:
+        try:
+            validate_enum(schema, "Country", "region", region)
+        except SchemaValidationError as ex:
+            raise ValueError(str(ex)) from None
+
+    if seniority_in:
+        for s in seniority_in:
+            try:
+                validate_enum(schema, "Employee", "skill_level", s)
+            except SchemaValidationError as ex:
+                raise ValueError(str(ex)) from None
+
+    # ── Build MATCH / WHERE ────────────────────────────────────────────
+    match_parts = ["(e:Employee)"]
+    where_parts: list[str] = []
+
+    if skills_any:
+        match_parts.append("(e)-[:HAS_SKILL]->(s:Skill)")
+        regex = _build_name_regex(skills_any)
+        if regex:
+            where_parts.append(f"s.name =~ '{regex}'")
+
+    if skill_domain:
+        match_parts.append("(e)-[:SPECIALIZES_IN]->(sd:SkillDomain)")
+        where_parts.append(f"sd.name = '{_sanitize_sql_string(skill_domain)}'")
+
+    needs_location = country is not None or region is not None or city is not None
+    if needs_location:
+        match_parts.append("(e)-[:LOCATED_IN]->(l:Location)-[:IN_COUNTRY]->(c:Country)")
+        if country:
+            where_parts.append(f"c.name = '{_sanitize_sql_string(country)}'")
+        if region:
+            where_parts.append(f"c.region = '{_sanitize_sql_string(region)}'")
+        if city:
+            where_parts.append(f"l.city = '{_sanitize_sql_string(city)}'")
+
+    if service_line:
+        match_parts.append("(e)-[:BELONGS_TO_SL]->(sl:ServiceLine)")
+        where_parts.append(f"sl.name = '{_sanitize_sql_string(service_line)}'")
+
+    if seniority_in:
+        in_list = ", ".join(f"'{_sanitize_sql_string(s)}'" for s in seniority_in)
+        where_parts.append(f"e.skill_level IN [{in_list}]")
+
+    if is_bench is True:
+        where_parts.append("e.is_bench = true")
+    elif is_bench is False:
+        where_parts.append("e.is_bench = false")
+
+    if min_years_experience is not None and min_years_experience > 0:
+        where_parts.append(f"e.years_of_experience >= {int(min_years_experience)}")
+
+    match_clause = "MATCH " + ",\n        ".join(match_parts)
+    where_clause = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+
+    # ── Aliases (safe identifiers, never reserved words) ───────────────
+    yoe = "yoe"
+    name = "name_"
+    email = "email_"
+    title = "title_"
+    city_a = "city_"
+    country_a = "country_"
+    bench_days = "bench_days_"
+
+    base_scalars = (
+        f"e.name AS {name}, e.email AS {email}, e.job_title AS {title}, "
+        f"e.years_of_experience AS {yoe}, e.bench_duration_days AS {bench_days}"
+    )
+    loc_scalars = f", l.city AS {city_a}, c.name AS {country_a}" if needs_location else ""
+
+    # ── Build the WITH chain ───────────────────────────────────────────
+    #
+    # Performance critical: AGE's planner does NOT push LIMIT through
+    # OPTIONAL MATCH + collect(DISTINCT ...). If we let cert/lang
+    # enrichment run before LIMIT, AGE enriches every employee that
+    # passed the WHERE (potentially thousands), then throws all but
+    # `limit` away. On 130k Employees this can run >180s.
+    #
+    # Strategy: keep `e` (and `l`/`c`) carried through every WITH so
+    # we can push ORDER BY + LIMIT *before* the cert/lang OPTIONAL
+    # MATCH whenever those are decoration only (no filter). The
+    # enrichment then runs on ≤limit rows.
+    needs_languages = bool(languages_any) or include_languages
+    needs_certs = bool(certifications_any) or include_certs
+    certs_are_filter = bool(certifications_any)
+    langs_are_filter = bool(languages_any)
+    can_pushdown_limit = not certs_are_filter and not langs_are_filter
+
+    carry = "e"
+    if needs_location:
+        carry += ", l, c"
+
+    with_clauses: list[str] = []
+
+    # 1) Skills aggregation (filter if requested) — keep `e` carried.
+    if skills_any:
+        with_clauses.append(f"WITH {carry}, collect(DISTINCT s.name) AS skills_")
+        if min_skill_coverage > 1:
+            with_clauses.append(f"WHERE size(skills_) >= {int(min_skill_coverage)}")
+    else:
+        with_clauses.append(f"WITH {carry}, [] AS skills_")
+
+    # ORDER BY targets are all derivable from `e`/`l`/`c` or skills_.
+    order_map = {
+        "years_desc": "e.years_of_experience DESC",
+        "skill_count_desc": "size(skills_) DESC",
+        "bench_days_desc": "e.bench_duration_days DESC",
+        "name": "e.name ASC",
+    }
+    early_order_clause = f"ORDER BY {order_map[order_by]}"
+
+    # 2) PUSH-DOWN LIMIT — runs against `e` directly, so AGE only
+    #    enriches the top-N from this point on.
+    if can_pushdown_limit:
+        with_clauses.append(early_order_clause)
+        with_clauses.append(f"LIMIT {limit}")
+
+    # 3) Certs enrichment / filter (uses `e`, still in scope).
+    if needs_certs:
+        with_clauses.append("OPTIONAL MATCH (e)-[hc:HOLDS_CERT]->(cert:Certification)")
+        cert_filters: list[str] = []
+        if cert_status:
+            cert_filters.append(f"hc.status = '{_sanitize_sql_string(cert_status)}'")
+        if certifications_any:
+            cert_regex = _build_name_regex(certifications_any)
+            if cert_regex:
+                cert_filters.append(f"cert.name =~ '{cert_regex}'")
+        if cert_filters:
+            with_clauses.append("WHERE " + " AND ".join(cert_filters))
+        with_clauses.append(
+            f"WITH {carry}, skills_, collect(DISTINCT cert.name) AS certs_"
+        )
+        if certifications_any:
+            with_clauses.append("WHERE size(certs_) >= 1")
+    else:
+        with_clauses.append(f"WITH {carry}, skills_, [] AS certs_")
+
+    # 4) Languages enrichment / filter.
+    if needs_languages:
+        with_clauses.append("OPTIONAL MATCH (e)-[:SPEAKS]->(lang:Language)")
+        if languages_any:
+            lang_regex = _build_name_regex(languages_any)
+            if lang_regex:
+                with_clauses.append(f"WHERE lang.name =~ '{lang_regex}'")
+        with_clauses.append(
+            f"WITH {carry}, skills_, certs_, collect(DISTINCT lang.name) AS langs_"
+        )
+        if languages_any:
+            with_clauses.append("WHERE size(langs_) >= 1")
+    else:
+        with_clauses.append(f"WITH {carry}, skills_, certs_, [] AS langs_")
+
+    # 5) Final flatten to the projected scalars used in RETURN/ORDER BY.
+    flatten = (
+        f"WITH e.name AS {name}, e.email AS {email}, "
+        f"e.job_title AS {title}, e.years_of_experience AS {yoe}, "
+        f"e.bench_duration_days AS {bench_days}, "
+    )
+    if needs_location:
+        flatten += f"l.city AS {city_a}, c.name AS {country_a}, "
+    # Project size(skills_) into a scalar so the final ORDER BY can resolve
+    # it post-RETURN (AGE can't resolve `size(skills_)` after the flatten
+    # WITH otherwise — yields "could not find rte for skills_").
+    flatten += "skills_, size(skills_) AS skills_count_, certs_, langs_"
+    with_clauses.append(flatten)
+
+    forwarded = (
+        f"{name}, {email}, {title}, {yoe}, {bench_days}"
+        + (f", {city_a}, {country_a}" if needs_location else "")
+        + ", skills_, certs_, langs_"
+    )
+
+    # Final ORDER BY uses the flattened aliases.
+    final_order_map = {
+        "years_desc": f"{yoe} DESC",
+        "skill_count_desc": "skills_count_ DESC",
+        "bench_days_desc": f"{bench_days} DESC",
+        "name": f"{name} ASC",
+    }
+    order_clause = f"ORDER BY {final_order_map[order_by]}"
+
+    # ── Wrap and execute ───────────────────────────────────────────────
+    cypher = "\n  ".join(
+        [match_clause]
+        + ([where_clause] if where_clause else [])
+        + with_clauses
+        + [f"RETURN {forwarded}", order_clause, f"LIMIT {limit}"]
+    )
+    out_aliases = [a.strip() for a in forwarded.split(",")]
+    out_decl = ", ".join(f"{a} ag_catalog.agtype" for a in out_aliases)
+    sql = (
+        f"SELECT * FROM ag_catalog.cypher('{_sanitize_sql_string(graph_name)}', $$\n"
+        f"  {cypher}\n"
+        f"$$) AS ({out_decl});"
+    )
+
+    logger.info("[find_employees] graph=%s sql=%s", graph_name, _compact(sql))
+    if ctx:
+        await ctx.info(f"[QUERY] CYPHER (find_employees): {sql}")
+
+    t0 = time.perf_counter()
+    rows = await _pg().query_using_sql_cypher(sql, graph_name)
+    elapsed = (time.perf_counter() - t0) * 1000
+
+    logger.info("[find_employees] %d rows in %.0fms", len(rows), elapsed)
+    if ctx:
+        await ctx.info(
+            f"[RESULT] CYPHER returned {len(rows)} rows ({elapsed:.0f}ms)"
+        )
+
+    rename = {
+        "name_": "name",
+        "email_": "email",
+        "title_": "job_title",
+        "yoe": "years",
+        "bench_days_": "bench_duration_days",
+        "city_": "city",
+        "country_": "country",
+        "skills_": "skills",
+        "certs_": "certs",
+        "langs_": "languages",
+    }
+    return [{rename.get(k, k): v for k, v in r.items()} for r in rows]
+
+
+def _compact(s: str) -> str:
+    return re.sub(r"\s+", " ", s)[:240]

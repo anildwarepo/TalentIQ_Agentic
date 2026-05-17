@@ -12,3 +12,7 @@ from .app import mcp, pg_helper  # noqa: F401
 from . import graph_tools  # noqa: F401
 from . import cv_generator  # noqa: F401
 from . import vector_tools  # noqa: F401
+from . import entity_tools  # noqa: F401
+# NOTE: `employee_search` (find_employees) intentionally NOT imported.
+# All employee queries are generated as raw Cypher by the query agent and
+# executed via `query_using_sql_cypher` (in graph_tools).

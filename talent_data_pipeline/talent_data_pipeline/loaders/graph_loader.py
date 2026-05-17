@@ -49,6 +49,8 @@ def _cypher_escape(value: Any) -> str:
         return "true" if value else "false"
     if isinstance(value, (int, float)):
         return str(value)
+    if isinstance(value, list):
+        return "[" + ", ".join(_cypher_escape(v) for v in value) + "]"
     if isinstance(value, str):
         return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
     return "'" + str(value).replace("\\", "\\\\").replace("'", "\\'") + "'"

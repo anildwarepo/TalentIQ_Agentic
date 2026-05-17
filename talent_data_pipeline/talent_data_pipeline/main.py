@@ -16,6 +16,7 @@ from talent_data_pipeline.generators.embedding_generator import EmbeddingGenerat
 from talent_data_pipeline.loaders.graph_loader import GraphLoader
 from talent_data_pipeline.loaders.vector_loader import VectorLoader
 from talent_data_pipeline.loaders.fts_loader import FTSLoader
+from talent_data_pipeline.loaders.entity_search_loader import EntitySearchLoader
 from talent_data_pipeline.validate import run_validation
 
 
@@ -79,6 +80,7 @@ def main() -> None:
     studied_at = edge_gen.generate_studied_at()
     worked_for = edge_gen.generate_worked_for()
     worked_on = edge_gen.generate_worked_on()
+    has_role = edge_gen.generate_has_role()
 
     # 3e. Embeddings
     print("\n[3e] Embeddings...")
@@ -124,6 +126,7 @@ def main() -> None:
         ("STUDIED_AT",        "Employee", "University",   studied_at,       "workday_id", "name"),
         ("WORKED_FOR",        "Employee", "Client",       worked_for,       "workday_id", "name"),
         ("WORKED_ON",         "Employee", "Project",      worked_on,        "workday_id", "name"),
+        ("HAS_ROLE",          "Employee", "Role",         has_role,         "workday_id", "name"),
     ]
 
     for edge_label, from_l, to_l, edges, fk, tk in edge_configs:
@@ -142,6 +145,16 @@ def main() -> None:
     fts_loader = FTSLoader()
     fts_loader.load_fts_data(employees, has_skill, holds_cert)
     fts_loader.close()
+
+    # 4g. Entity search (reference entities)
+    print("\n[4g] Entity search...")
+    entity_loader = EntitySearchLoader()
+    entity_loader.load_entity_search()
+
+    # 4h. Entity embeddings
+    print("\n[4h] Entity embeddings...")
+    entity_loader.embed_entities()
+    entity_loader.close()
 
     print()
 
