@@ -7,11 +7,21 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Load from app_config/.env (centralized config)
-_env_path = Path(__file__).resolve().parents[2] / "app_config" / ".env"
-if not _env_path.exists():
-    _env_path = Path(__file__).resolve().parents[3] / "app_config" / ".env"
-load_dotenv(_env_path)
+# Load from app_config/.env (centralized config).
+# Walk up the parent chain looking for app_config/.env. This handles both
+# local dev (repo root has app_config/) and containers (where the file
+# typically isn't present and env vars are injected by the platform).
+def _find_env_file() -> Path | None:
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "app_config" / ".env"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+_env_path = _find_env_file()
+if _env_path is not None:
+    load_dotenv(_env_path)
 
 # ── PostgreSQL / AGE ────────────────────────────────────────
 PGHOST: str = os.getenv("PGHOST", "localhost")

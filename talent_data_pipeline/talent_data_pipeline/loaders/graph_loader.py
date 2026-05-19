@@ -9,14 +9,76 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, TYPE_CHECKING
 
 from psycopg2.extras import execute_values
-from tqdm import tqdm
 
 from talent_data_pipeline.config import db_config, pipeline_config
 from talent_data_pipeline.loaders.base_loader import BaseLoader
+
+
+class _ProgressReporter:
+    """Plain-text periodic progress reporter (TTY-independent).
+
+    Designed for environments where stdout is captured (azd hooks, CI logs)
+    and tqdm's carriage-return updates either disappear or get buffered into
+    one-per-completion lines. Prints a short line every ~min_interval seconds
+    OR every step_pct% items, whichever comes first.
+    """
+
+    def __init__(
+        self,
+        label: str,
+        total: int,
+        step_pct: float = 5.0,
+        min_interval_sec: float = 15.0,
+    ) -> None:
+        self.label = label
+        self.total = max(1, total)
+        self.done = 0
+        self.step = max(1, int(self.total * step_pct / 100))
+        self.next_threshold = self.step
+        self.min_interval = min_interval_sec
+        self.start = time.time()
+        self.last_print = self.start
+        self._lock = threading.Lock()
+        print(f"  [{label}] 0 / {self.total:,} (0%) — starting", flush=True)
+
+    def update(self, n: int) -> None:
+        with self._lock:
+            self.done += n
+            now = time.time()
+            hit_step = self.done >= self.next_threshold
+            hit_time = (now - self.last_print) >= self.min_interval
+            if not (hit_step or hit_time or self.done >= self.total):
+                return
+            elapsed = now - self.start
+            pct = self.done * 100.0 / self.total
+            rate = self.done / max(0.001, elapsed)
+            remaining = max(0, self.total - self.done)
+            eta_sec = remaining / max(0.001, rate)
+            print(
+                f"  [{self.label}] {self.done:,} / {self.total:,} "
+                f"({pct:5.1f}%) — elapsed {elapsed/60:5.1f}m, "
+                f"rate {rate:.0f}/s, ETA {eta_sec/60:5.1f}m",
+                flush=True,
+            )
+            self.last_print = now
+            while self.next_threshold <= self.done:
+                self.next_threshold += self.step
+
+    def finish(self) -> None:
+        with self._lock:
+            elapsed = time.time() - self.start
+            rate = self.done / max(0.001, elapsed)
+            print(
+                f"  [{self.label}] done: {self.done:,} / {self.total:,} "
+                f"in {elapsed/60:.1f}m ({rate:.0f}/s)",
+                flush=True,
+            )
 
 if TYPE_CHECKING:
     from talent_data_pipeline.checkpoint import LoadCheckpoint
@@ -40,6 +102,7 @@ NODE_KEY_PROPS: dict[str, str] = {
     "University": "name",
     "Client": "name",
     "Project": "name",
+    "Role": "name",
 }
 
 
@@ -184,12 +247,16 @@ class GraphLoader(BaseLoader):
 
         # Small sets — load sequentially
         if len(nodes) < 200:
+            reporter = _ProgressReporter(label, len(nodes), step_pct=25.0, min_interval_sec=5.0)
             for idx, batch in enumerate(batches):
                 if idx in done_indices:
+                    reporter.update(len(batch))
                     continue
-                self._load_node_batch(batch, label, key_prop)
+                count = self._load_node_batch(batch, label, key_prop)
+                reporter.update(len(batch))
                 if checkpoint and phase_key:
                     checkpoint.mark_batch_done(phase_key, idx, total_batches)
+            reporter.finish()
             if checkpoint and phase_key:
                 checkpoint.mark_phase_done(phase_key, len(nodes))
             return
@@ -203,22 +270,23 @@ class GraphLoader(BaseLoader):
         if skipped:
             print(f"  (resuming — skipping {skipped} completed batches)")
 
-        with tqdm(total=items_to_process, desc=f"  {label}", miniters=500) as pbar:
-            with ThreadPoolExecutor(max_workers=LOAD_WORKERS) as executor:
-                futures = {}
-                for idx, batch in enumerate(batches):
-                    if idx in done_indices:
-                        continue
-                    fut = executor.submit(self._load_node_batch, batch, label, key_prop)
-                    futures[fut] = (idx, len(batch))
+        reporter = _ProgressReporter(label, items_to_process)
+        with ThreadPoolExecutor(max_workers=LOAD_WORKERS) as executor:
+            futures = {}
+            for idx, batch in enumerate(batches):
+                if idx in done_indices:
+                    continue
+                fut = executor.submit(self._load_node_batch, batch, label, key_prop)
+                futures[fut] = (idx, len(batch))
 
-                for future in as_completed(futures):
-                    idx, batch_size = futures[future]
-                    count = future.result()
-                    total_loaded += count
-                    pbar.update(batch_size)
-                    if checkpoint and phase_key:
-                        checkpoint.mark_batch_done(phase_key, idx, total_batches)
+            for future in as_completed(futures):
+                idx, batch_size = futures[future]
+                count = future.result()
+                total_loaded += count
+                reporter.update(batch_size)
+                if checkpoint and phase_key:
+                    checkpoint.mark_batch_done(phase_key, idx, total_batches)
+        reporter.finish()
 
         if checkpoint and phase_key:
             checkpoint.mark_phase_done(phase_key, len(nodes))
@@ -254,12 +322,16 @@ class GraphLoader(BaseLoader):
 
         # Small sets — load sequentially
         if len(edges) < 200:
+            reporter = _ProgressReporter(edge_label, len(edges), step_pct=25.0, min_interval_sec=5.0)
             for idx, batch in enumerate(batches):
                 if idx in done_indices:
+                    reporter.update(len(batch))
                     continue
                 self._load_edge_batch(batch, edge_label, from_label, to_label, from_key_prop, to_key_prop)
+                reporter.update(len(batch))
                 if checkpoint and phase_key:
                     checkpoint.mark_batch_done(phase_key, idx, total_batches)
+            reporter.finish()
             if checkpoint and phase_key:
                 checkpoint.mark_phase_done(phase_key, len(edges))
             return
@@ -273,25 +345,26 @@ class GraphLoader(BaseLoader):
         if skipped:
             print(f"  (resuming — skipping {skipped} completed batches)")
 
-        with tqdm(total=items_to_process, desc=f"  {edge_label}", miniters=1000) as pbar:
-            with ThreadPoolExecutor(max_workers=LOAD_WORKERS) as executor:
-                futures = {}
-                for idx, batch in enumerate(batches):
-                    if idx in done_indices:
-                        continue
-                    fut = executor.submit(
-                        self._load_edge_batch, batch, edge_label,
-                        from_label, to_label, from_key_prop, to_key_prop,
-                    )
-                    futures[fut] = (idx, len(batch))
+        reporter = _ProgressReporter(edge_label, items_to_process)
+        with ThreadPoolExecutor(max_workers=LOAD_WORKERS) as executor:
+            futures = {}
+            for idx, batch in enumerate(batches):
+                if idx in done_indices:
+                    continue
+                fut = executor.submit(
+                    self._load_edge_batch, batch, edge_label,
+                    from_label, to_label, from_key_prop, to_key_prop,
+                )
+                futures[fut] = (idx, len(batch))
 
-                for future in as_completed(futures):
-                    idx, batch_size = futures[future]
-                    count = future.result()
-                    total_loaded += count
-                    pbar.update(batch_size)
-                    if checkpoint and phase_key:
-                        checkpoint.mark_batch_done(phase_key, idx, total_batches)
+            for future in as_completed(futures):
+                idx, batch_size = futures[future]
+                count = future.result()
+                total_loaded += count
+                reporter.update(batch_size)
+                if checkpoint and phase_key:
+                    checkpoint.mark_batch_done(phase_key, idx, total_batches)
+        reporter.finish()
 
         if checkpoint and phase_key:
             checkpoint.mark_phase_done(phase_key, len(edges))
@@ -327,39 +400,190 @@ class GraphLoader(BaseLoader):
         )
 
     # ── Direct SQL Batch INSERT Methods ───────────────────────────
+    #
+    # Bypass Cypher MERGE entirely: INSERT straight into the AGE label tables
+    # created by Phase 2 (create_vlabel / create_elabel). ~50–100× faster than
+    # per-row MERGE because there is no parse/plan/match round-trip per row.
+    # The trade-off is non-idempotency: we DELETE the label table first
+    # (controlled by --no-truncate). AGE generates `id` via DEFAULT.
 
-    def _build_node_lookup(self, label: str, key_prop: str) -> dict[str, int]:
-        """Query all nodes of a label and return {key_property_value → AGE id}."""
-        graph = self.graph
-        lookup: dict[str, int] = {}
+    def truncate_label(self, label: str) -> int:
+        """DELETE all rows from an AGE label table. Returns count deleted."""
         with self.get_conn() as conn:
             cur = conn.cursor()
-            cur.execute(f'SELECT id, properties FROM {graph}."{label}"')
-            for raw_id, raw_props in cur:
-                node_id = (
-                    int(raw_id)
-                    if isinstance(raw_id, (int, float))
-                    else int(str(raw_id).strip())
-                )
+            cur.execute(f'DELETE FROM {self.graph}."{label}"')
+            deleted = cur.rowcount
+            conn.commit()
+            cur.close()
+        return deleted
+
+    def _load_nodes_direct_batch(
+        self, batch: list[dict[str, Any]], label: str
+    ) -> int:
+        """Direct SQL INSERT batch — AGE generates `id` via DEFAULT.
+
+        Internal keys (prefix `_`) are dropped before serialization.
+        """
+        if not batch:
+            return 0
+        values: list[tuple[str]] = []
+        for node in batch:
+            props = {k: v for k, v in node.items() if not k.startswith("_")}
+            values.append((json.dumps(props),))
+        with self.get_conn() as conn:
+            cur = conn.cursor()
+            execute_values(
+                cur,
+                f'INSERT INTO {self.graph}."{label}" (properties) VALUES %s',
+                values,
+                template="(%s::ag_catalog.agtype)",
+                page_size=5000,
+            )
+            conn.commit()
+            cur.close()
+        return len(batch)
+
+    def load_nodes_direct(
+        self,
+        label: str,
+        nodes: list[dict[str, Any]],
+        key_prop: str = "name",
+        checkpoint: LoadCheckpoint | None = None,
+        phase_key: str = "",
+    ) -> None:
+        """Load nodes via direct SQL INSERT (no Cypher MERGE).
+
+        Truncates the label table first unless --no-truncate. Parallel for
+        large sets, sequential for small. Uses _ProgressReporter for visible
+        progress under captured stdout (azd hook).
+        """
+        if checkpoint and phase_key and checkpoint.is_phase_done(phase_key):
+            print(f"  ⏭️  {phase_key} — already loaded (checkpoint), skipping")
+            return
+
+        if not nodes:
+            return
+
+        no_truncate = "--no-truncate" in sys.argv
+        if no_truncate:
+            print(f"  ⚠️  --no-truncate: keeping existing {label} nodes")
+        else:
+            deleted = self.truncate_label(label)
+            if deleted:
+                print(f"  Cleared {deleted:,} existing {label} nodes")
+
+        print(
+            f"Loading {len(nodes):,} {label} nodes via direct SQL "
+            f"({LOAD_WORKERS} workers)..."
+        )
+
+        batches = list(self.batched(nodes))
+        if not batches:
+            return
+        total_batches = len(batches)
+
+        # Small → sequential
+        if len(nodes) < 1000:
+            reporter = _ProgressReporter(
+                label, len(nodes), step_pct=25.0, min_interval_sec=5.0
+            )
+            for idx, batch in enumerate(batches):
+                self._load_nodes_direct_batch(batch, label)
+                reporter.update(len(batch))
+                if checkpoint and phase_key:
+                    checkpoint.mark_batch_done(phase_key, idx, total_batches)
+            reporter.finish()
+            if checkpoint and phase_key:
+                checkpoint.mark_phase_done(phase_key, len(nodes))
+            return
+
+        # Parallel
+        reporter = _ProgressReporter(label, len(nodes))
+        with ThreadPoolExecutor(max_workers=LOAD_WORKERS) as executor:
+            futures: dict[Any, tuple[int, int]] = {}
+            for idx, batch in enumerate(batches):
+                fut = executor.submit(self._load_nodes_direct_batch, batch, label)
+                futures[fut] = (idx, len(batch))
+            for fut in as_completed(futures):
+                idx, sz = futures[fut]
                 try:
-                    props = (
-                        json.loads(raw_props)
-                        if isinstance(raw_props, str)
-                        else raw_props
-                    )
-                except (json.JSONDecodeError, TypeError):
+                    fut.result()
+                except Exception as exc:
+                    print(f"  batch {idx} FAILED: {exc}")
                     continue
-                key_val = props.get(key_prop) if isinstance(props, dict) else None
+                reporter.update(sz)
+                if checkpoint and phase_key:
+                    checkpoint.mark_batch_done(phase_key, idx, total_batches)
+        reporter.finish()
+
+        if checkpoint and phase_key:
+            checkpoint.mark_phase_done(phase_key, len(nodes))
+
+    def load_employees_direct(
+        self,
+        employees: list[dict[str, Any]],
+        checkpoint: LoadCheckpoint | None = None,
+    ) -> None:
+        """Load Employee nodes via direct SQL INSERT (fast path)."""
+        self.load_nodes_direct(
+            "Employee", employees, key_prop="workday_id",
+            checkpoint=checkpoint, phase_key="nodes:Employee",
+        )
+
+    def load_reference_nodes_direct(
+        self,
+        ref_data: dict[str, list[dict[str, Any]]],
+        checkpoint: LoadCheckpoint | None = None,
+    ) -> None:
+        """Load reference/dimension nodes via direct SQL INSERT."""
+        key_props = {
+            "Country": "code",
+            "Location": "city",
+            "Manager": "employee_id",
+            "Subregion": "name",
+        }
+        for label, nodes in ref_data.items():
+            kp = key_props.get(label, "name")
+            phase_key = f"nodes:{label}"
+            self.load_nodes_direct(
+                label, nodes, key_prop=kp,
+                checkpoint=checkpoint, phase_key=phase_key,
+            )
+
+    def _build_node_lookup(self, label: str, key_prop: str) -> dict[str, str]:
+        """Return {key_property_value → graphid-as-text} for a label.
+
+        Uses SQL-side extraction with the agtype→text→jsonb double cast that
+        AGE 1.6.0 requires (the bare `->>` operator does not exist on agtype).
+        graphid is returned as text so it can be cast back via ::graphid in
+        edge INSERT statements.
+        """
+        graph = self.graph
+        lookup: dict[str, str] = {}
+        with self.get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                f'SELECT id::text, ((properties::text)::jsonb)->>%s '
+                f'FROM {graph}."{label}"',
+                (key_prop,),
+            )
+            for raw_id, key_val in cur:
                 if key_val is not None:
-                    lookup[str(key_val)] = node_id
+                    lookup[str(key_val)] = str(raw_id)
             cur.close()
         return lookup
 
-    def build_all_lookups(self) -> dict[str, dict[str, int]]:
-        """Build {label → {key_value → AGE id}} lookups for all node labels."""
-        lookups: dict[str, dict[str, int]] = {}
+    def build_all_lookups(self) -> dict[str, dict[str, str]]:
+        """Build {label → {key_value → graphid-as-text}} for all labels."""
+        lookups: dict[str, dict[str, str]] = {}
         for label, key_prop in NODE_KEY_PROPS.items():
+            t0 = time.time()
             lookups[label] = self._build_node_lookup(label, key_prop)
+            print(
+                f"  Lookup {label:15s} → {len(lookups[label]):>8,} entries "
+                f"in {time.time()-t0:.1f}s",
+                flush=True,
+            )
         return lookups
 
     def _get_edge_label_id(self, edge_label: str) -> int:
@@ -386,16 +610,21 @@ class GraphLoader(BaseLoader):
         from_label: str,
         to_label: str,
         edges: list[dict[str, Any]],
-        from_lookup: dict[str, int],
-        to_lookup: dict[str, int],
+        from_lookup: dict[str, str],
+        to_lookup: dict[str, str],
         checkpoint: LoadCheckpoint | None = None,
         phase_key: str = "",
     ) -> None:
         """Load edges via direct SQL INSERT into AGE's internal edge table.
 
-        Uses batch execute_values() for 10-100x speedup over Cypher MERGE.
-        Deletes existing edges first for idempotent fresh load unless
+        Uses execute_values() in chunks of 50k for 10–100× speedup over
+        Cypher MERGE. AGE generates `id` via DEFAULT — we only provide
+        (start_id, end_id, properties). Truncates the label first unless
         --no-truncate is passed.
+
+        Lookups map key-value → graphid-as-text (built via
+        :meth:`build_all_lookups`); we cast back via ::ag_catalog.graphid
+        on the SQL side.
         """
         if checkpoint and phase_key and checkpoint.is_phase_done(phase_key):
             print(f"  ⏭️  {phase_key} — already loaded (checkpoint), skipping")
@@ -407,12 +636,11 @@ class GraphLoader(BaseLoader):
 
         no_truncate = "--no-truncate" in sys.argv
         graph = self.graph
-        label_id = self._get_edge_label_id(edge_label)
 
         print(f"Loading {len(edges):,} {edge_label} edges (direct SQL)...")
 
-        # 1. Build values list — resolve start/end IDs from lookups
-        values: list[tuple[int, int, str]] = []
+        # Resolve start/end IDs from lookups
+        values: list[tuple[str, str, str]] = []
         skipped = 0
         for edge in edges:
             fk = edge.get("from_key", ("", ""))
@@ -440,33 +668,29 @@ class GraphLoader(BaseLoader):
                 checkpoint.mark_phase_done(phase_key, 0)
             return
 
-        # 2. Execute direct SQL INSERT
-        seq_name = f'{graph}."{edge_label}_id_seq"'
-        template = (
-            f"(({label_id}::bigint << 48 | nextval('{seq_name}'))::agtype, "
-            f"%s::agtype, %s::agtype, %s::agtype)"
-        )
+        # Truncate first (unless --no-truncate)
+        if no_truncate:
+            print(f"  ⚠️  --no-truncate: keeping existing {edge_label} edges")
+        else:
+            deleted = self.truncate_label(edge_label)
+            if deleted:
+                print(f"  Cleared {deleted:,} existing {edge_label} edges")
+
+        # Batch INSERT — let AGE generate id via DEFAULT
         insert_sql = (
             f'INSERT INTO {graph}."{edge_label}" '
-            f"(id, start_id, end_id, properties) VALUES %s"
+            f"(start_id, end_id, properties) VALUES %s"
+        )
+        template = (
+            "(%s::ag_catalog.graphid, %s::ag_catalog.graphid, "
+            "%s::ag_catalog.agtype)"
         )
 
+        chunk_size = 50_000
+        total_inserted = 0
+        reporter = _ProgressReporter(edge_label, len(values))
         with self.get_conn() as conn:
             cur = conn.cursor()
-
-            # Delete existing edges (unless --no-truncate)
-            if no_truncate:
-                print(f"  ⚠️  --no-truncate: keeping existing {edge_label} edges")
-            else:
-                cur.execute(f'DELETE FROM {graph}."{edge_label}"')
-                deleted = cur.rowcount
-                conn.commit()
-                if deleted:
-                    print(f"  Cleared {deleted:,} existing {edge_label} edges")
-
-            # Batch INSERT in chunks for progress reporting
-            chunk_size = 50_000
-            total_inserted = 0
             for i in range(0, len(values), chunk_size):
                 chunk = values[i : i + chunk_size]
                 execute_values(
@@ -474,15 +698,9 @@ class GraphLoader(BaseLoader):
                 )
                 conn.commit()
                 total_inserted += len(chunk)
-                if len(values) > chunk_size:
-                    print(
-                        f"    {edge_label}: {total_inserted:,} / {len(values):,}",
-                        end="\r",
-                    )
-
+                reporter.update(len(chunk))
             cur.close()
-
-        print(f"  ✓ {edge_label}: {total_inserted:,} edges inserted" + " " * 30)
+        reporter.finish()
 
         if checkpoint and phase_key:
             checkpoint.mark_phase_done(phase_key, total_inserted)

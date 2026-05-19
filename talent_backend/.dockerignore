@@ -1,0 +1,43 @@
+# Bytecode / venvs
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.venv/
+venv/
+env/
+
+# Build / dist
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Git
+.git/
+.gitignore
+
+# Docs / tests not needed in runtime image
+tests/
+docs/
+*.md
+!README.md
+
+# Local dev
+.env
+.env.local
+*.log

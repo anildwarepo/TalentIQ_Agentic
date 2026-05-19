@@ -1,0 +1,85 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: talentiq
+metadata:
+  template: talentiq@0.0.1-beta
+
+infra:
+  provider: bicep
+  path: ./infra
+
+hooks:
+  preprovision:
+    windows:
+      shell: pwsh
+      run: ./hooks/preprovision.ps1
+    posix:
+      shell: sh
+      run: ./hooks/preprovision.sh
+  postprovision:
+    windows:
+      shell: pwsh
+      run: ./hooks/postprovision.ps1
+    posix:
+      shell: sh
+      run: ./hooks/postprovision.sh
+  # postup runs after `azd up` ALWAYS — even when provision is cache-skipped
+  # ("Skipped: Didn't find new changes."). This guarantees the SPA redirect
+  # URI gets registered against the Entra app reg on every up, not just on
+  # provisions where the bicep actually changed.
+  # interactive: true is required to surface hook stdout/stderr — otherwise
+  # azd captures the output and we can't see registration warnings/errors.
+  postup:
+    windows:
+      shell: pwsh
+      run: ./hooks/postup.ps1
+      interactive: true
+      continueOnError: true
+  # postdeploy fires after `azd deploy`. Belt-and-suspenders with postup —
+  # if `postup` is gated by azd's state cache, postdeploy still runs.
+  postdeploy:
+    windows:
+      shell: pwsh
+      run: ./hooks/postup.ps1
+      interactive: true
+      continueOnError: true
+
+# Map Bicep outputs to azd environment variables
+outputs:
+  AZURE_RESOURCE_GROUP: AZURE_RESOURCE_GROUP
+  accountName: accountName
+  projectName: projectName
+  accountEndpoint: accountEndpoint
+  vnetId: vnetId
+  vnetName: vnetName
+  acrName: acrName
+  acrLoginServer: acrLoginServer
+  postgresqlServerName: postgresqlServerName
+  postgresqlServerFqdn: postgresqlServerFqdn
+  postgresqlAdminLogin: postgresqlAdminLogin
+  graphName: graphName
+  cosmosEndpoint: cosmosEndpoint
+  cosmosDatabaseName: cosmosDatabaseName
+  cosmosContainerName: cosmosContainerName
+  mcpServerImageName: mcpServerImageName
+  mcpServerImageTag: mcpServerImageTag
+  mcpServerFullImageName: mcpServerFullImageName
+  buildMcpServerContainer: buildMcpServerContainer
+  backendImageName: backendImageName
+  backendImageTag: backendImageTag
+  backendFullImageName: backendFullImageName
+  buildBackendContainer: buildBackendContainer
+  webappImageName: webappImageName
+  webappImageTag: webappImageTag
+  webappFullImageName: webappFullImageName
+  buildWebappContainer: buildWebappContainer
+  containerAppsEnvName: containerAppsEnvName
+  containerAppsEnvDefaultDomain: containerAppsEnvDefaultDomain
+  mcpServerContainerAppName: mcpServerContainerAppName
+  mcpServerContainerAppFqdn: mcpServerContainerAppFqdn
+  backendContainerAppName: backendContainerAppName
+  backendContainerAppFqdn: backendContainerAppFqdn
+  webappContainerAppName: webappContainerAppName
+  webappContainerAppFqdn: webappContainerAppFqdn
+  keyVaultName: keyVaultName
+  appInsightsConnectionString: appInsightsConnectionString

@@ -48,6 +48,13 @@
       "created_at": "2026-05-08T19:51:00Z",
       "legacy_named": false,
       "status": "active"
+    },
+    "bishop": {
+      "persistent_name": "Bishop",
+      "universe": "Alien",
+      "created_at": "2026-05-12T00:00:00Z",
+      "legacy_named": false,
+      "status": "active"
     }
   }
 }

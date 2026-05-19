@@ -44,3 +44,24 @@ All Bicep files from Passes 1-3 were lost to disk. Rebuilt entire `talent_infra/
 - Foundry PE needs dual DNS zone config (cognitive + openai) — single PE, two privateDnsZoneConfigs
 - Key Vault 24-char and Container App 32-char name limits require `take()` truncation
 - `mcp_bicep_build_bicep` validation confirms zero-error compilation end-to-end
+
+### 2026-05-16: Pass 5 — Reference Pattern Alignment
+Anil requested full alignment with `talentiq_requirements/reference_code/azd_deploy/` pattern. Deleted all existing `talent_infra/` files (except `.azure/`) and rebuilt from scratch.
+
+**New pattern:** Two-phase deployment
+- Phase 1: `azd provision` deploys infra only (container app deploy flags = false)
+- Phase 2: postprovision hook builds Docker images, then deploys container apps via `az deployment group create`
+
+**Key changes from previous passes:**
+- Moved Bicep files from `talent_infra/` to `talent_infra/infra/` (matching `infra.path: ./infra`)
+- Added hooks/ directory with preprovision + postprovision (PowerShell + bash)
+- Switched from Entra-only auth to password-based PG auth (simpler for dev/test, matching ref)
+- Container App module creates its own UAMI inline (not external module)
+- Docker builds: local Docker Desktop preferred, ACR remote build fallback, content hashing to skip unchanged
+- Data loading uses `talent_data_pipeline/main.py` (not ref's scripts)
+- Added Cosmos DB module for chat history (new vs ref)
+- Kept Key Vault module
+- PostgreSQL extensions: AGE + VECTOR + PG_TRGM
+- Bicep compiles clean (1 warning: unused throughput param in serverless Cosmos)
+
+**Files created:** azure.yaml, infra/bicepconfig.json, infra/main.bicep, infra/main.parameters.json, 13 Bicep modules, 4 hook scripts

@@ -155,6 +155,29 @@ def create_age_graph_indexes(cur) -> None:
               f"AGE index {idx_name}")
 
 
+def run_age_label_indexes() -> None:
+    """Create AGE label property indexes (idempotent).
+
+    Designed to run BEFORE bulk loading so that Cypher MERGE uses an index
+    lookup (O(log N)) instead of a sequential scan of a growing label table
+    (which makes MERGE-driven loads O(N²) and dominates wall time at scale).
+    Index creation on empty tables is instant, so calling this right after
+    schema/label setup is cheap.
+    """
+    print("=" * 60)
+    print("AGE Label Indexes (pre-load)")
+    print("=" * 60)
+    conn = psycopg2.connect(**db_config.connection_dict)
+    conn.autocommit = True
+    cur = conn.cursor()
+    try:
+        create_age_graph_indexes(cur)
+    finally:
+        cur.close()
+        conn.close()
+    print("AGE label indexes ready.")
+
+
 def run_index_creation() -> None:
     """Create all indexes."""
     print("=" * 60)

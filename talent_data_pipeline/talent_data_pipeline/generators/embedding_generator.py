@@ -167,9 +167,15 @@ class EmbeddingGenerator:
         Completed batches are saved to disk so that a crashed/interrupted run
         can resume without re-calling the Azure OpenAI API for finished batches.
 
-        Returns list of dicts with workday_id, resume_embedding, skills_embedding.
+        Returns a flat list of dicts with workday_id, resume_embedding,
+        skills_embedding (legacy interface). Streaming callers should use
+        :meth:`iter_embedding_batches` directly.
         """
-        return list(self.iter_embedding_batches(employees, skill_edges, batch_size))
+        return [
+            rec
+            for batch in self.iter_embedding_batches(employees, skill_edges, batch_size)
+            for rec in batch
+        ]
 
     def iter_embedding_batches(
         self,

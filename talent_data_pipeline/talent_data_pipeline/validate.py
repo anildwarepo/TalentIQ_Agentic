@@ -31,7 +31,7 @@ def _count_nodes(cur, graph: str, label: str) -> int:
     try:
         cur.execute("SET search_path = ag_catalog, '$user', public;")
         cur.execute(
-            f"SELECT count(*) FROM ag_catalog.cypher('{graph}', $$ "
+            f"SELECT cnt FROM ag_catalog.cypher('{graph}', $$ "
             f"MATCH (n:{label}) RETURN count(n) $$) AS (cnt agtype);"
         )
         row = cur.fetchone()
@@ -47,7 +47,7 @@ def _count_edges(cur, graph: str, label: str) -> int:
     try:
         cur.execute("SET search_path = ag_catalog, '$user', public;")
         cur.execute(
-            f"SELECT count(*) FROM ag_catalog.cypher('{graph}', $$ "
+            f"SELECT cnt FROM ag_catalog.cypher('{graph}', $$ "
             f"MATCH ()-[r:{label}]->() RETURN count(r) $$) AS (cnt agtype);"
         )
         row = cur.fetchone()
@@ -130,7 +130,7 @@ def run_validation() -> bool:
         cur.execute("SET search_path = ag_catalog, '$user', public;")
         # Check bench rate
         cur.execute(
-            f"SELECT count(*) FROM ag_catalog.cypher('{graph}', $$ "
+            f"SELECT cnt FROM ag_catalog.cypher('{graph}', $$ "
             f"MATCH (e:Employee) WHERE e.is_bench = true RETURN count(e) $$) AS (cnt agtype);"
         )
         bench = int(str(cur.fetchone()[0]).strip('"'))

@@ -19,6 +19,7 @@
 | Lambert | Tester | `.squad/agents/lambert/charter.md` | 🧪 Active |
 | Ash | Scrum Master | `.squad/agents/ash/charter.md` | 📝 Active |
 | Brett | Data Generator & Loader | `.squad/agents/brett/charter.md` | 🗄️ Active |
+| Bishop | Deployment Engineer | `.squad/agents/bishop/charter.md` | ⚙️ Active |
 | Scribe | Session Logger | `.squad/agents/scribe/charter.md` | 📋 Active |
 | Ralph | Work Monitor | — | 🔄 Monitor |
 

@@ -1,0 +1,177 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "westus"
+    },
+    "aiServicesName": {
+      "value": "kgfoundry"
+    },
+    "projectName": {
+      "value": "kgproject"
+    },
+    "projectDescription": {
+      "value": "Knowledge Graph Project"
+    },
+    "projectDisplayName": {
+      "value": "Knowledge Graph"
+    },
+    "modelName": {
+      "value": "gpt-4.1"
+    },
+    "modelFormat": {
+      "value": "OpenAI"
+    },
+    "modelVersion": {
+      "value": "2025-04-14"
+    },
+    "modelSkuName": {
+      "value": "GlobalStandard"
+    },
+    "modelCapacity": {
+      "value": 165
+    },
+    "deployAcrVnet": {
+      "value": true
+    },
+    "vnetNamePrefix": {
+      "value": "vnet-kg"
+    },
+    "acrNamePrefix": {
+      "value": "kgacr"
+    },
+    "deployPostgresql": {
+      "value": true
+    },
+    "postgresqlServerNamePrefix": {
+      "value": "kgpgsql"
+    },
+    "postgresqlAdminLogin": {
+      "value": "kgadmin"
+    },
+    "postgresqlAdminPassword": {
+      "value": "${POSTGRESQL_ADMIN_PASSWORD}"
+    },
+    "postgresqlVersion": {
+      "value": "16"
+    },
+    "postgresqlSkuName": {
+      "value": "Standard_D4ds_v5"
+    },
+    "postgresqlSkuTier": {
+      "value": "GeneralPurpose"
+    },
+    "postgresqlStorageSizeGB": {
+      "value": 32
+    },
+    "postgresqlEnablePrivateEndpoint": {
+      "value": true
+    },
+    "clientIpAddress": {
+      "value": "${CLIENT_IP_ADDRESS}"
+    },
+    "buildMcpServerContainer": {
+      "value": true
+    },
+    "mcpServerImageName": {
+      "value": "knowledgegraph-mcp-server"
+    },
+    "mcpServerImageTag": {
+      "value": "latest"
+    },
+    "buildFastApiContainer": {
+      "value": true
+    },
+    "fastApiImageName": {
+      "value": "af-fastapi"
+    },
+    "fastApiImageTag": {
+      "value": "latest"
+    },
+    "buildWebappContainer": {
+      "value": true
+    },
+    "webappImageName": {
+      "value": "webapp"
+    },
+    "webappImageTag": {
+      "value": "latest"
+    },
+    "deployContainerApp": {
+      "value": "${deployContainerApp=false}"
+    },
+    "deployContainerAppsEnv": {
+      "value": "${deployContainerAppsEnv=true}"
+    },
+    "deployMcpServerContainerApp": {
+      "value": "${deployMcpServerContainerApp=false}"
+    },
+    "deployFastApiContainerApp": {
+      "value": "${deployFastApiContainerApp=false}"
+    },
+    "deployWebappContainerApp": {
+      "value": "${deployWebappContainerApp=false}"
+    },
+    "containerAppsEnvNamePrefix": {
+      "value": "cae-kg"
+    },
+    "containerAppNamePrefix": {
+      "value": "mcp-server"
+    },
+    "containerAppExternalIngress": {
+      "value": true
+    },
+    "containerAppCpu": {
+      "value": "0.5"
+    },
+    "containerAppMemory": {
+      "value": "1Gi"
+    },
+    "fastApiContainerAppNamePrefix": {
+      "value": "fastapi"
+    },
+    "fastApiExternalIngress": {
+      "value": true
+    },
+    "fastApiCpu": {
+      "value": "0.5"
+    },
+    "fastApiMemory": {
+      "value": "1Gi"
+    },
+    "webappContainerAppNamePrefix": {
+      "value": "webapp"
+    },
+    "webappExternalIngress": {
+      "value": true
+    },
+    "webappCpu": {
+      "value": "0.25"
+    },
+    "webappMemory": {
+      "value": "0.5Gi"
+    },
+    "graphName": {
+      "value": "customer_graph"
+    },
+    "azureOpenAiEndpoint": {
+      "value": ""
+    },
+    "azureOpenAiApiVersion": {
+      "value": "2025-02-01-preview"
+    },
+    "azureOpenAiChatDeploymentName": {
+      "value": ""
+    },
+    "azureSearchServiceEndpoint": {
+      "value": ""
+    },
+    "azureSearchIndex": {
+      "value": ""
+    },
+    "appInsightsConnectionString": {
+      "value": ""
+    }
+  }
+}

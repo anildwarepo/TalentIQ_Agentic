@@ -146,6 +146,16 @@
 
 ---
 
+## Infrastructure Backlog
+
+| Item | Description | Priority | Status |
+|------|-------------|----------|--------|
+| INFRA-001 | Add Redis (Azure Cache) for SSE pub/sub when backend scales to multiple replicas | P3 | Deferred |
+
+> `deployRedis` is set to `false`. Re-enable when Container Apps backend scales beyond a single replica and cross-instance event broadcasting is needed.
+
+---
+
 ## Gap Features (Not Yet in User Stories)
 
 30 features from `features.csv` have **no corresponding user stories**. These require backlog grooming. See `docs/traceability.md` for the full list.

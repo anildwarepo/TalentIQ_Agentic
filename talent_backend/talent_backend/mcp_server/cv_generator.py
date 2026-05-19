@@ -150,21 +150,34 @@ async def generate_employee_cv(
     if ctx:
         await ctx.info(f"[cv] Data collected: {len(skills)} skills, {len(certs)} certs, {len(langs)} languages, {len(edu)} education, {len(exp)} experience")
 
-    # Resolve template
+    # Resolve template — fail loudly on unknown names so the agent cannot
+    # fabricate a template name and silently fall through to the default.
     TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "agent" / "template_docs"
+    available_docx = [f.name for f in TEMPLATE_DIR.iterdir() if f.suffix.lower() == ".docx"] if TEMPLATE_DIR.is_dir() else []
     template_path = None
+    template_used = "default_dxc"  # tracks what we actually rendered with
     if template_name:
         candidate = TEMPLATE_DIR / template_name
         if candidate.exists() and candidate.suffix.lower() == ".docx":
             template_path = candidate
+            template_used = template_name
             logger.info("[cv] Using template: %s", template_name)
         elif candidate.exists() and candidate.suffix.lower() == ".pdf":
+            logger.warning("[cv] PDF template requested: %s", template_name)
             return {
                 "error": f"Template '{template_name}' is a PDF and cannot be used for CV generation. PDF templates are for preview/reference only. Please choose a DOCX template instead.",
-                "available_docx_templates": [f.name for f in TEMPLATE_DIR.iterdir() if f.suffix.lower() == ".docx"],
+                "available_docx_templates": available_docx,
             }
         else:
-            logger.warning("[cv] Template not found: %s", template_name)
+            logger.warning("[cv] Template not found: %s (available: %s)", template_name, available_docx)
+            return {
+                "error": (
+                    f"Template '{template_name}' does not exist. Only the templates listed in "
+                    f"`available_docx_templates` are real. Do not invent template names. "
+                    f"Call `list_cv_templates` and ask the user to pick one of the real options."
+                ),
+                "available_docx_templates": available_docx,
+            }
 
     # Generate DOCX
     file_id = uuid.uuid4().hex[:12]
@@ -207,6 +220,7 @@ async def generate_employee_cv(
         "filename": filename,
         "download_url": download_url,
         "employee": employee_name,
+        "template_used": template_used,
         "skills_count": len(skills),
         "certs_count": len(certs),
         "format": format,

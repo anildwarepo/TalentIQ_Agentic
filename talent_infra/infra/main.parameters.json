@@ -1,0 +1,213 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "westus"
+    },
+    "aiServicesName": {
+      "value": "tiqai"
+    },
+    "projectName": {
+      "value": "talentiq"
+    },
+    "projectDescription": {
+      "value": "TalentIQ Agentic HR Platform"
+    },
+    "projectDisplayName": {
+      "value": "TalentIQ"
+    },
+    "modelName": {
+      "value": "gpt-4.1"
+    },
+    "modelFormat": {
+      "value": "OpenAI"
+    },
+    "modelVersion": {
+      "value": "2025-04-14"
+    },
+    "modelSkuName": {
+      "value": "GlobalStandard"
+    },
+    "modelCapacity": {
+      "value": 165
+    },
+    "deployAcrVnet": {
+      "value": true
+    },
+    "vnetResourceGroup": {
+      "value": "vnet"
+    },
+    "vnetName": {
+      "value": "vnet-westus"
+    },
+    "defaultSubnetName": {
+      "value": "default"
+    },
+    "peSubnetName": {
+      "value": "pe-subnet"
+    },
+    "acaSubnetName": {
+      "value": "talentiq-aca"
+    },
+    "acaSubnetAddressPrefix": {
+      "value": "10.0.6.0/23"
+    },
+    "acrNamePrefix": {
+      "value": "tiqacr"
+    },
+    "deployPostgresql": {
+      "value": true
+    },
+    "postgresqlServerNamePrefix": {
+      "value": "tiqpgsql"
+    },
+    "postgresqlAdminLogin": {
+      "value": "tiqadmin"
+    },
+    "postgresqlAdminPassword": {
+      "value": "${POSTGRESQL_ADMIN_PASSWORD}"
+    },
+    "postgresqlVersion": {
+      "value": "16"
+    },
+    "postgresqlSkuName": {
+      "value": "Standard_D4ds_v5"
+    },
+    "postgresqlSkuTier": {
+      "value": "GeneralPurpose"
+    },
+    "postgresqlStorageSizeGB": {
+      "value": 32
+    },
+    "postgresqlEnablePrivateEndpoint": {
+      "value": true
+    },
+    "postgresqlExistingDnsZoneId": {
+      "value": "/subscriptions/e4718866-4e88-411f-a0b8-10c8051dc165/resourceGroups/vnet/providers/Microsoft.Network/privateDnsZones/privatelink.postgres.database.azure.com"
+    },
+    "clientIpAddress": {
+      "value": "${CLIENT_IP_ADDRESS}"
+    },
+    "deployRedis": {
+      "value": false
+    },
+    "redisNamePrefix": {
+      "value": "tiqredis"
+    },
+    "redisSkuName": {
+      "value": "Basic"
+    },
+    "redisSkuCapacity": {
+      "value": 0
+    },
+    "deployCosmos": {
+      "value": true
+    },
+    "cosmosAccountNamePrefix": {
+      "value": "tiqcosmos"
+    },
+    "cosmosDatabaseName": {
+      "value": "talent_db"
+    },
+    "cosmosContainerName": {
+      "value": "chat_history_db"
+    },
+    "deployKeyVault": {
+      "value": true
+    },
+    "keyVaultNamePrefix": {
+      "value": "kv"
+    },
+    "buildMcpServerContainer": {
+      "value": true
+    },
+    "mcpServerImageName": {
+      "value": "talentiq-mcp-server"
+    },
+    "mcpServerImageTag": {
+      "value": "latest"
+    },
+    "buildBackendContainer": {
+      "value": true
+    },
+    "backendImageName": {
+      "value": "talentiq-backend"
+    },
+    "backendImageTag": {
+      "value": "latest"
+    },
+    "buildWebappContainer": {
+      "value": true
+    },
+    "webappImageName": {
+      "value": "talentiq-webapp"
+    },
+    "webappImageTag": {
+      "value": "latest"
+    },
+    "deployContainerAppsEnv": {
+      "value": "${deployContainerAppsEnv=true}"
+    },
+    "deployMcpServerContainerApp": {
+      "value": "${deployMcpServerContainerApp=false}"
+    },
+    "deployBackendContainerApp": {
+      "value": "${deployBackendContainerApp=false}"
+    },
+    "deployWebappContainerApp": {
+      "value": "${deployWebappContainerApp=false}"
+    },
+    "containerAppsEnvNamePrefix": {
+      "value": "cae-tiq"
+    },
+    "mcpServerContainerAppNamePrefix": {
+      "value": "mcp-server"
+    },
+    "mcpServerExternalIngress": {
+      "value": false
+    },
+    "mcpServerCpu": {
+      "value": "0.5"
+    },
+    "mcpServerMemory": {
+      "value": "1Gi"
+    },
+    "backendContainerAppNamePrefix": {
+      "value": "backend"
+    },
+    "backendExternalIngress": {
+      "value": true
+    },
+    "backendCpu": {
+      "value": "0.5"
+    },
+    "backendMemory": {
+      "value": "1Gi"
+    },
+    "webappContainerAppNamePrefix": {
+      "value": "webapp"
+    },
+    "webappExternalIngress": {
+      "value": true
+    },
+    "webappCpu": {
+      "value": "0.25"
+    },
+    "webappMemory": {
+      "value": "0.5Gi"
+    },
+    "graphNamePrefix": {
+      "value": "talent_graph"
+    },
+    "azureOpenAiEndpoint": {
+      "value": ""
+    },
+    "azureOpenAiChatDeploymentName": {
+      "value": ""
+    },
+    "appInsightsConnectionString": {
+      "value": ""
+    }
+  }
+}

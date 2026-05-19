@@ -28,11 +28,11 @@ def create_vector_indexes(cur) -> None:
     if has_diskann:
         _exec(cur,
               "CREATE INDEX IF NOT EXISTS idx_emb_resume_diskann "
-              "ON employee_embeddings USING diskann (resume_embedding);",
+              "ON employee_embeddings USING diskann (resume_embedding vector_cosine_ops);",
               "DiskANN index on resume_embedding")
         _exec(cur,
               "CREATE INDEX IF NOT EXISTS idx_emb_skills_diskann "
-              "ON employee_embeddings USING diskann (skills_embedding);",
+              "ON employee_embeddings USING diskann (skills_embedding vector_cosine_ops);",
               "DiskANN index on skills_embedding")
     else:
         # Fallback to HNSW
@@ -109,50 +109,79 @@ def create_entity_search_indexes(cur) -> None:
 def create_age_graph_indexes(cur) -> None:
     """Indexes on AGE graph internal tables for query performance.
 
-    AGE stores each label as a table under the graph schema.
-    We index key properties used in Cypher WHERE clauses.
+    AGE stores each label as a table under the graph schema with a
+    `properties` column of type ``ag_catalog.agtype``. The bare ``->>``
+    operator does not exist for agtype in AGE 1.6.0, so we index against
+    ``((properties::text)::jsonb)->>'<key>'`` — the double cast that AGE
+    accepts for SQL-side property extraction.
     """
     graph = pipeline_config.graph_name
 
-    # Employee indexes — most-queried node
+    # (table, json-key, index-name). Index expression built below as
+    # ((properties::text)::jsonb)->>'<key>'.
     property_indexes = [
-        (f"{graph}.\"Employee\"", "properties->>'workday_id'", "idx_emp_workday_id"),
-        (f"{graph}.\"Employee\"", "properties->>'email'", "idx_emp_email"),
-        (f"{graph}.\"Employee\"", "properties->>'is_bench'", "idx_emp_is_bench"),
-        (f"{graph}.\"Employee\"", "properties->>'employment_status'", "idx_emp_status"),
-        (f"{graph}.\"Employee\"", "properties->>'skill_level'", "idx_emp_skill_level"),
-        (f"{graph}.\"Employee\"", "properties->>'job_level'", "idx_emp_job_level"),
-        (f"{graph}.\"Employee\"", "properties->>'delivery_model'", "idx_emp_delivery_model"),
-        # Reference node lookups by name
-        (f"{graph}.\"Location\"", "properties->>'city'", "idx_loc_city"),
-        (f"{graph}.\"Skill\"", "properties->>'name'", "idx_skill_name"),
-        (f"{graph}.\"Skill\"", "properties->>'code'", "idx_skill_code"),
-        (f"{graph}.\"SkillDomain\"", "properties->>'name'", "idx_skilldomain_name"),
-        (f"{graph}.\"SkillDomain\"", "properties->>'code'", "idx_skilldomain_code"),
-        (f"{graph}.\"Certification\"", "properties->>'name'", "idx_cert_name"),
-        (f"{graph}.\"Certification\"", "properties->>'code'", "idx_cert_code"),
-        (f"{graph}.\"Language\"", "properties->>'name'", "idx_lang_name"),
-        (f"{graph}.\"Language\"", "properties->>'code'", "idx_lang_code"),
-        (f"{graph}.\"ServiceLine\"", "properties->>'name'", "idx_sl_name"),
-        (f"{graph}.\"ServiceLine\"", "properties->>'code'", "idx_sl_code"),
-        (f"{graph}.\"Offering\"", "properties->>'name'", "idx_offering_name"),
-        (f"{graph}.\"Offering\"", "properties->>'code'", "idx_offering_code"),
-        (f"{graph}.\"Manager\"", "properties->>'employee_id'", "idx_mgr_empid"),
-        (f"{graph}.\"University\"", "properties->>'name'", "idx_uni_name"),
-        (f"{graph}.\"University\"", "properties->>'code'", "idx_uni_code"),
-        (f"{graph}.\"Client\"", "properties->>'name'", "idx_client_name"),
-        (f"{graph}.\"Client\"", "properties->>'code'", "idx_client_code"),
-        (f"{graph}.\"Project\"", "properties->>'name'", "idx_project_name"),
-        (f"{graph}.\"Project\"", "properties->>'code'", "idx_project_code"),
-        (f"{graph}.\"Country\"", "properties->>'code'", "idx_country_code"),
-        (f"{graph}.\"Role\"", "properties->>'name'", "idx_role_name"),
-        (f"{graph}.\"Role\"", "properties->>'code'", "idx_role_code"),
+        # Employee — most-queried node
+        (f"{graph}.\"Employee\"", "workday_id", "idx_emp_workday_id"),
+        (f"{graph}.\"Employee\"", "email", "idx_emp_email"),
+        (f"{graph}.\"Employee\"", "is_bench", "idx_emp_is_bench"),
+        (f"{graph}.\"Employee\"", "employment_status", "idx_emp_status"),
+        (f"{graph}.\"Employee\"", "skill_level", "idx_emp_skill_level"),
+        (f"{graph}.\"Employee\"", "job_level", "idx_emp_job_level"),
+        (f"{graph}.\"Employee\"", "delivery_model", "idx_emp_delivery_model"),
+        # Reference node lookups by name/code
+        (f"{graph}.\"Location\"", "city", "idx_loc_city"),
+        (f"{graph}.\"Skill\"", "name", "idx_skill_name"),
+        (f"{graph}.\"Skill\"", "code", "idx_skill_code"),
+        (f"{graph}.\"SkillDomain\"", "name", "idx_skilldomain_name"),
+        (f"{graph}.\"SkillDomain\"", "code", "idx_skilldomain_code"),
+        (f"{graph}.\"Certification\"", "name", "idx_cert_name"),
+        (f"{graph}.\"Certification\"", "code", "idx_cert_code"),
+        (f"{graph}.\"Language\"", "name", "idx_lang_name"),
+        (f"{graph}.\"Language\"", "code", "idx_lang_code"),
+        (f"{graph}.\"ServiceLine\"", "name", "idx_sl_name"),
+        (f"{graph}.\"ServiceLine\"", "code", "idx_sl_code"),
+        (f"{graph}.\"Offering\"", "name", "idx_offering_name"),
+        (f"{graph}.\"Offering\"", "code", "idx_offering_code"),
+        (f"{graph}.\"Manager\"", "employee_id", "idx_mgr_empid"),
+        (f"{graph}.\"University\"", "name", "idx_uni_name"),
+        (f"{graph}.\"University\"", "code", "idx_uni_code"),
+        (f"{graph}.\"Client\"", "name", "idx_client_name"),
+        (f"{graph}.\"Client\"", "code", "idx_client_code"),
+        (f"{graph}.\"Project\"", "name", "idx_project_name"),
+        (f"{graph}.\"Project\"", "code", "idx_project_code"),
+        (f"{graph}.\"Country\"", "code", "idx_country_code"),
+        (f"{graph}.\"Role\"", "name", "idx_role_name"),
+        (f"{graph}.\"Role\"", "code", "idx_role_code"),
     ]
 
-    for table, expr, idx_name in property_indexes:
+    for table, key, idx_name in property_indexes:
+        expr = f"((properties::text)::jsonb)->>'{key}'"
         _exec(cur,
               f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table} (({expr}));",
               f"AGE index {idx_name}")
+
+
+def run_age_label_indexes() -> None:
+    """Create AGE label property indexes (idempotent).
+
+    Designed to run BEFORE bulk loading so that Cypher MERGE uses an index
+    lookup (O(log N)) instead of a sequential scan of a growing label table
+    (which makes MERGE-driven loads O(N²) and dominates wall time at scale).
+    Index creation on empty tables is instant, so calling this right after
+    schema/label setup is cheap.
+    """
+    print("=" * 60)
+    print("AGE Label Indexes (pre-load)")
+    print("=" * 60)
+    conn = psycopg2.connect(**db_config.connection_dict)
+    conn.autocommit = True
+    cur = conn.cursor()
+    try:
+        create_age_graph_indexes(cur)
+    finally:
+        cur.close()
+        conn.close()
+    print("AGE label indexes ready.")
 
 
 def run_index_creation() -> None:

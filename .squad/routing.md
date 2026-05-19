@@ -11,6 +11,7 @@ How to decide who handles what.
 | Backend / APIs | Kane | Python services, Agent Framework, MCP servers, API endpoints |
 | Data / Graph DB | Parker | Cypher queries, vector search, full-text search, data models, graph schema |
 | Data Generation & Loading | Brett | Generate synthetic talent data, PostgreSQL/AGE loading, DiskANN vectors, FTS indexes, connectivity tests, parallel idempotent loading |
+| Infrastructure / Deployment | Bishop | Azure infra (Bicep), azd config, VNet, private endpoints, Entra ID + MI auth, Container Apps, ACR, RBAC |
 | Testing / QA | Lambert | Write tests, edge cases, verify fixes, quality gates |
 | Requirements / Stories | Ash | User stories, epics, specs, requirements decomposition, backlog |
 | Code review | Ripley | Review PRs, check quality, suggest improvements |
