@@ -59,6 +59,26 @@ Azure forbids in-place mutation of `privateDnsZoneConfigs[*].properties.privateD
 
 Script silently connected over the public PaaS firewall when run from a non-VNet host (PE never actually exercised). Installed **resolve → classify → gate → connect** pattern: `socket.getaddrinfo` → `ipaddress.ip_address(ip).is_private` (covers RFC1918 + CGNAT 100.64/10) → colored indicator line → gate BEFORE Entra token. New flags `--allow-public` (opt-in for public path, yellow warning) and `--show-path-only` (network-only diagnostic, skips token+psycopg2). Diagnostic hint surfaces the firewall-rule check when public-path connections fail. stdlib-only, exit-code contract unchanged. Pattern lifts to every PE-fronted PaaS probe (Cosmos, Cognitive, OpenAI, ACR, KeyVault) — captured as skill `azure-pe-test-script-private-default`. **See `history-archive.md` for full pattern walkthrough + live verification transcript.**
 
+### 2026-05-22T23:59:30Z — GitGuardian remediation: `01-postgresql/deploy.ps1` `.EXAMPLE` literal-password scrub
+
+GitGuardian flagged `ConvertTo-SecureString 'P@ssw0rd!Strong!' -AsPlainText -Force` at `talent_infra_modules/01-postgresql/deploy.ps1:43` (pushed 2026-05-22T22:58:37Z, present in commits `69af3ac` and HEAD `cbb8b23`). Literal lived inside the script-header `.EXAMPLE` block — pure documentation, never an active credential. Fix: rewrote the example to use `Read-Host -AsSecureString -Prompt 'Postgres admin password'` (better security guidance — nothing lands in shell history, scripts, or CI logs; also leverages `shared/common.ps1::Get-ParameterValue`'s built-in `Read-Host` fallback when `-AdminPassword` is omitted). Added a CI guidance block with the `<your-strong-password>` angle-bracket placeholder pattern for cases where documentation must show the `ConvertTo-SecureString` form. Working-tree grep `P@ssw0rd!Strong!` → 0 matches. PowerShell parse → 0 errors.
+
+**Three lessons that go beyond this single file:**
+
+1. **`.EXAMPLE` blocks ARE production surface for secret scanners.** PowerShell `Get-Help` surfaces them verbatim, operators copy-paste them into terminals, and tools like GitGuardian regex on shape, not intent. A plausible-looking literal in `.EXAMPLE` is functionally a hardcoded credential. New rule: **literal strings inside `ConvertTo-SecureString '...'` are forbidden anywhere a script can be committed.** Only the four allowed shapes: (a) `Read-Host -AsSecureString`, (b) `Get-AzKeyVaultSecret`, (c) variable from secret-store at call site, (d) `<angle-bracket-placeholder>` in pure-doc comments. Captured in decision `2026-05-22T23:59:30Z`.
+
+2. **`shared/common.ps1` `ConvertTo-SecureString` call sites are NOT the same hazard.** Lines 195/206/225 convert a *variable* (`$Value`, `$envVal`, `$Default`) to SecureString. The dangerous pattern is **literal string between the quotes**. Scanners distinguish; reviewers should too. Future Lambert sweeps: regex `ConvertTo-SecureString\s+['"][^<\$].*['"].*-AsPlainText` — the `[^<\$]` negation excludes both angle-bracket placeholders and variable references.
+
+3. **The two `.env` files I found with `POSTGRESQL_ADMIN_PASSWORD="Treetop@1234"` (under `talent_infra_v2/.azure/talent-devtest-v{2,8}/`) were a false alarm — gitignored by `talent_infra_v2/.azure/.gitignore` line 2 (`* ` wildcard), `git log --all -S "Treetop@1234"` returns zero commits. Local-dev `azd` state only.** That said: any future `azd` env or `.outputs.json` written under `talent_infra_*/.azure/` MUST be gitignored at the parent-folder level — never per-file — because azd generates these on `azd env new` and they bypass any per-file `.gitignore` we'd add reactively. The wildcard `*` pattern in `talent_infra_v2/.azure/.gitignore` is the correct shape; if a future toolkit (`talent_infra_v3`, etc.) is added, the same wildcard MUST be in its `.azure/.gitignore` on day one.
+
+**Operator action required (NOT done by Bishop — Anil controls git operations):** see remediation runbook delivered inline 2026-05-22. Recommended: accept the exposure (the literal was never an active credential), rotate-as-precaution only if the value is actively used anywhere (it is not — confirmed via grep across `.env` + `.outputs.json` files), resolve GitGuardian alert as "doc example, no real impact." Optional: install `gitleaks` pre-commit hook to catch the next one before push.
+
+**Cross-toolkit guardrail (forward-looking):** Every future `talent_infra_*/` script that takes a `-SecureString` parameter MUST:
+- Default to `Read-Host -AsSecureString` in its `.EXAMPLE` block.
+- Document the `Get-AzKeyVaultSecret` form for CI.
+- Treat any literal between `ConvertTo-SecureString '...'` quotes as a bug — fail review.
+This rule is codification-grade and should be applied to every `00-*/`, `01-*/`, `02-*/`, ... module in any current or future toolkit.
+
 
 ## Cross-agent note — 2026-05-22T22:30:00Z (Scribe)
 - **Model directive (Anil, captured 2026-05-22T18:30:00Z):** all squad spawns — including Scribe and Ralph, including any agent normally defaulted to a fast/cheap tier — MUST use `claude-opus-4.6-1m` (Opus 4.7 Extra-high reasoning). `.squad/config.json` `defaultModel` is the source of truth; the "never bump Scribe" rule is overridden. Per `decisions.md` `2026-05-22T18:30:00Z`.

@@ -62,3 +62,8 @@
 
 ## Cross-agent note — 2026-05-22T22:30:00Z (Scribe)
 - **Bishop deploy.ps1 sweep follow-up.** Two additional `01-postgresql/deploy.ps1` bugs fixed (2026-05-22T22:00:00Z Section 7c DNS stale-list trap; 2026-05-22T22:15:00Z Section 8 `az deployment group create` `2>&1` JSON-capture stream pollution). Both are reusable patterns: (a) gate DNS link cleanup on `record-set list` (counters lag the RP); (b) separate stderr to per-run log file when capturing `az ... --output json` (never `2>&1`). Lambert should sweep `talent_infra_modules/{00,02,03,04}/deploy.ps1` for the same `2>&1` JSON-capture idiom. Architectural awareness for future PE modules: list/count endpoints lag the RP — only named-delete attempts are authoritative. See decisions.md `2026-05-22T22:20:00Z` for the normative pattern. **Model directive (2026-05-22):** all future squad spawns (including Scribe/Ralph) use `claude-opus-4.6-1m` per `.squad/config.json` `defaultModel`. Coordinator must pass `model: "claude-opus-4.6-1m"` on every spawn until Anil changes it.
+
+
+## Team update — 2026-05-22T23:59:30Z (via Scribe, originated by Bishop)
+
+Team-wide rule from GitGuardian remediation on `talent_infra_modules/01-postgresql/deploy.ps1`: **no literal secrets in `.EXAMPLE` / docstring / sample-code blocks** — use `Read-Host -AsSecureString` or an angle-bracket `<placeholder>`. Scanners regex on shape, not intent; a plausible-looking literal in a help comment is functionally a leak. Applies to any sample code you emit (Python docstrings, JS examples, README snippets, agent prompts), not just PowerShell.

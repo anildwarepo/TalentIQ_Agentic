@@ -5,6 +5,54 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-22T23:59:30Z: PowerShell deployment scripts — no literal passwords in `.EXAMPLE` blocks; prefer `Read-Host -AsSecureString`, fall back to `<angle-bracket-placeholder>` only
+
+**By:** Bishop (Deployment Engineer) — requested by Anil
+**Status:** Implemented (single-file edit) — awaiting Anil git commit + decision on history scrub
+
+**Trigger:** GitGuardian flagged `ConvertTo-SecureString Password` literal in `talent_infra_modules/01-postgresql/deploy.ps1` line 43, pushed 2026-05-22T22:58:37Z. The literal `P@ssw0rd!Strong!` was example documentation inside the script-header `.EXAMPLE` block — never an active credential, never present in any `.env` or `.outputs.json` — but it is a real GitGuardian hit, indexed in two commits (`69af3ac` "add moduler deployment", `cbb8b23` "add modular deployment" — still HEAD on `origin/master`), and looks like a real password to any automated scanner.
+
+**Why a doc-comment example is still a leak:** `.EXAMPLE` blocks in PowerShell are surfaced verbatim by `Get-Help`, ship with the script forever, and get copy-pasted by operators into shell history. A plausible-looking literal there is functionally identical to a hardcoded credential — scanners treat it as one, and humans assume it works. The fix is not "make it a less-real-looking literal" — the fix is "remove the literal entirely."
+
+**Decision (normative for every `*.ps1` script under `talent_infra_modules/`, `talent_infra/`, `talent_infra_v2/`, and any future `talent_infra_*` toolkit):**
+
+1. **`.EXAMPLE` blocks for secret-bearing parameters MUST NOT contain any string that could be interpreted as a real password.** No `'P@...'`, no `'Test@1234'`, no `'changeMe123!'`. Scanners do not read intent — they regex on shape.
+2. **Preferred pattern** — `Read-Host -AsSecureString`:
+   ```powershell
+   -AdminPassword (Read-Host -AsSecureString -Prompt 'Postgres admin password')
+   ```
+   This is both safer (nothing in shell history, nothing in scripts, nothing in CI logs) AND better documentation: it teaches operators the right interactive flow. `shared/common.ps1::Get-ParameterValue` already falls back to `Read-Host` when `-AdminPassword` is omitted, so the parameter can be dropped entirely.
+3. **CI / automated runs** — source from Key Vault / GitHub Actions secret / AZ DevOps variable group, convert to SecureString **at the call site**, never check the literal into a script. When a placeholder is genuinely necessary (e.g., a comment showing the `ConvertTo-SecureString` form), use an obvious `<angle-bracket>` token (`'<your-strong-password>'`) so both humans and scanners can see it's a template:
+   ```powershell
+   #   -AdminPassword (ConvertTo-SecureString '<your-strong-password>' -AsPlainText -Force)
+   ```
+4. **Legitimate `ConvertTo-SecureString` call sites** — `shared/common.ps1` lines 195, 206, 225 convert variable / env-var / prompt input to SecureString. Those are correct. The rule targets **literal strings inside `ConvertTo-SecureString '...'`**, not the function itself.
+
+**Pre-commit guardrail:** Recommend adopting `gitleaks` (or equivalent) as a pre-commit hook on this repo before the next `talent_infra_*` PR lands. Gitleaks' default rule `generic-api-key` matches the exact `ConvertTo-SecureString 'literal'` pattern and would have caught this. See remediation runbook (delivered inline to Anil 2026-05-22) for the exact `.pre-commit-config.yaml` snippet.
+
+**Files changed (Bishop, awaiting Anil commit):**
+- `talent_infra_modules/01-postgresql/deploy.ps1` — `.EXAMPLE` block (lines 40–55) rewritten:
+  - Removed: `(ConvertTo-SecureString 'P@ssw0rd!Strong!' -AsPlainText -Force)`
+  - Added: `(Read-Host -AsSecureString -Prompt 'Postgres admin password')` as the primary example
+  - Added: explanatory comment noting `Get-ParameterValue` auto-prompts when `-AdminPassword` is omitted, plus a CI guidance block with the `<your-strong-password>` placeholder pattern for documentation use
+  - PowerShell parse: 0 errors. Workspace-wide grep for `P@ssw0rd!Strong!`: 0 matches in working tree.
+
+**Scope of remaining exposure (NOT fixed by this edit):**
+- Git history commits `69af3ac` and `cbb8b23` still contain the literal. Scrubbing requires `git filter-repo` + force-push, which is Anil's call (see runbook option b). Recommended: **accept the exposure** (option a) — the literal was never active credential and no rotation is required, GitGuardian alert can be resolved as "doc example, no real impact."
+
+**Cross-agent impact:**
+- **Lambert (Reviewer):** Pattern is normative for all future `talent_infra_*` PowerShell deploy scripts. Next sweep should grep all `.ps1` `.EXAMPLE` blocks for `ConvertTo-SecureString '<not-angle-bracketed>'` and flag any survivors. Suggested regex: `ConvertTo-SecureString\s+['"][^<].*['"].*-AsPlainText`.
+- **Brett (Data Generator & Loader):** Pipeline scripts under `talent_data_pipeline/` are already password-free (Entra-token only via `pg_entra`). No change required.
+- **Kane (Backend), Dallas (Frontend):** App code never had hardcoded passwords. No change required.
+- **Coordinator / Squad:** Recommend adding a session-init step that runs `gitleaks detect --no-banner` (when available) before any agent spawns that touch `talent_infra_*`. Earned-knowledge candidate for `.squad/skills/` — likely name `azure-ps1-no-literal-secrets-in-example` or fold into existing `azure-postgres` skill.
+
+**Validation (Bishop):**
+- Working-tree grep `P@ssw0rd!Strong!` → 0 matches.
+- PowerShell parse `[System.Management.Automation.Language.Parser]::ParseFile(...)` on `01-postgresql/deploy.ps1` → 0 errors.
+- Sweep across `talent_infra_modules/`, `talent_infra/`, `talent_infra_v2/` for `ConvertTo-SecureString 'literal'` → only the 3 legitimate variable-conversion uses in `shared/common.ps1` remain (lines 195, 206, 225). No other `.ps1` literal-password sites.
+- Sweep for `AccountKey=|SharedAccessSignature=|client_secret=|api[_-]?key=|Bearer [A-Za-z0-9]` literals in committed infra files → 0 matches (all 8 hits are doc references to "bearer token", not literals).
+- `.env` files containing `POSTGRESQL_ADMIN_PASSWORD="Treetop@1234"` under `talent_infra_v2/.azure/talent-devtest-v{2,8}/` are gitignored by `talent_infra_v2/.azure/.gitignore` line 2 and never committed (`git log --all -S "Treetop@1234"` returns zero commits). Local-dev only — flagged to Anil but not a leak.
+
 ### 2026-05-22T23:59:00Z: Phase 1 connectivity test — `PGUSER` must be the full Entra principal; `pg_entra` now emits an actionable hint on libpq `password authentication failed`
 
 **By:** Brett (Data Generator & Loader) — requested by Anil
@@ -361,55 +409,6 @@ Data: {..., '_comment_sku': '...', 'skuName': {'value': '...'}, ...}, {Deploymen
 **Status:** Implemented
 **What:** Rewrote `TALENT_GRAPH_QUERY_GENERATION_AGENT_v1.md` to enforce clean resolve-first architecture. All hardcoded entity values removed. Instructions teach patterns, not specific values. Workflow: parse → resolve_entities → build Cypher with codes → execute → format. The `resolve_entities` tool is the sole source of truth for entity→code mapping. All 19 AGE Query Rules, RFP Multi-Role Matching Workflow, Response Format, and Graph Ontology sections preserved.
 **Why:** Hardcoded entity names and regex patterns in instructions were brittle and caused mismatches.
-
-### 2026-05-15: Entity search table and reference data enrichment
-**By:** Brett (Data Generator & Loader)
-**Status:** Implemented
-**What:** Added `code` and `aliases` fields to all 10 reference entity types in reference_data.py. Created `entity_search` relational table for unified FTS + vector search across all reference/dimension entities. Updated SKILLS_BY_DOMAIN from `list[str]` to `list[dict]` format, updated edge_generator for compatibility, added entity_search_loader.py, wired into pipeline main.py as step 4g.
-**Why:** Enables fast code-based lookups, alias resolution, and unified entity search across all reference data types.
-**Impact:** Breaking change to SKILLS_BY_DOMAIN API (str→dict); all consumers updated. Entity search table schema added with GIN + B-tree indexes.
-
-### 2026-05-15: Per-question pipeline logging
-**By:** Kane (Backend Dev)
-**Status:** Implemented
-**What:** Added `PipelineLogger` — per-question trace logger capturing the full request pipeline (triage, handoffs, MCP tool calls, queries, errors, final response) and writing structured logs to disk. Folder structure: `query_logs/{timestamp}_{session_short}_{question_hash}/`. Toggle: `ENABLE_PIPELINE_LOGGING=true`. Non-blocking flush via thread pool. PII sanitization (email masking). Hooked into both `POST /api/chat` (SSE) and `POST /af/graph/responses` (NDJSON).
-**Why:** Enables detailed per-question debugging and analysis without impacting response streaming.
-**Impact:** Lambert — new module needs tests. Dallas — no impact, backend-only.
-
-### 2026-05-15: resolve_entities MCP tool — entity resolution via entity_search table
-**By:** Kane (Backend Dev)
-**Status:** Implemented
-**What:** Added `resolve_entities` MCP tool. Resolves user-supplied terms to canonical entity names and codes from the `entity_search` PostgreSQL table. Resolution cascade: exact code match (1.0) → exact name match (1.0) → FTS via plainto_tsquery → alias substring ILIKE (0.7) → not found (0.0). Shared pool, entity type whitelist, graceful degradation if table missing, all queries parameterized.
-**Why:** Enables fuzzy-to-canonical entity resolution before building Cypher queries, improving accuracy.
-**Impact:** Agent orchestration can now resolve fuzzy user input to canonical entities before Cypher.
-
-### 2026-05-15: Agent instructions updated for entity resolution workflow
-**By:** Parker (Data Engineer)
-**Status:** Implemented
-**What:** Updated `TALENT_GRAPH_QUERY_GENERATION_AGENT_v1.md` to integrate `resolve_entities` MCP tool. Entity resolution required before Cypher for all canonical entity references. Code-based matching (`entity.code = 'RESOLVED_CODE'`) instead of regex. Three-tier classification: enum values (direct), free text (regex/vector), canonical entities (resolve first). Batch resolution for all entities in single call.
-**Why:** Code-based matching is faster (index hit) and deterministic vs regex approximation.
-**Impact:** All agents using Talent Graph Query Agent instructions.
-
-### 2026-05-15: Chat history thread management — backend endpoints
-**By:** Kane (Backend Dev)
-**Status:** Implemented
-
-**What:**
-Added thread management endpoints that the frontend (App.jsx) is already calling:
-- `GET /api/threads?limit=20` — list user's threads
-- `GET /api/threads/{id}` — get thread messages
-- `DELETE /api/threads/{id}` — soft delete thread
-- `PATCH /api/threads/{id}` — rename thread (body: `{"title": "..."}`)
-
-**Key decisions:**
-1. **session_meta co-located with messages** — The `session_meta` document lives in the same Cosmos container and partition as messages (keyed by `session_id`). A `type` field (`session_meta` vs `message`) distinguishes them. Avoids a second container; single-partition reads stay fast.
-2. **Ownership = 404** — Wrong user gets 404 (not 403) to avoid leaking thread IDs.
-3. **Soft delete** — `DELETE /api/threads/{id}` sets `is_deleted=true` on the meta doc. Messages retained for future retention/export features.
-4. **Cross-partition query for list_threads** — `list_threads()` uses `enable_cross_partition_query=True` since user_id spans partitions. Acceptable for a user's thread list (low cardinality, limited to 20 results).
-5. **Legacy endpoints preserved** — `/api/sessions/*` endpoints still exist alongside new `/api/threads/*` endpoints. Frontend should migrate to threads.
-6. **CORS updated** — `allow_methods` now includes `DELETE` and `PATCH`.
-
-**Impact:** Dallas (Frontend) — The four endpoints the frontend is already calling now exist. No frontend changes needed. Lambert (Tester) — 16 tests written and passing.
 
 ### 2026-05-22: talent_data_pipeline outer folders are stale refactor artifacts
 **By:** Brett (Data Generator & Loader), requested by Anil

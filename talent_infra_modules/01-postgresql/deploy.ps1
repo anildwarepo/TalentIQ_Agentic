@@ -36,14 +36,24 @@
     match the UAMI's resource name exactly.
 
 .EXAMPLE
+    # Preferred: prompt securely — nothing lands in shell history, scripts, or
+    # the GitGuardian feed. Get-ParameterValue in shared/common.ps1 also falls
+    # back to Read-Host when -AdminPassword is omitted, so you can drop the
+    # parameter entirely and just answer the prompt.
     pwsh ./deploy.ps1 `
         -SubscriptionId e4718866-... `
         -ResourceGroup rg-talent-modular `
         -Location westus `
-        -AdminPassword (ConvertTo-SecureString 'P@ssw0rd!Strong!' -AsPlainText -Force) `
+        -AdminPassword (Read-Host -AsSecureString -Prompt 'Postgres admin password') `
         -VnetName vnet-talent-shared `
         -VnetResourceGroup rg-network `
         -Force
+
+    # CI / automated runs: source the password from a secret manager (Key Vault,
+    # GitHub Actions secret, AZ DevOps variable group) and convert to SecureString
+    # just before invocation. NEVER hardcode a literal password in this file or
+    # any committed script — use the placeholder pattern below only as a template:
+    #   -AdminPassword (ConvertTo-SecureString '<your-strong-password>' -AsPlainText -Force)
 
 .NOTES
     Requires Azure CLI 2.53+, Bicep CLI, Contributor on -ResourceGroup,

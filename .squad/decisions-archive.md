@@ -557,3 +557,55 @@ from talent_backend.azure_clients import get_credential, get_cosmos_client, get_
 **What:** Live database testing (not mocks) — 7 test classes, 88 tests covering graph/FTS/vector/hybrid queries. Every test docstring references its user story ID. Coverage matrix at `docs/test-coverage-matrix.md`.
 **Impact:** Tests require a running Azure PostgreSQL instance with loaded data. Session-scoped connection fixture.
 
+
+### Archived on 2026-05-22 (Tier 2: file exceeded 50KB, entries >=7 days old archived)
+
+### 2026-05-15: Entity search table and reference data enrichment
+**By:** Brett (Data Generator & Loader)
+**Status:** Implemented
+**What:** Added `code` and `aliases` fields to all 10 reference entity types in reference_data.py. Created `entity_search` relational table for unified FTS + vector search across all reference/dimension entities. Updated SKILLS_BY_DOMAIN from `list[str]` to `list[dict]` format, updated edge_generator for compatibility, added entity_search_loader.py, wired into pipeline main.py as step 4g.
+**Why:** Enables fast code-based lookups, alias resolution, and unified entity search across all reference data types.
+**Impact:** Breaking change to SKILLS_BY_DOMAIN API (str→dict); all consumers updated. Entity search table schema added with GIN + B-tree indexes.
+
+### 2026-05-15: Per-question pipeline logging
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+**What:** Added `PipelineLogger` — per-question trace logger capturing the full request pipeline (triage, handoffs, MCP tool calls, queries, errors, final response) and writing structured logs to disk. Folder structure: `query_logs/{timestamp}_{session_short}_{question_hash}/`. Toggle: `ENABLE_PIPELINE_LOGGING=true`. Non-blocking flush via thread pool. PII sanitization (email masking). Hooked into both `POST /api/chat` (SSE) and `POST /af/graph/responses` (NDJSON).
+**Why:** Enables detailed per-question debugging and analysis without impacting response streaming.
+**Impact:** Lambert — new module needs tests. Dallas — no impact, backend-only.
+
+### 2026-05-15: resolve_entities MCP tool — entity resolution via entity_search table
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+**What:** Added `resolve_entities` MCP tool. Resolves user-supplied terms to canonical entity names and codes from the `entity_search` PostgreSQL table. Resolution cascade: exact code match (1.0) → exact name match (1.0) → FTS via plainto_tsquery → alias substring ILIKE (0.7) → not found (0.0). Shared pool, entity type whitelist, graceful degradation if table missing, all queries parameterized.
+**Why:** Enables fuzzy-to-canonical entity resolution before building Cypher queries, improving accuracy.
+**Impact:** Agent orchestration can now resolve fuzzy user input to canonical entities before Cypher.
+
+### 2026-05-15: Agent instructions updated for entity resolution workflow
+**By:** Parker (Data Engineer)
+**Status:** Implemented
+**What:** Updated `TALENT_GRAPH_QUERY_GENERATION_AGENT_v1.md` to integrate `resolve_entities` MCP tool. Entity resolution required before Cypher for all canonical entity references. Code-based matching (`entity.code = 'RESOLVED_CODE'`) instead of regex. Three-tier classification: enum values (direct), free text (regex/vector), canonical entities (resolve first). Batch resolution for all entities in single call.
+**Why:** Code-based matching is faster (index hit) and deterministic vs regex approximation.
+**Impact:** All agents using Talent Graph Query Agent instructions.
+
+### 2026-05-15: Chat history thread management — backend endpoints
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+
+**What:**
+Added thread management endpoints that the frontend (App.jsx) is already calling:
+- `GET /api/threads?limit=20` — list user's threads
+- `GET /api/threads/{id}` — get thread messages
+- `DELETE /api/threads/{id}` — soft delete thread
+- `PATCH /api/threads/{id}` — rename thread (body: `{"title": "..."}`)
+
+**Key decisions:**
+1. **session_meta co-located with messages** — The `session_meta` document lives in the same Cosmos container and partition as messages (keyed by `session_id`). A `type` field (`session_meta` vs `message`) distinguishes them. Avoids a second container; single-partition reads stay fast.
+2. **Ownership = 404** — Wrong user gets 404 (not 403) to avoid leaking thread IDs.
+3. **Soft delete** — `DELETE /api/threads/{id}` sets `is_deleted=true` on the meta doc. Messages retained for future retention/export features.
+4. **Cross-partition query for list_threads** — `list_threads()` uses `enable_cross_partition_query=True` since user_id spans partitions. Acceptable for a user's thread list (low cardinality, limited to 20 results).
+5. **Legacy endpoints preserved** — `/api/sessions/*` endpoints still exist alongside new `/api/threads/*` endpoints. Frontend should migrate to threads.
+6. **CORS updated** — `allow_methods` now includes `DELETE` and `PATCH`.
+
+**Impact:** Dallas (Frontend) — The four endpoints the frontend is already calling now exist. No frontend changes needed. Lambert (Tester) — 16 tests written and passing.
+
