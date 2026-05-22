@@ -126,3 +126,7 @@ Earlier learnings (2026-05-08 through 2026-05-12) have been summarized and moved
 ## Team update — 2026-05-22T23:59:30Z (via Scribe, originated by Bishop)
 
 Team-wide rule from GitGuardian remediation on `talent_infra_modules/01-postgresql/deploy.ps1`: **no literal secrets in `.EXAMPLE` / docstring / sample-code blocks** — use `Read-Host -AsSecureString` or an angle-bracket `<placeholder>`. Scanners regex on shape, not intent; a plausible-looking literal in a help comment is functionally a leak. Applies to any sample code you emit (Python docstrings, JS examples, README snippets, agent prompts), not just PowerShell.
+
+## Team update — 2026-05-22T23:59:59Z (via Scribe, originated by Bishop)
+
+FYI for backend devs touching deploy hooks: per decisions.md `2026-05-22T23:59:59Z`, **all `.ps1` files in this repo MUST be UTF-8 with BOM** (cross-VM PS 5.1 compat). If you ever edit `talent_infra*/hooks/*.ps1` or any `talent_infra_modules/*/deploy.ps1`, save with BOM and avoid non-ASCII characters (em-dashes, smart quotes, box-drawing chars) — or you'll silently break the file on any Windows PowerShell 5.1 host. See the substitution map + `.editorconfig`/`.vscode/settings.json` prevention guards in the decision entry.

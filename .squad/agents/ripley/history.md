@@ -67,3 +67,7 @@
 ## Team update — 2026-05-22T23:59:30Z (via Scribe, originated by Bishop)
 
 Team-wide rule from GitGuardian remediation on `talent_infra_modules/01-postgresql/deploy.ps1`: **no literal secrets in `.EXAMPLE` / docstring / sample-code blocks** — use `Read-Host -AsSecureString` or an angle-bracket `<placeholder>`. Scanners regex on shape, not intent; a plausible-looking literal in a help comment is functionally a leak. Applies to any sample code you emit (Python docstrings, JS examples, README snippets, agent prompts), not just PowerShell.
+
+## Team update — 2026-05-22T23:59:59Z (via Scribe, originated by Bishop)
+
+Architectural guardrail (decisions.md `2026-05-22T23:59:59Z`): **all `.ps1` files in this repo MUST be UTF-8 with BOM.** Cross-VM PS 5.1 parser-cascade failure (em-dash in BOM-less UTF-8 → CP1252 mojibake → quoted-string break → 30+ misleading errors) just hit Bishop's `talent_infra_modules\01-postgresql\deploy.ps1`. One file fixed; 11 sibling `.ps1` files identified with the same latent bug and deferred. Apply when reviewing any new infra module or PS-based tooling — `shared/common.ps1` is the cross-cutting hazard since every component deploy.ps1 sources it.

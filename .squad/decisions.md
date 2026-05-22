@@ -5,6 +5,76 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-22T23:59:59Z: All `.ps1` files in this repo MUST be UTF-8 *with* BOM (cross-VM PS 5.1 compat)
+
+**By:** Bishop (Deployment Engineer) — proposal to Lambert, merged by Scribe
+**Status:** Rule adopted (single file fixed: `talent_infra_modules/01-postgresql/deploy.ps1`); 11-file remediation sweep deferred; `.editorconfig` + `.vscode/settings.json` prevention guards pending
+
+**Trigger:** Cross-VM parser-cascade failure — `adwarakanat2@CXAILABDevBox-3` saw 30+ syntax errors invoking `talent_infra_modules\01-postgresql\deploy.ps1` (smoking gun: mojibake line `nual cleanup (Azure RP cache can lag â€" retry after a few minutes)`). `anildwa`'s box parsed the same file cleanly. Root cause: file saved as **UTF-8 without BOM** with 2405 non-ASCII chars (em-dashes, box-drawing horizontals, right-arrows) → Windows PowerShell 5.1 read it as CP1252 → em-dash `E2 80 94` rendered as `â€"`, the trailing `"` terminated the enclosing single-quoted string, every subsequent brace/paren mismatched → 30+ cascading parse errors that don't point at the real char. pwsh 7+ (Core, .NET 8+) tolerates BOM-less UTF-8, so the author never saw the bug on their box.
+
+**Proposed Decision (verbatim from Bishop's inbox proposal):**
+
+> **All `.ps1` files in this repository MUST be saved as UTF-8 *with* BOM (byte order mark `0xEF 0xBB 0xBF`).** This is required for cross-VM compatibility with Windows PowerShell 5.1 (Desktop, .NET Framework), which defaults to the current ANSI codepage (CP1252 on en-US locales) when reading a `.ps1` that has no BOM. pwsh 7+ (Core, .NET 8+) defaults to UTF-8 for BOM-less `.ps1`, so the bug is invisible on developer boxes that only have pwsh 7 installed — but it triggers a cascade of parser errors on any 5.1 host. Bishop must verify BOM presence before committing any `.ps1` edit. Future agents authoring or editing `.ps1` files must do the same.
+
+**Why it matters:**
+- PS 5.1 is still default on Windows 10/11, Server 2019/2022, and most Azure VMs — many lab boxes (including Anil's `adwarakanat2`) run 5.1 by default.
+- Silent on author's box, catastrophic on consumer's box — one em-dash in a single-quoted string terminates the string and cascades through every brace/paren, yielding parse errors that don't point at the real problem (the char in line 368 produces the "missing }" in line 832).
+
+**Substitution map (apply during remediation — covers every non-ASCII char Bishop has seen in the codebase):**
+
+| Codepoint | Glyph | → Replacement |
+|---|---|---|
+| U+2014 | `—` em-dash | ` - ` (space-hyphen-space) |
+| U+2013 | `–` en-dash | `-` |
+| U+2018 | `'` left single quote | `'` |
+| U+2019 | `'` right single quote | `'` |
+| U+201C | `"` left double quote | `"` |
+| U+201D | `"` right double quote | `"` |
+| U+00A0 | NBSP | ` ` (space) |
+| U+2026 | `…` ellipsis | `...` |
+| U+2192 | `→` right arrow | `->` |
+| U+2190 | `←` left arrow | `<-` |
+| U+2500 | `─` box-drawing horizontal | `-` |
+
+Write back via `[System.IO.File]::WriteAllText($path, $text, [System.Text.UTF8Encoding]::new($true))` — the `$true` constructor argument enables the BOM. Verify post-write: (a) first 3 bytes = `0xEF 0xBB 0xBF`, (b) `Get-Content -Raw | ?{ $_ -match '[^\x00-\x7F]' }` returns nothing, (c) `$null = [scriptblock]::Create((Get-Content $path -Raw))` succeeds in **both** `powershell.exe` (5.1) and `pwsh` (7+).
+
+**Single file fixed this round (target only — per Anil's "only-target-this-round" instruction):**
+- `talent_infra_modules\01-postgresql\deploy.ps1` — 7215 non-ASCII bytes → **0**, BOM added (first 3 bytes `EF BB BF`), file shrank 46189 → 40552 bytes, line count unchanged (832), parses clean in both PS 5.1.26100 and pwsh 7.6.1.
+
+**11 files identified as having the same latent bug — DEFERRED for a future single-pass sweep:**
+- HIGH risk (6855–3789 non-ASCII bytes, likely em-dashes in quoted strings): `talent_infra_modules\{02-backend,03-frontend,04-data-loading}\deploy.ps1`, `talent_infra_modules\shared\common.ps1`
+- MED risk (~250–430 non-ASCII bytes, mostly section dividers): `talent_infra_modules\00-container-apps-env\deploy.ps1`, `talent_infra\hooks\postprovision.ps1`, `talent_infra_v2\hooks\postprovision.ps1`
+- LOW risk (≤63 non-ASCII bytes): `talent_infra\hooks\{postup,preprovision}.ps1`, `talent_infra_v2\hooks\{postup,preprovision}.ps1`
+
+`shared/common.ps1` is sourced by every `deploy.ps1` — its breakage on PS 5.1 would block every component in the toolkit, not just one. Full per-file byte counts preserved in `.squad/agents/bishop/history.md` (2026-05-22 entry).
+
+**Prevention (recommended, awaits implementation):**
+
+1. **`.editorconfig`** at repo root:
+   ```
+   [*.ps1]
+   charset = utf-8-bom
+   ```
+   The VS Code EditorConfig extension will save `.ps1` files with BOM automatically.
+2. **`.vscode/settings.json`** (workspace-scoped, belt-and-braces):
+   ```json
+   "[powershell]": {
+     "files.encoding": "utf8bom"
+   }
+   ```
+3. **Optional pre-commit hook:** for each staged `.ps1`, check first 3 bytes are `EF BB BF`; reject otherwise.
+4. **Skill candidate** (Lambert): `powershell-utf8-bom-for-5.1-compat` — encapsulates the substitution map + BOM-save + dual-engine (`powershell.exe` + `pwsh`) parse test as a reusable pattern.
+
+**Bonus fix this round (separate decision `2026-05-22T23:59:30Z`):** While editing `01-postgresql/deploy.ps1`, Bishop also scrubbed a GitGuardian-flagged literal password (`P@ssw0rd!Strong!`) from the `.EXAMPLE` block. The encoding fix and the secret-scrub fix landed in the same edit.
+
+**Cross-agent impact:**
+- **Ripley (Lead / Architect):** Architectural guardrail — all `.ps1` files in this repo MUST be UTF-8 with BOM. Apply when reviewing new infra modules or PS-based tooling.
+- **Lambert (Tester):** Pre-deploy quality sweep should grep every `.ps1` for missing BOM + non-ASCII bytes before any release. Both checks are cheap and would have caught this round's bug before it shipped.
+- **Kane (Backend Dev):** Backend devs occasionally touch deploy hooks (`talent_infra*/hooks/*.ps1`) — same rule applies when editing or adding to those files.
+- **Bishop (Deployment Engineer):** Owner of the 11-file remediation sweep when scheduled. Verify BOM presence on every `.ps1` edit going forward.
+
+**Scope:** Encoding-only fix. Out of scope this round: line-ending normalization (CRLF/LF), trailing-whitespace cleanup, logic refactoring. Anil owns the git commit for `talent_infra_modules/01-postgresql/deploy.ps1`.
+
 ### 2026-05-22T23:59:30Z: PowerShell deployment scripts — no literal passwords in `.EXAMPLE` blocks; prefer `Read-Host -AsSecureString`, fall back to `<angle-bracket-placeholder>` only
 
 **By:** Bishop (Deployment Engineer) — requested by Anil

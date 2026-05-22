@@ -323,3 +323,81 @@ The 2026-05-22T18:00:00Z entry was previously summarized but two trailing list i
   2. Default (no flags) -> same resolve line, then explicit `ERROR: Resolved to a PUBLIC IP (20.237.146.249). This server should be reached privately.` + override hint, exit 1, no token call. ✓
   3. `--allow-public` -> resolve line, yellow `WARNING: proceeding over PUBLIC path (20.237.146.249) because --allow-public was set.`, then token acquired (`expires in ~69.5 min`), connection succeeded, all sanity queries ran. Interestingly `inet_server_addr()` returned `10.34.0.4` — the backend IS on a private subnet, but the client crossed the public NAT'd PaaS endpoint. The new indicator now makes that divergence impossible to miss.
 - **Generalises to:** every probe/test script in the repo that targets an Azure PaaS resource intended to be PE-fronted (PostgreSQL today; same applies to Cosmos, Cognitive, OpenAI, ACR, KeyVault). The resolve->classify->gate pattern is universal — captured as the new skill `azure-pe-test-script-private-default`.
+
+
+---
+
+### 2026-05-22 - talent_infra_modules/01-postgresql/deploy.ps1 mojibake-cascading parser bug on Windows PowerShell 5.1 + UTF-8-with-BOM mandate (Archived 2026-05-22T23:59:59Z by Scribe)
+
+**Reported by Anil:** adwarakanat2@CXAILABDevBox-3 saw a 30+ line cascade of "Missing closing }", "Missing closing )", "Unexpected token" errors when invoking deploy.ps1, including the smoking-gun mojibake line "nual cleanup (Azure RP cache can lag a EUR'' retry after a few minutes)".
+
+**Root cause confirmed.** talent_infra_modules\01-postgresql\deploy.ps1 was saved as UTF-8 without BOM (file head = 0x3C 0x23 0x0D, no 0xEF 0xBB 0xBF) and contained 2405 non-ASCII characters across 66 lines:
+
+| Codepoint | Glyph | Count | Where |
+|---|---|---|---|
+| U+2014 | em-dash | 33 | inline prose inside Write-*/comment/quoted strings |
+| U+2500 | box-drawing horizontal | 2368 | Section header # ---...--- separators (74 chars/line x ~32 lines) |
+| U+2192 | right arrow | 4 | comment text e.g. "script arg -> env var -> prompt" |
+
+**Why it broke 5.1, not pwsh 7+:** Windows PowerShell 5.1 (Desktop, .NET Framework) defaults to the current ANSI codepage (CP1252 on en-US) when reading a .ps1 with no BOM; the UTF-8 byte sequence E2 80 94 (em-dash) becomes the three CP1252 glyphs aEUR''. The trailing quote terminated the enclosing single-quoted string, and every subsequent brace/paren mismatched -> cascade. pwsh 7+ (Core, .NET 8+) defaults to UTF-8 for BOM-less .ps1, so the author never saw the bug. The smoking gun for Anil's reported error is line 509 (Write-Info "Manual cleanup (Azure RP cache can lag - retry after a few minutes):") plus line 368 (em-dash inside a single-quoted string: BLOCKED - rerun with -FixStaleDnsZoneGroup).
+
+**Fix applied (target only - the other 11 .ps1 files in scope deferred per Anil):**
+- Fix A - char substitution map applied (codepoint -> ASCII): U+2014 -> " - " (33x), U+2500 -> "-" (2368x), U+2192 -> "->" (4x). Total: 2405 substitutions. No logic changes; no refactoring.
+- Fix B - re-saved as UTF-8 with BOM via [System.IO.File]::WriteAllText($path, $text, [System.Text.UTF8Encoding]::new($true)).
+
+**Verification (post-fix):**
+- File size: 46189 -> 40552 bytes (smaller because U+2500 = 3 UTF-8 bytes -> 1 ASCII byte saves ~5400).
+- First 3 bytes = EF BB BF (BOM present).
+- Non-ASCII bytes in content (excluding BOM): 0. Decoded-string non-ASCII char count: 0.
+- Line count: 832 (unchanged).
+- Parse test pwsh 7.6.1 (Core): PARSE OK.
+- Parse test powershell.exe 5.1.26100 (Desktop): PARSE OK.
+
+**Cross-file scan (Bishop''s surface, deferred per Anil''s "only-target-this-round" instruction).** Every .ps1 under talent_infra_modules/, talent_infra/hooks/, talent_infra_v2/hooks/ is NO-BOM with non-ASCII bytes - same latent bug:
+
+| File | Bytes | Non-ASCII bytes |
+|---|---|---|
+| talent_infra_modules\00-container-apps-env\deploy.ps1 | 23165 | 429 |
+| talent_infra_modules\02-backend\deploy.ps1 | 31939 | 6855 |
+| talent_infra_modules\03-frontend\deploy.ps1 | 26576 | 5874 |
+| talent_infra_modules\04-data-loading\deploy.ps1 | 29502 | 6048 |
+| talent_infra_modules\shared\common.ps1 | 31533 | 3789 |
+| talent_infra\hooks\postprovision.ps1 | 63131 | 246 |
+| talent_infra\hooks\postup.ps1 | 10106 | 63 |
+| talent_infra\hooks\preprovision.ps1 | 5571 | 9 |
+| talent_infra_v2\hooks\postprovision.ps1 | 64888 | 249 |
+| talent_infra_v2\hooks\postup.ps1 | 10106 | 63 |
+| talent_infra_v2\hooks\preprovision.ps1 | 5571 | 9 |
+
+These 11 files are tracked for a follow-up sweep. The other 10 modules likely fail on 5.1 too (02-backend and 03-frontend carry the most non-ASCII per byte - high mojibake risk).
+
+**Prevention (recommended, not yet committed - awaits Lambert review):**
+1. .editorconfig rule: [*.ps1] + charset = utf-8-bom.
+2. .vscode/settings.json: "[powershell]": { "files.encoding": "utf8bom" }.
+3. Pre-commit hook (optional): scan .ps1 files for missing BOM before commit.
+
+**Skill candidate:** This bug class (UTF-8 no-BOM + non-ASCII + PS 5.1) is generic enough to lift into a reusable skill powershell-utf8-bom-for-5.1-compat - flagged for Lambert review.
+
+**Files touched:** talent_infra_modules\01-postgresql\deploy.ps1 (encoding + chars only; zero logic change). Tmp helper scripts deleted.
+
+---
+
+### 2026-05-22T23:59:30Z - GitGuardian remediation: 01-postgresql/deploy.ps1 .EXAMPLE literal-password scrub (Archived 2026-05-22T23:59:59Z by Scribe)
+
+GitGuardian flagged ConvertTo-SecureString "P@ssw0rd!Strong!" -AsPlainText -Force at talent_infra_modules/01-postgresql/deploy.ps1:43 (pushed 2026-05-22T22:58:37Z, present in commits 69af3ac and HEAD cbb8b23). Literal lived inside the script-header .EXAMPLE block - pure documentation, never an active credential. Fix: rewrote the example to use Read-Host -AsSecureString -Prompt "Postgres admin password" (better security guidance - nothing lands in shell history, scripts, or CI logs; also leverages shared/common.ps1::Get-ParameterValue''s built-in Read-Host fallback when -AdminPassword is omitted). Added a CI guidance block with the <your-strong-password> angle-bracket placeholder pattern for cases where documentation must show the ConvertTo-SecureString form. Working-tree grep for the literal -> 0 matches. PowerShell parse -> 0 errors.
+
+**Three lessons that go beyond this single file:**
+
+1. **.EXAMPLE blocks ARE production surface for secret scanners.** PowerShell Get-Help surfaces them verbatim, operators copy-paste them into terminals, and tools like GitGuardian regex on shape, not intent. A plausible-looking literal in .EXAMPLE is functionally a hardcoded credential. New rule: literal strings inside ConvertTo-SecureString "..." are forbidden anywhere a script can be committed. Only the four allowed shapes: (a) Read-Host -AsSecureString, (b) Get-AzKeyVaultSecret, (c) variable from secret-store at call site, (d) <angle-bracket-placeholder> in pure-doc comments. Captured in decision 2026-05-22T23:59:30Z.
+
+2. **shared/common.ps1 ConvertTo-SecureString call sites are NOT the same hazard.** Lines 195/206/225 convert a variable ($Value, $envVal, $Default) to SecureString. The dangerous pattern is literal string between the quotes. Scanners distinguish; reviewers should too. Future Lambert sweeps: regex ConvertTo-SecureString\s+["][^<\$].*["].*-AsPlainText - the [^<\$] negation excludes both angle-bracket placeholders and variable references.
+
+3. **The two .env files found with literal Postgres password under talent_infra_v2/.azure/talent-devtest-v{2,8}/ were a false alarm - gitignored by talent_infra_v2/.azure/.gitignore line 2 (* wildcard), git log --all -S "<literal>" returns zero commits. Local-dev azd state only.** That said: any future azd env or .outputs.json written under talent_infra_*/.azure/ MUST be gitignored at the parent-folder level - never per-file - because azd generates these on azd env new and they bypass any per-file .gitignore we''d add reactively. The wildcard * pattern in talent_infra_v2/.azure/.gitignore is the correct shape; if a future toolkit (talent_infra_v3, etc.) is added, the same wildcard MUST be in its .azure/.gitignore on day one.
+
+**Operator action required (NOT done by Bishop - Anil controls git operations):** see remediation runbook delivered inline 2026-05-22. Recommended: accept the exposure (the literal was never an active credential), rotate-as-precaution only if the value is actively used anywhere (it is not - confirmed via grep across .env + .outputs.json files), resolve GitGuardian alert as "doc example, no real impact." Optional: install gitleaks pre-commit hook to catch the next one before push.
+
+**Cross-toolkit guardrail (forward-looking):** Every future talent_infra_*/ script that takes a -SecureString parameter MUST:
+- Default to Read-Host -AsSecureString in its .EXAMPLE block.
+- Document the Get-AzKeyVaultSecret form for CI.
+- Treat any literal between ConvertTo-SecureString "..." quotes as a bug - fail review.
+This rule is codification-grade and should be applied to every 00-*/, 01-*/, 02-*/, ... module in any current or future toolkit.
