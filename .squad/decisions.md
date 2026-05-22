@@ -5,6 +5,44 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-22T18:00:00Z: PE-bearing deploy scripts MUST pre-flight stale `privateDnsZoneGroup` resources before Bicep, gated by `-FixStaleDnsZoneGroup`
+
+**By:** Bishop (Deployment Engineer) — requested by Anil after `01-postgresql` re-deploy failed with `UpdatingPrivateDnsZoneIdOnPrivateDnsZoneConfigNotAllowed` on PE `tiqpg9a6d3-pe` (existing `default` zone group pointed at a stale local zone in `rg-talent-devtest-11`; current run resolves the canonical zone in RG `vnet`).
+
+**What:** Every `talent_infra_modules/*/deploy.ps1` script that provisions (or could rebuild) an Azure Private Endpoint MUST pre-flight check for stale `privateDnsZoneGroup` resources on the target PE BEFORE invoking `az deployment group create`, and MUST refuse the destructive cleanup unless the operator explicitly opts in via `-FixStaleDnsZoneGroup` (or the umbrella `-Force` switch). Captured today for `01-postgresql`; applies as future modules add PEs for Cosmos, Foundry/CogServices, Key Vault, ACR, etc.
+
+**Why:** Azure rejects in-place mutation of `privateDnsZoneConfigs[*].properties.privateDnsZoneId` with `UpdatingPrivateDnsZoneIdOnPrivateDnsZoneConfigNotAllowed`. This blocks re-deploys whenever the discover-and-reuse logic (decision 2026-05-22T12:30:00Z) resolves a different Private DNS zone than the one wired into the existing PE's zone group — typical when a pre-fix deploy created a duplicate zone in the local RG and a later run discovers the canonical zone in the shared network RG. Bicep cannot fix this because the constraint is enforced at the Network RP, not the template. The only remediation is to delete the offending `privateDnsZoneGroup` so Bicep recreates it pointing at the right zone.
+
+**Pattern (normative — every PE-bearing deploy script SHALL implement):**
+
+1. **Detection (read-only).** After canonical zone resolution, probe the PE with `az network private-endpoint show -g <rg> -n <pe> 2>$null`. First-run safe: exit≠0 or empty body → log "PE not present yet" and skip. Otherwise list zone groups via `az network private-endpoint dns-zone-group list` and case-insensitive compare each `privateDnsZoneConfigs[*].privateDnsZoneId` against the resolved canonical zone ID using `-ieq`. Stash the mismatch (zone group name + old zone ID) for later steps.
+2. **Surface in plan summary.** Show the stale zone group name and the gate status (`auto-approved (-FixStaleDnsZoneGroup or -Force)` vs `BLOCKED — rerun with -FixStaleDnsZoneGroup`). Yellow / dark-yellow coloring.
+3. **Act (gated).** AFTER `Confirm-Action` and BEFORE Bicep deploy:
+   - If mismatch detected AND operator did NOT pass `-FixStaleDnsZoneGroup` or `-Force` → `Write-Fail` with rerun instructions and `exit 1`. Never silently let Bicep error half-way.
+   - If gated, delete via `az network private-endpoint dns-zone-group delete -g <rg> --endpoint-name <pe> -n <name> --output none`. (That subcommand does NOT accept `--yes`.) Check `$LASTEXITCODE`; `exit 1` with captured stderr on failure.
+4. **Optional orphan-zone cleanup (best-effort, narrow).** Only when step 3 deleted a zone group AND the gate was on AND the old zone ID resolves to a zone in the SAME `$ResourceGroup` as the deploy target. Read `numberOfRecordSets` + `numberOfVirtualNetworkLinks` via `az network private-dns zone show`. Delete only if `rsCount -le 1 -and linkCount -eq 0` (≤1 because the SOA always survives). Anything higher → log a manual cleanup command and move on. Non-fatal on failure.
+
+**Switch naming (normative):**
+- New per-script switch: `[switch]$FixStaleDnsZoneGroup`.
+- Umbrella `[switch]$Force` MUST imply it (CI / unattended deploys already pass `-Force`).
+- No env-var binding by default — operators must consciously opt in.
+- README rows MUST appear in the Inputs (parameters) table when the switch is present.
+
+**Why not auto-repair without a gate:** Deleting a `privateDnsZoneGroup` is a destructive, name-resolution-breaking operation on a shared piece of infrastructure. The seconds between delete + Bicep recreate are a window where any service depending on the PE's name resolution will fail. Operators MUST explicitly opt into that window. The fail-fast message gives them everything they need to make that call deliberately.
+
+**Reference implementation (done):** `talent_infra_modules/01-postgresql/deploy.ps1` 2026-05-22 — new `-FixStaleDnsZoneGroup` switch in `param()`, Section 6c (detection), Section 7b (delete stale zone group), Section 7c (best-effort orphan zone cleanup guarded by same-RG + empty record/link checks). README updated with switch row + "Deployment lessons encoded" bullet on the immutability rule. PSParser clean on patched script.
+
+**Applies to (future modules — apply when adding PE for the service):**
+- Cosmos DB SQL API (`privatelink.documents.azure.com`)
+- Azure AI Foundry / Cognitive Services (`privatelink.cognitiveservices.azure.com`, `privatelink.openai.azure.com`)
+- Key Vault (`privatelink.vaultcore.azure.net`)
+- ACR Premium (`privatelink.azurecr.io`)
+- Container Apps Env on internal ingress (`privatelink.<region>.azurecontainerapps.io`)
+
+**Re-run path:** `pwsh .\deploy.ps1 -ResourceGroup rg-talent-devtest-11 -Location westus -FixStaleDnsZoneGroup` (or `-Force` for unattended).
+
+**Skill captured:** `.squad/skills/azure-pe-dns-zone-group-self-heal/SKILL.md` (reusable PowerShell template with anti-patterns).
+
 ### 2026-05-22T12:30:00Z: Every PaaS Private Endpoint module must discover-and-reuse its `privatelink.<service>.*` Private DNS zone before creating one
 
 **By:** Bishop (Deployment Engineer) — captured at Anil's direction after the `01-postgresql` overlapping-namespaces failure.
