@@ -57,3 +57,25 @@ Entries summarized and archived from main history.md to keep recent context acce
 **From Ripley (Product):** Co-host backend+MCP on same App Service. OTel SDK for observability. JSON logging with correlation IDs.
 **From Dallas (Frontend):** SSE via POST+ReadableStream. Proactive 5-min token refresh. AbortController for cancellation.
 **From Parker (MCP):** 3 gaps: (a) `search_graph_nodes()` SQL function missing, (b) `employee_ageid` always 0, (c) `pg_trgm` availability on Azure.
+
+
+## 2026-05-12 — Cross-agent infrastructure notes (Bishop + Lambert) — archived 2026-05-21
+
+Three cross-agent updates from the Pass-3 deployment day, summarized here. Originals were duplicated in history.md (twice each) due to earlier append-without-dedup; Scribe consolidated.
+
+### Bishop — Backend Container App + UAMI passwordless wiring (2026-05-12)
+
+- Backend Container App provisioned with User-Assigned Managed Identity (UAMI). Backend code MUST authenticate via `DefaultAzureCredential` + `AZURE_CLIENT_ID` env var.
+- Passwordless wiring complete for: **PostgreSQL** (`POSTGRES_HOST` → Entra ID token, no password in conn string), **Cosmos DB** (RBAC; Built-in Data Contributor on UAMI), **Azure AI Foundry** (`FOUNDRY_ENDPOINT`; Cognitive Services OpenAI User role on UAMI), **Key Vault** (`KEY_VAULT_URI`; Key Vault Secrets User role), **Application Insights** (`APPLICATIONINSIGHTS_CONNECTION_STRING` telemetry).
+- Action required (since completed): `Dockerfile` under `talent_backend/`, passwordless refactor of DB connection, `config.py` updated to read the env-var contract above, same pattern applied to MCP server.
+
+### Lambert — Probes module shipped (2026-05-12)
+
+- `talent_backend/talent_backend/probes/` package created with three reusable probe modules: `smoke_pg.py` (Postgres + extensions + AGE + Cypher + vector + FTS), `smoke_foundry.py` (Foundry gpt-5.4 via UAMI using `az containerapp exec`), `smoke_mcp_pg.py` (MCP → Postgres connectivity + AGE).
+- JSON output, runs inside Container App via `az containerapp exec`. Positioned for future wrap as `/health/pg`, `/health/foundry`, `/health/mcp` backend endpoints.
+- No Docker rebuild needed — probes ship with the existing `talent_backend` wheel.
+
+### Lambert — Smoke test expectations for backend (2026-05-12)
+
+- `test_03_backend_foundry.py` validates Foundry chat completion using deployer credentials (`azd auth context`) as a temporary workaround.
+- Documented follow-on: backend should expose `/health/foundry` using UAMI-acquired token (not deployer creds) for production-safe health checks. Non-blocking for prod deployment.

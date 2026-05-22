@@ -108,3 +108,7 @@
 
 ## Cross-agent note — 2026-05-21 (Scribe)
 - `Get-ParameterValue` in `talent_infra_modules/shared/common.ps1` now safely handles secure prompts. Bishop fixed a case-insensitive variable/parameter shadow on 2026-05-21 — the local `$secure = Read-Host -AsSecureString` was overwriting the `[switch]$Secure` parameter (PowerShell variable names are case-insensitive, so `$secure` and `$Secure` are the same slot). Local renamed to `$secureValue`. Toolkit rule (captured in `decisions.md`): when a natural local name would collide with a parameter, use suffixed names (`$secureValue`, `$nameStr`, `$promptText`). Relevant to `04-data-loading/deploy.ps1` runs when Anil supplies the admin password interactively rather than via env var.
+
+### 2026-05-21T22:25:00Z — Postgres SKU parity fix (from Bishop)
+
+`talent_infra_modules/01-postgresql/` Postgres SKU now matches `talent_infra_v2/` (`Standard_D4ds_v5` / `GeneralPurpose`, 32 GiB, version 16) — same flavor regardless of which deployment path the operator chose. Bishop fixed an invalid `Standard_B2s` + `GeneralPurpose` pairing on 2026-05-21 that was causing `ServerEditionIncompatibleWithSkuSize` on the standalone path. Relevant to you because `04-data-loading/deploy.ps1` connects to this Postgres via Entra auth — no pipeline changes needed; SKU change is transparent.

@@ -5,6 +5,28 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-21: Postgres SKU/tier defaults in `talent_infra_modules/01-postgresql/` MUST mirror `talent_infra_v2/`
+
+**By:** Bishop (Deployment Engineer) — at Anil's directive
+**What:** `talent_infra_modules/01-postgresql/` postgres SKU defaults must track `talent_infra_v2/` exactly. As of 2026-05-21 the canonical pair is `skuName=Standard_D4ds_v5`, `skuTier=GeneralPurpose` (storage `32 GiB`, version `16`), sourced from `talent_infra_v2/infra/main.parameters.json` lines 86–95.
+**Why:** Deploy was failing with `ServerEditionIncompatibleWithSkuSize`. Root cause: the standalone module shipped with `skuName=Standard_B2s` + `skuTier=GeneralPurpose` — an invalid pairing (B-series is **Burstable only**; D-series is GeneralPurpose; E-series is MemoryOptimized). The v2 stack avoided the bug because its `main.parameters.json` overrides the (also-broken) Bicep default with `Standard_D4ds_v5`. The standalone module had no such override.
+**Files changed (3):**
+- `talent_infra_modules/01-postgresql/deploy.ps1` — param-block defaults (`$SkuName`, `$SkuTier`) and the two `Get-ParameterValue -Default ...` calls now resolve to `Standard_D4ds_v5` / `GeneralPurpose`. Env-var overrides `POSTGRESQL_SKU_NAME` / `POSTGRESQL_SKU_TIER` still win.
+- `talent_infra_modules/01-postgresql/infra/main.bicep` — `param skuName` default `Standard_B2s` → `Standard_D4ds_v5`; expanded `@description` to spell out the valid `tier ↔ family` pairings (Burstable=B*, GeneralPurpose=D*ds_v4/v5, MemoryOptimized=E*ds_v4/v5) so the next operator doesn't repeat the mistake.
+- `talent_infra_modules/01-postgresql/infra/main.parameters.json` — `skuName` value `Standard_B2s` → `Standard_D4ds_v5`. Added `_comment_sku` field citing the v2 source-of-truth file.
+
+**Files INTENTIONALLY NOT changed:**
+- `talent_infra_modules/01-postgresql/infra/modules/postgresql-flexible-server.bicep` (still defaults to `Standard_B2s` on its own param) — `main.bicep:112-113` always passes explicit `skuName`/`skuTier` values into the module, so the submodule default is unreachable. Keeping it untouched preserves verbatim parity with `talent_infra_v2/infra/modules/postgresql-flexible-server.bicep`.
+- `talent_infra_v2/` (read-only canonical source; not in scope for this fix).
+
+**Rule going forward:** Any change to the postgres SKU+tier+storage+version in `talent_infra_v2/infra/main.parameters.json` triggers a matching update in `talent_infra_modules/01-postgresql/{deploy.ps1, infra/main.bicep, infra/main.parameters.json}`. Reviewers should flag divergence between the two paths at PR time, not at `Deployment failed` time.
+
+**Validation:**
+- `bicep build` on `talent_infra_modules/01-postgresql/infra/main.bicep` → `success=true`, 0 errors, 0 warnings.
+- `[System.Management.Automation.Language.Parser]::ParseFile` (pwsh 7) on `deploy.ps1` → zero parse errors, 2455 tokens.
+- SKU/tier sanity: `Standard_D4ds_v5` is D-series → `GeneralPurpose` ✓ (valid Azure Database for PostgreSQL Flexible Server pairing).
+- Deploy NOT re-run (per workflow: Anil owns deploys).
+
 ### 2026-05-21: PowerShell variable naming — no case-insensitive collisions with parameters
 **By:** Bishop (Deployment Engineer)
 **What:** In all PowerShell scripts under `talent_infra_modules/` (and any sibling toolkit added later), a local variable inside a function MUST NOT have a name that matches a parameter of the same function under case-insensitive comparison. PowerShell treats `$secure` and `$Secure` as the same variable, so the local overwrites the parameter — corrupting typed parameters (e.g., a `[switch]` being assigned a `[SecureString]`) and producing confusing cascade type-coercion errors at the call site. Prefer suffixed local names (`$secureValue`, `$nameStr`, `$promptText`) when the natural name would collide.
