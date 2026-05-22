@@ -5,6 +5,35 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-22T22:20:00Z: Two reusable deploy.ps1 patterns shipped (PG bug fixes 1 + 2)
+
+**By:** Bishop (Deployment Engineer) — requested by Anil
+**What:** Patched `talent_infra_modules/01-postgresql/deploy.ps1` for two latent bugs surfaced during yesterday's `-FixStaleDnsZoneGroup` ship. Both fixes are reusable patterns that should be swept across the other four module folders.
+
+**Bug 1 — Section 7c orphan-zone cleanup (Azure Private DNS stale-list trap):**
+- `numberOfVirtualNetworkLinks` on `zone show` AND `link vnet list` both reported `0`/`[]` while Azure RP rejected zone delete with `CannotDeleteResource` citing `vnet-westus-link`. Listing endpoints can lag the RP truth by several minutes after a link delete.
+- **New pattern:** Guard on `record-set list --query "[?type!='...SOA']"` (record-set listing IS reliable); idempotently delete any visible links via named delete; attempt zone delete; on failure log manual-hint and continue (non-fatal — Bicep does not depend on orphan removal).
+- **Applies to:** every Private DNS zone in the stack — cosmos, postgres, cognitive, openai, keyvault, ACR — wherever the 2026-05-22T12:15:00Z discover-and-reuse pattern gets rolled out to other modules.
+
+**Bug 2 — Section 8 Bicep deploy JSON capture (`2>&1` stream pollution):**
+- `Invoke-Native { az deployment group create ... --output json 2>&1 }` interleaves stderr (Bicep "new release available" notice and ARM warnings) into stdout, breaking `ConvertFrom-Json` on a successful deploy. Downstream steps (Section 9 PG restart) silently skipped because the script exited 1 right after `Write-Success "Bicep deployment succeeded"`.
+- **New pattern:** Redirect stderr to per-run file under `$scriptDir/.deploy-logs/{stamp}-bicep-stderr.txt` (`2>$stderrLog`); capture stdout-only; force `-o json`; validate non-empty before parsing; on parse failure dump raw stdout to disk (never echo inline — may contain secrets/IDs), log both file paths, exit 1; on non-zero exit surface stderr inline (small) + dump stdout to disk; on success delete the stderr file.
+- **Applies to:** every `az deployment group create` capture in `talent_infra_modules/*/deploy.ps1` (00, 01, 02, 03, 04). The `2>&1` idiom for JSON capture is unsound across the board — Section-8 shape in `01-postgresql/deploy.ps1` is now the canonical replacement.
+
+**Why:** Both bugs were latent before the discover-and-reuse + self-heal work because the unhappy paths never ran. Bug 2 in particular silently skipped Section 9 (PG flexible server restart for the auth/extensions remount) on every successful deploy — masked because operators were re-running manually. Sweeping the pattern across the other four folders prevents the same blind spot from recurring there.
+
+**Verification:** deploy.ps1 parses clean (`[System.Management.Automation.Language.Parser]::ParseFile` → 0 errors). Live cleanup of `vnet-westus-link` + orphan zone in `rg-talent-devtest-11` completed (exit 0 on each step; `zone show 2>$null` returns empty). Anil can verify with `az network private-dns zone show -g rg-talent-devtest-11 -n privatelink.postgres.database.azure.com 2>$null` (should return empty).
+
+**Follow-up suggested:** Lambert sweep of the four sibling `talent_infra_modules/{00,02,03,04}/deploy.ps1` files for the same `2>&1` JSON-capture idiom, replacing with the Section-8 canonical shape.
+
+### 2026-05-22T18:30:00Z: All squad members MUST use claude-opus-4.6-1m (Opus 4.7 Extra-high reasoning)
+
+**By:** Anil (via Copilot)
+**What:** Every agent spawn — including Scribe and any other role normally defaulted to a fast/cheap tier — MUST use `claude-opus-4.6-1m` (displayed as "Claude Opus 4.7 (Extra high reasoning)(Internal only)"). The "never bump Scribe" rule and all per-role fast-tier defaults in the coordinator's task-aware auto-selection table are overridden. `.squad/config.json` `defaultModel` is the source of truth and must be honored on every spawn — coordinator must not hardcode a different model on any agent.
+**Why:** User directive — captured for team memory. Anil prefers consistent premium reasoning across the entire team, even for mechanical/logging tasks, over per-task cost optimization.
+**Scope:** Applies to all current and future squad members. Applies to Scribe (logging, decisions merge, git commits), Ralph (work-monitor), and any agent added later. Overrides Layer 3 (task-aware auto-selection) and Layer 4 (default) of the coordinator's model-selection hierarchy.
+**Honoring:** Coordinator MUST pass `model: "claude-opus-4.6-1m"` on every `runSubagent` / `task` call until the user explicitly changes `defaultModel` in `.squad/config.json` or issues a new directive.
+
 ### 2026-05-22T18:00:00Z: PE-bearing deploy scripts MUST pre-flight stale `privateDnsZoneGroup` resources before Bicep, gated by `-FixStaleDnsZoneGroup`
 
 **By:** Bishop (Deployment Engineer) — requested by Anil after `01-postgresql` re-deploy failed with `UpdatingPrivateDnsZoneIdOnPrivateDnsZoneConfigNotAllowed` on PE `tiqpg9a6d3-pe` (existing `default` zone group pointed at a stale local zone in `rg-talent-devtest-11`; current run resolves the canonical zone in RG `vnet`).

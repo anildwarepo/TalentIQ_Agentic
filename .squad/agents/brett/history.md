@@ -35,3 +35,7 @@ Unified 17 roles (previously hardcoded strings in 3 generators) into canonical `
 - Inner package files are NOT always identical to outer stubs — must update each independently
 - Deduplicating roles across generators: unify all hardcoded lists into single reference data source
 - `role_name` on Employee serves dual purpose: edge generation metadata for HAS_ROLE, and structured query alternative to regex on `job_title`
+
+
+## Cross-agent note — 2026-05-22T22:30:00Z (Scribe)
+- **Model directive (Anil, captured 2026-05-22T18:30:00Z):** all squad spawns — including Scribe and Ralph, including any agent normally defaulted to a fast/cheap tier — MUST use `claude-opus-4.6-1m` (Opus 4.7 Extra-high reasoning). `.squad/config.json` `defaultModel` is the source of truth; the "never bump Scribe" rule is overridden. Per `decisions.md` `2026-05-22T18:30:00Z`.
