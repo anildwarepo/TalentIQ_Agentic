@@ -119,3 +119,6 @@
 
 ## Cross-agent note — 2026-05-22T22:30:00Z (Scribe)
 - **Model directive (Anil, captured 2026-05-22T18:30:00Z):** all squad spawns — including Scribe and Ralph, including any agent normally defaulted to a fast/cheap tier — MUST use `claude-opus-4.6-1m` (Opus 4.7 Extra-high reasoning). `.squad/config.json` `defaultModel` is the source of truth; the "never bump Scribe" rule is overridden. Per `decisions.md` `2026-05-22T18:30:00Z`.
+
+## Cross-agent note — 2026-05-22T23:45:00Z (Scribe, from Brett)
+- **Pipeline layout cleanup (Brett, requested by Anil):** the outer `talent_data_pipeline/{loaders,generators,schema}/` flat-layout folders are GONE (13 files deleted: loaders=5, generators=6, schema=2). The nested `talent_data_pipeline/talent_data_pipeline/` package is now the SOLE source of truth for pipeline schema/queries — no more dual-edit discipline, no more silent divergence between outer and nested copies. Pre-flight import scan returned zero hits; post-delete smoke test (`from talent_data_pipeline.loaders.{base,fts,graph,vector,entity_search}_loader import *`) returned OK. Deletions are unstaged (` D` in git); Anil owns the commit. All your future schema/query work goes directly into the nested package. Per `decisions.md` `2026-05-22: talent_data_pipeline outer folders are stale refactor artifacts`.

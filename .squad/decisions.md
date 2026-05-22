@@ -324,3 +324,18 @@ Added thread management endpoints that the frontend (App.jsx) is already calling
 
 **Impact:** Dallas (Frontend) — The four endpoints the frontend is already calling now exist. No frontend changes needed. Lambert (Tester) — 16 tests written and passing.
 
+### 2026-05-22: talent_data_pipeline outer folders are stale refactor artifacts
+**By:** Brett (Data Generator & Loader), requested by Anil
+**What:** The outer-level `talent_data_pipeline/{loaders,generators,schema}/` folders are dead code left over from a flat-layout → nested-package refactor. Only the nested `talent_data_pipeline/talent_data_pipeline/` package is built and imported.
+
+**Evidence:**
+- `pyproject.toml` declares `packages = ["talent_data_pipeline"]` — only the nested package is installable.
+- All entry scripts (`main.py`, `validate.py`, `connectivity_test.py`) import exclusively from `talent_data_pipeline.X` (the nested package), never from the flat outer folders.
+- The two `loaders/` trees have diverged: the inner versions have checkpoint/resume logic, batched `execute_values`, and recent optimizations that the outer copies lack.
+
+**Recommendation:** Delete the outer `loaders/`, `generators/`, and `schema/` folders. Keep only the nested package. No imports break, no scripts need updating — pure cleanup.
+
+**Risk if left as-is:** Anyone editing the outer files (autocomplete, grep hits, IDE jumps) silently changes dead code while the runtime uses the inner package. Already-diverged copies will keep diverging.
+
+**Action taken (2026-05-22, Brett):** Deleted 13 tracked files under `talent_data_pipeline/{loaders,generators,schema}/` (loaders=5, generators=6, schema=2). Pre-flight import scan across the repo (excluding `.venv`/`__pycache__`/`node_modules`) found zero hits on bare `loaders|generators|schema` imports; post-delete smoke test `from talent_data_pipeline.loaders.{base,fts,graph,vector,entity_search}_loader import *` returned OK. Deletions are unstaged (` D` in git) for Anil to commit when ready. The nested `talent_data_pipeline/talent_data_pipeline/` package is now the SOLE source of truth — no more dual-edit discipline, no more silent divergence.
+

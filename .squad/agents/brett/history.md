@@ -35,6 +35,7 @@ Unified 17 roles (previously hardcoded strings in 3 generators) into canonical `
 - Inner package files are NOT always identical to outer stubs — must update each independently
 - Deduplicating roles across generators: unify all hardcoded lists into single reference data source
 - `role_name` on Employee serves dual purpose: edge generation metadata for HAS_ROLE, and structured query alternative to regex on `job_title`
+- **2026-05-22 — Stale outer pipeline folders removed.** Deleted the leftover flat-layout artifacts `talent_data_pipeline/{loaders,generators,schema}/` (13 tracked files total: loaders=5, generators=6, schema=2). All entry scripts (`main.py`, `validate.py`, `connectivity_test.py`) and `pyproject.toml` (`packages = ["talent_data_pipeline"]`) only ever referenced the nested package, and the inner copies had diverged with checkpoint/resume + batched `execute_values` optimizations the outer stubs lacked. Pre-flight import scan across the repo (excluding `.venv`/`__pycache__`/`node_modules`) found zero hits on bare `loaders|generators|schema` imports; post-delete smoke test `from talent_data_pipeline.loaders.{base,fts,graph,vector,entity_search}_loader import *` returned `OK`. Going forward, the nested `talent_data_pipeline/talent_data_pipeline/` package is the sole source of truth — no more dual-edit discipline, no more silent divergence between outer stubs and inner package. The 13 deletions are unstaged (` D`) in git; Anil decides when to commit.
 
 
 ## Cross-agent note — 2026-05-22T22:30:00Z (Scribe)
