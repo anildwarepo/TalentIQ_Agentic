@@ -102,3 +102,18 @@
 - Legacy `/api/sessions/*` endpoints still work but frontend should migrate to `/api/threads/*`.
 - **No frontend changes needed** — endpoints match what App.jsx already calls.
 - 16 tests passing (Lambert).
+
+### 2026-05-21: `VITE_DISABLE_AUTH` build-time MSAL bypass for demo deployments
+- **Why:** `talent_infra_modules/` deploys to environments where an Entra SPA app registration cannot be provisioned. Backend `auth.py` already short-circuits to a synthetic `dev-user` when `AZURE_TENANT_ID` is unset; this is the matching frontend half so the UI doesn't get stuck on the sign-in card.
+- **Flag:** `VITE_DISABLE_AUTH=true` (Docker build arg, inlined by Vite as a literal — cannot be flipped at runtime). Default is `"false"` → production MSAL behavior unchanged.
+- **Files touched (5, all under `talent_ui/`):**
+  - `Dockerfile` — added `ARG`/`ENV` for `VITE_DISABLE_AUTH`, `VITE_API_BASE`, `VITE_AF_BACKEND_URL`, `VITE_AGENT_NAME` (matching the build args `03-frontend/deploy.ps1` passes).
+  - `src/authConfig.js` — `msalConfig` now exports `null` when disabled; hardcoded clientId/authority/redirectUri replaced with `VITE_MSAL_*` env-var lookups + the existing dev values as fallback.
+  - `src/main.jsx` — branched: AUTH_DISABLED renders `<App />` bare, else wraps in `<MsalProvider instance={msalInstance}>` exactly as before. `PublicClientApplication` is only constructed in the production branch (no console errors about missing clientId).
+  - `src/App.jsx` — module-level `const AUTH_DISABLED = import.meta.env.VITE_DISABLE_AUTH === "true";` + `DEMO_ACCOUNT` constant. Conditional hook calls (`useMsal`, `useIsAuthenticated`) with `eslint-disable-next-line react-hooks/rules-of-hooks` — safe because Vite inlines the constant at build time so dead-code elimination makes the hook call pattern consistent per build. `getToken` short-circuits to `null`; `logout` becomes a local-state clear; every `if (!token) return` bail-out gated with `&& !AUTH_DISABLED`; every direct `Authorization: Bearer ${token}` header replaced with `AUTH_DISABLED ? {} : {...}` (handleFileUpload, default `/chat` path, loadThreads, loadThread); the `loadThreads` effect fires on `isAuthenticated && (accessToken || AUTH_DISABLED)`.
+  - `.env.example` — documented `VITE_DISABLE_AUTH=false`.
+- **How to undo when a future env gets MSAL:** set `VITE_DISABLE_AUTH=false` (or unset) at Docker build time, supply the four `VITE_MSAL_*` env vars per `.env.example`, rebuild and push. No source changes needed.
+- **Contract with Bishop's `talent_infra_modules/03-frontend/`:** the flag name and the `"true"` string match `AUTH-DISABLED.md` exactly. If that doc changes, this code must follow.
+
+## Cross-agent note — 2026-05-21 (Scribe)
+- **Auth-disable contract is a two-agent deliverable.** Dallas owns the React source change (conditional `<MsalProvider>`, suppressed bearer header, synthetic demo account in `talent_ui/`); Bishop owns the Container App env-vars + deploy scripts (omits `AZURE_TENANT_ID` on backend; passes `VITE_DISABLE_AUTH=true` to the frontend Docker build). Both halves must move together to deliver the "auth-off demo deploy" promised by `talent_infra_modules/AUTH-DISABLED.md`. Changing the contract requires coordinated edits across both surfaces — never one in isolation.
