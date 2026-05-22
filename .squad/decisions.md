@@ -5,6 +5,25 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-22T00:30:00Z: ARM/Bicep parameter files — no comment keys allowed
+
+**By:** Bishop (Deployment Engineer) — requested by Anil
+**What:** Every top-level key inside the `parameters` block of an ARM/Bicep parameter file (`*.parameters*.json`) MUST be a `DeploymentParameter` object — i.e. `{"value": ...}`. JSON has no comment syntax, and ARM does **not** honor the `_comment_*` convention some tooling uses. Adding a bare-string key like `"_comment_sku": "..."` causes the entire file to fail deserialization with `az deployment ... validate` / `azd up`:
+
+```
+ERROR: Unable to build a model: Unable to deserialize response data.
+Data: {..., '_comment_sku': '...', 'skuName': {'value': '...'}, ...}, {DeploymentParameter}
+```
+
+**Rule for all future modules** (`02-backend`, `03-frontend`, `04-data-loading`, and any new `talent_infra_modules/*/infra/*.parameters*.json`):
+- Never add `_comment_*`, `//`-style, or any non-`DeploymentParameter` keys inside the `parameters` object.
+- Put human-readable context on the corresponding `param` in the `.bicep` file using `@description('...')`. The description flows into Azure portal hints, `az deployment ... what-if` output, and IDE tooltips — strictly better than a JSON comment.
+- If you need cross-file rationale that doesn't fit on a single `@description`, put it in a sibling `README.md` next to the `infra/` folder, not inside the parameter file.
+
+**Why:** This came up because `01-postgresql/infra/main.parameters.json` had a `_comment_sku` explaining the SKU/tier parity with `talent_infra_v2/`. The Bicep already has `@description('PostgreSQL SKU name...')` on `param skuName`, so the comment was redundant **and** breaking the deploy. Removed.
+
+**Scope check:** Swept `talent_infra_modules/**/*.parameters*.json` (all 4 files: `00-container-apps-env`, `01-postgresql`, `02-backend`, `03-frontend`); only `01-postgresql` had the issue. Fixed.
+
 ### 2026-05-22T00:00:00Z: Prereq existence checks must use RP-specific `az <rp> show`, not generic `az resource show`
 
 **By:** Bishop (Deployment Engineer) — requested by Anil
