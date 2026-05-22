@@ -5,6 +5,11 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-21: PowerShell variable naming — no case-insensitive collisions with parameters
+**By:** Bishop (Deployment Engineer)
+**What:** In all PowerShell scripts under `talent_infra_modules/` (and any sibling toolkit added later), a local variable inside a function MUST NOT have a name that matches a parameter of the same function under case-insensitive comparison. PowerShell treats `$secure` and `$Secure` as the same variable, so the local overwrites the parameter — corrupting typed parameters (e.g., a `[switch]` being assigned a `[SecureString]`) and producing confusing cascade type-coercion errors at the call site. Prefer suffixed local names (`$secureValue`, `$nameStr`, `$promptText`) when the natural name would collide.
+**Why:** Concrete regression in `shared/common.ps1::Get-ParameterValue` where `$secure = Read-Host -AsSecureString` shadowed `[switch]$Secure`, breaking the secure-prompt path that all 5 component `deploy.ps1` scripts depend on. One-line discipline prevents an entire class of hard-to-diagnose runtime errors in shared infra helpers.
+
 ### 2026-05-21: talent_infra_modules/00-container-apps-env — standalone ACA env deployer
 **By:** Bishop (Deployment Engineer)
 **Status:** Implemented (recovered by Squad coordinator — Bishop spawn returned silent success; all artifacts verified on filesystem and validated)

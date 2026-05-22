@@ -105,3 +105,6 @@
   - **Removed all hardcoded values:** No specific cert names, country names, or skill names appear as rules. Examples use codes as teaching patterns, not as hardcoded mappings.
 - **Key principle:** Instructions teach PATTERNS, not specific values. The resolver is the single source of truth for entity→code mapping. Agent never needs to know entity codes itself.
 - **Preserved:** All 19 AGE Query Rules, RFP Multi-Role Matching Workflow, Response Format, Graph Ontology.
+
+## Cross-agent note — 2026-05-21 (Scribe)
+- `Get-ParameterValue` in `talent_infra_modules/shared/common.ps1` now safely handles secure prompts. Bishop fixed a case-insensitive variable/parameter shadow on 2026-05-21 — the local `$secure = Read-Host -AsSecureString` was overwriting the `[switch]$Secure` parameter (PowerShell variable names are case-insensitive, so `$secure` and `$Secure` are the same slot). Local renamed to `$secureValue`. Toolkit rule (captured in `decisions.md`): when a natural local name would collide with a parameter, use suffixed names (`$secureValue`, `$nameStr`, `$promptText`). Relevant to `04-data-loading/deploy.ps1` runs when Anil supplies the admin password interactively rather than via env var.

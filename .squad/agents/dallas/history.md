@@ -117,3 +117,6 @@
 
 ## Cross-agent note — 2026-05-21 (Scribe)
 - **Auth-disable contract is a two-agent deliverable.** Dallas owns the React source change (conditional `<MsalProvider>`, suppressed bearer header, synthetic demo account in `talent_ui/`); Bishop owns the Container App env-vars + deploy scripts (omits `AZURE_TENANT_ID` on backend; passes `VITE_DISABLE_AUTH=true` to the frontend Docker build). Both halves must move together to deliver the "auth-off demo deploy" promised by `talent_infra_modules/AUTH-DISABLED.md`. Changing the contract requires coordinated edits across both surfaces — never one in isolation.
+
+## Cross-agent note — 2026-05-21 (Scribe)
+- `Get-ParameterValue` in `talent_infra_modules/shared/common.ps1` now safely handles secure prompts. Bishop fixed a case-insensitive variable/parameter shadow on 2026-05-21 — the local `$secure = Read-Host -AsSecureString` was overwriting the `[switch]$Secure` parameter (PowerShell variable names are case-insensitive, so `$secure` and `$Secure` are the same slot). Local renamed to `$secureValue`. Toolkit rule (captured in `decisions.md`): when a natural local name would collide with a parameter, use suffixed names (`$secureValue`, `$nameStr`, `$promptText`). Relevant to `03-frontend/deploy.ps1` redeploys when Anil supplies any secret interactively rather than via env var.
