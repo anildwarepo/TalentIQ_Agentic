@@ -62,3 +62,6 @@ Script silently connected over the public PaaS firewall when run from a non-VNet
 
 ## Cross-agent note — 2026-05-22T22:30:00Z (Scribe)
 - **Model directive (Anil, captured 2026-05-22T18:30:00Z):** all squad spawns — including Scribe and Ralph, including any agent normally defaulted to a fast/cheap tier — MUST use `claude-opus-4.6-1m` (Opus 4.7 Extra-high reasoning). `.squad/config.json` `defaultModel` is the source of truth; the "never bump Scribe" rule is overridden. Per `decisions.md` `2026-05-22T18:30:00Z`.
+
+## Cross-agent note — 2026-05-22T23:55:00Z (Scribe, from Brett)
+- `talent_data_pipeline.main` gained `--mode {env,manual}` CLI flag + `DATALOAD_MODE` env var (precedence: CLI > env var > default `env`). Default `env` preserves today's behavior — no prompts, reads `PGHOST` from `.env`. `manual` interactively prompts `PG host [<current PGHOST>]:` (host only — port/user/database/sslmode stay from `.env`); fails fast with exit 2 when no TTY, so CI never hangs. Entra `DefaultAzureCredential` path is fully preserved (no password fallback). Inner package only; outer stubs deliberately untouched per 2026-05-22 cleanup. Relevant to `talent_infra_modules/04-data-loading/deploy.ps1` if operators ever want to override the deployed PG host ad-hoc without re-publishing `.env`. Per `decisions.md 2026-05-22T23:55:00Z`.

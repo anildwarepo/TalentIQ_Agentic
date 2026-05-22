@@ -5,6 +5,50 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-22T23:55:00Z: `talent_data_pipeline.main` gains `--mode {env,manual}` flag + `DATALOAD_MODE` env var
+
+**By:** Brett (Data Generator & Loader) — requested by Anil
+**Status:** Implemented — awaiting Anil review
+
+**What:** New first-class dataload-mode selector on `python -m talent_data_pipeline.main`. Precedence is **CLI flag > env var > default**:
+
+| Source | Value | Wins over |
+|---|---|---|
+| `--mode env\|manual` CLI flag | explicit | env var, default |
+| `DATALOAD_MODE=env\|manual` env var | explicit | default |
+| (unset) | `env` | — |
+
+Invalid `DATALOAD_MODE` → fatal exit **2** (typos in automation must never silently re-route the control path).
+
+**Modes**
+- **`env`** (default) — identical to today's behavior. Reads `PGHOST` and every other connection field from `.env`. No prompts.
+- **`manual`** — prompts interactively at startup: `PG host [<current PGHOST>]: ` (default in brackets when `PGHOST` set). Enter accepts default; whitespace-only = empty; up to **3 attempts** then exit **2**. Only the **host** is prompted — port, user, database, sslmode stay from `.env`.
+
+**Non-interactive guard:** `--mode manual` + `sys.stdin.isatty() == False` → exits **2** immediately with a redirect message to `--mode env` / `DATALOAD_MODE=env`. CI can never hang on `input()`.
+
+**Banner** (printed once before any DB connection opens):
+```
+[pipeline] mode=env     host=<host>  (from .env)
+[pipeline] mode=manual  host=<host>  (overridden via prompt)
+```
+
+**Key plumbing decision — `config.apply_host_override(host)`:** mutates the existing `db_config` singleton **in place** via `object.__setattr__` (bypassing `@dataclass(frozen=True)`) and writes `os.environ["PGHOST"]`. Rationale: `base_loader._get_pool()` and several other modules hold `db_config` by reference from import time; rebinding `config.db_config = NewInstance()` would leave those references stale. In-place mutation gives every lazy reader the correct host at next read. **Only the host changes** — Entra `DefaultAzureCredential` path in `pg_entra.pg_connect()` is fully preserved (same user, port, database, sslmode, same bearer-token password injection, no password fallback).
+
+**Files touched (inner package only, per 2026-05-22 outer-folders cleanup):**
+- `talent_data_pipeline/talent_data_pipeline/config.py` — added `apply_host_override(host: str) -> None`.
+- `talent_data_pipeline/talent_data_pipeline/main.py` — added `_resolve_mode`, `_resolve_manual_host`, `_VALID_MODES`, `_MAX_HOST_PROMPT_ATTEMPTS`; extended `__main__` with `--mode` argparse, no-TTY guard, manual-mode prompt, `apply_host_override()` call, and banner. `--force` flag and downstream `main(force=...)` call unchanged.
+
+Outer stubs at `talent_data_pipeline/{main,config,validate,connectivity_test}.py` **deliberately left alone**.
+
+**Verification:** `py_compile` clean; `--help` shows the new flag; 14/14 isolated unit checks (no DB) covering precedence, override mutation, prompt retry, whitespace handling; live `'' | python -m talent_data_pipeline.main --mode manual` exits 2 with redirect message and never contacts DB.
+
+**Open follow-ups for Anil (3):**
+1. Should `manual` also prompt for `PGDATABASE` / `PGUSER`? (Current scope: host only.)
+2. Should an audit-log line be written when an override is applied (in addition to the banner)?
+3. Should `--mode manual` be allowed inside `python -m talent_data_pipeline.run_all` (the multi-step wrapper)? Currently the new flag only lives on `python -m talent_data_pipeline.main`; the wrapper would need its own flag pass-through.
+
+**Owner of pipeline-code commit:** Anil (Brett's ownership boundary excludes `talent_data_pipeline/*` git stage/commit).
+
 ### 2026-05-22T22:20:00Z: Two reusable deploy.ps1 patterns shipped (PG bug fixes 1 + 2)
 
 **By:** Bishop (Deployment Engineer) — requested by Anil
