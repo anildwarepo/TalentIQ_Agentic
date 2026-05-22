@@ -13,6 +13,23 @@ COPY . .
 ARG VITE_API_BASE_URL=""
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
+# Build args passed by talent_infra_modules/03-frontend/deploy.ps1.
+# Vite inlines VITE_* into the bundle at build time — they cannot be set at runtime.
+ARG VITE_API_BASE=""
+ENV VITE_API_BASE=$VITE_API_BASE
+
+ARG VITE_AF_BACKEND_URL="/af"
+ENV VITE_AF_BACKEND_URL=$VITE_AF_BACKEND_URL
+
+ARG VITE_AGENT_NAME="talentiq-agent"
+ENV VITE_AGENT_NAME=$VITE_AGENT_NAME
+
+# Demo / partial-environment auth bypass — see talent_infra_modules/AUTH-DISABLED.md.
+# When "true", main.jsx skips MsalProvider and App.jsx treats the user as authenticated.
+# Default is "false" (production behavior, MSAL flows as normal).
+ARG VITE_DISABLE_AUTH="false"
+ENV VITE_DISABLE_AUTH=$VITE_DISABLE_AUTH
+
 RUN npm run build
 
 # ─── Stage 2: nginx serve + reverse proxy to backend ────────

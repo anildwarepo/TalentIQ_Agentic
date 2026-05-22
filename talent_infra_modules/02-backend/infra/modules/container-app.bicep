@@ -1,3 +1,16 @@
+// Container App + UAMI module — copied from talent_infra_v2/infra/modules/container-app.bicep
+// on 2026-05-21 with two output additions for talent_infra_modules use:
+//   1. `identityClientId` so the parent template (and downstream scripts) can
+//      read the UAMI's clientId without a second `existing` ref.
+//   2. `identityName` so the deploy.ps1 PG registration step knows the exact
+//      UAMI name to pass as --display-name.
+// Everything else is intentionally unchanged so the sidecar wiring stays
+// identical to the v2 topology that has been proven against multiple envs.
+//
+// ACR must be in the SAME resource group as the Container App deployment
+// because the inline AcrPull role assignment cannot target a cross-RG
+// resource without a tunneling sub-module. The deploy.ps1 enforces this.
+
 @description('The location for the Container App')
 param location string
 
@@ -10,7 +23,7 @@ param containerAppsEnvironmentId string
 @description('The container image to deploy')
 param containerImage string
 
-@description('The name of the Azure Container Registry')
+@description('The name of the Azure Container Registry (must be in the deployment RG)')
 param acrName string
 
 @description('The target port for the container')
@@ -46,19 +59,21 @@ param allowInsecure bool = false
 @description('Tags for the resources')
 param tags object = {}
 
-// Reference existing ACR for managed identity access
+// Reference existing ACR (same RG as the Container App deployment)
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: acrName
 }
 
-// User-assigned managed identity for ACR pull
+// User-assigned managed identity for ACR pull (+ PG / Foundry / Cosmos)
 resource acrPullIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${containerAppName}-identity'
   location: location
   tags: tags
 }
 
-// Role assignment for ACR pull - created BEFORE container app
+// Role assignment for ACR pull - created BEFORE container app to avoid the
+// well-known startup race (`failed to pull image: unauthorized`) that hits
+// when the Container App spins up before AcrPull propagates.
 resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(acr.id, acrPullIdentity.id, 'acrpull')
   scope: acr
@@ -76,7 +91,6 @@ resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 // number of named sidecar params if more are needed later.
 var hasSidecar = !empty(sidecarContainer)
 
-// Container App with user-assigned managed identity
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
@@ -88,7 +102,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     }
   }
   dependsOn: [
-    acrPullRole // Ensure role assignment is complete before container app is created
+    acrPullRole
   ]
   properties: {
     managedEnvironmentId: containerAppsEnvironmentId
@@ -109,9 +123,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       secrets: secrets
     }
     template: {
-      // When a sidecar is provided, emit two containers; otherwise one.
-      // Both share the same UAMI via AZURE_CLIENT_ID injection, so the
-      // sidecar authenticates as the SAME PG / OpenAI principal as main.
       containers: hasSidecar ? [
         {
           name: containerAppName
@@ -169,5 +180,7 @@ output id string = containerApp.id
 output name string = containerApp.name
 output fqdn string = containerApp.properties.configuration.ingress.fqdn
 output identityId string = acrPullIdentity.id
+output identityName string = acrPullIdentity.name
 output identityPrincipalId string = acrPullIdentity.properties.principalId
+output identityClientId string = acrPullIdentity.properties.clientId
 output latestRevisionName string = containerApp.properties.latestRevisionName

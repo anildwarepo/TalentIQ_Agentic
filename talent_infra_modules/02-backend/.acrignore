@@ -1,0 +1,37 @@
+# Keep ACR build context small. The two Dockerfiles only need
+# pyproject.toml + talent_backend/ — everything else is noise that
+# slows uploads and bloats the build layer.
+
+# Local dev artifacts
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docs and ephemeral state — never needed in the container image
+*.md
+docs/
+.outputs.json
+.azure/
+.git/
+.github/
+
+# Test trees that ship separately
+tests/
+
+# Misc
+*.log
+*.tmp

@@ -1,0 +1,586 @@
+<#
+.SYNOPSIS
+    Shared helpers for talent_infra_modules per-component deployment scripts.
+
+.DESCRIPTION
+    Dot-source this file from any per-component deploy.ps1:
+
+        . (Join-Path $PSScriptRoot "..\shared\common.ps1")
+
+    Then call the functions documented below. All helpers are idempotent,
+    write coloured output via Write-Step / Write-Success / Write-Warn /
+    Write-Fail, and never modify global $ErrorActionPreference.
+
+    Design notes (carry-over from talent_infra_v2/hooks/postprovision.ps1 and
+    scripts/Enable-PostgresEntraAuth.ps1):
+      * No azd dependency. All env discovery is via $env:* OR an explicit
+        -Default argument. Scripts under talent_infra_modules/ are invoked
+        directly by the operator (no azd hooks).
+      * az CLI is the source of truth. We never parse az output without
+        --output json | ConvertFrom-Json.
+      * Native az errors (WARNING/ERROR lines on stdout) are filtered out
+        of -o tsv reads so callers see only the value.
+      * Get-ParameterValue is the SINGLE entry point for any required
+        parameter — env var first, then prompt, then default. Secure
+        values are read via Read-Host -AsSecureString and returned as a
+        SecureString.
+
+    Style:
+      * Verb-Noun PowerShell function names where natural.
+      * Write-* helpers prefixed with the script's contract verb.
+      * No global state. Helpers take what they need as parameters.
+#>
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Coloured output helpers
+# ──────────────────────────────────────────────────────────────────────────────
+
+function Write-Step {
+    param([Parameter(Mandatory)][string]$Message)
+    Write-Host ""
+    Write-Host "==> $Message" -ForegroundColor Cyan
+}
+
+function Write-Success {
+    param([Parameter(Mandatory)][string]$Message)
+    Write-Host "    OK  $Message" -ForegroundColor Green
+}
+
+function Write-Warn {
+    param([Parameter(Mandatory)][string]$Message)
+    Write-Host "    !!  $Message" -ForegroundColor Yellow
+}
+
+function Write-Fail {
+    param([Parameter(Mandatory)][string]$Message)
+    Write-Host "    XX  $Message" -ForegroundColor Red
+}
+
+function Write-Info {
+    param([Parameter(Mandatory)][string]$Message)
+    Write-Host "    $Message" -ForegroundColor Gray
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Native command runner — keeps $ErrorActionPreference local to the call
+# ──────────────────────────────────────────────────────────────────────────────
+
+function Invoke-Native {
+    <#
+    .SYNOPSIS
+        Run a native command (az, docker, etc.) without letting native
+        non-zero exits stop the surrounding script. Returns the command
+        output. Caller MUST check $LASTEXITCODE.
+    #>
+    param([Parameter(Mandatory)][scriptblock]$Command)
+    $saved = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try { & $Command }
+    finally { $ErrorActionPreference = $saved }
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Az CLI sign-in & subscription
+# ──────────────────────────────────────────────────────────────────────────────
+
+function Test-AzLoggedIn {
+    <#
+    .SYNOPSIS
+        Verifies `az account show` works. Exits with a clear message
+        otherwise.
+    .OUTPUTS
+        [pscustomobject] account object on success (user.name, tenantId,
+        id, name).
+    #>
+    Write-Step "Verifying Azure CLI sign-in"
+    $raw = Invoke-Native { az account show --output json 2>$null }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($raw)) {
+        Write-Fail "Not signed in to Azure CLI."
+        Write-Info "Run: az login"
+        exit 1
+    }
+    try { $acct = $raw | ConvertFrom-Json } catch {
+        Write-Fail "Could not parse 'az account show' output."
+        exit 1
+    }
+    Write-Success "Signed in as $($acct.user.name) (tenant $($acct.tenantId))"
+    Write-Info "Subscription: $($acct.name) [$($acct.id)]"
+    return $acct
+}
+
+function Test-AzSubscription {
+    <#
+    .SYNOPSIS
+        Verifies the active subscription matches -SubscriptionId. Switches
+        if it doesn't.
+    .PARAMETER SubscriptionId
+        Target subscription GUID.
+    #>
+    param([Parameter(Mandatory)][string]$SubscriptionId)
+    Write-Step "Ensuring active subscription is $SubscriptionId"
+    $current = (Invoke-Native { az account show --query id -o tsv 2>$null } | Where-Object { $_ -notmatch '^(WARNING|ERROR)' }) -join ""
+    $current = $current.Trim()
+    if ($current -eq $SubscriptionId) {
+        Write-Success "Already on $SubscriptionId"
+        return
+    }
+    Write-Info "Switching from $current to $SubscriptionId"
+    Invoke-Native { az account set --subscription $SubscriptionId 2>&1 | Out-Null }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "Could not switch subscription. Check that you have access to $SubscriptionId."
+        exit 1
+    }
+    Write-Success "Switched to $SubscriptionId"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Parameter resolution (env var → prompt → default)
+# ──────────────────────────────────────────────────────────────────────────────
+
+function Get-ParameterValue {
+    <#
+    .SYNOPSIS
+        Resolve a required parameter value from (in order):
+          1. The -Value parameter, if non-empty (script-arg pass-through).
+          2. The env var named -EnvVar, if set and non-empty.
+          3. An interactive Read-Host prompt, defaulting to -Default.
+          4. The -Default value if running non-interactively with no input.
+
+    .PARAMETER Name
+        Display name for log/prompt text.
+
+    .PARAMETER Prompt
+        Prompt text shown to the user. Defaults to "$Name".
+
+    .PARAMETER Value
+        Optional script-arg pre-supplied value. When non-empty, returned
+        as-is (no prompt, no env var lookup). Lets a script wire its own
+        named param directly through.
+
+    .PARAMETER Default
+        Default value if user just presses Enter at the prompt. Shown in
+        the prompt as "(default: <value>)".
+
+    .PARAMETER EnvVar
+        Environment variable name to check before prompting. When the
+        env var is set and non-empty, its value is returned without
+        prompting.
+
+    .PARAMETER Secure
+        When set, the prompt uses Read-Host -AsSecureString and returns
+        a SecureString. The env var is converted to SecureString if set.
+
+    .OUTPUTS
+        [string] or [SecureString] depending on -Secure.
+
+    .EXAMPLE
+        $rg = Get-ParameterValue -Name "Resource group" -EnvVar "AZURE_RESOURCE_GROUP" -Default "rg-talent-prod"
+
+    .EXAMPLE
+        $pw = Get-ParameterValue -Name "Postgres admin password" -EnvVar "POSTGRESQL_ADMIN_PASSWORD" -Secure
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [string]$Prompt = "",
+        [string]$Value = "",
+        [string]$Default = "",
+        [string]$EnvVar = "",
+        [switch]$Secure
+    )
+
+    # 1. Explicit script-arg pass-through wins.
+    if (-not [string]::IsNullOrEmpty($Value)) {
+        if ($Secure) {
+            return (ConvertTo-SecureString $Value -AsPlainText -Force)
+        }
+        return $Value
+    }
+
+    # 2. Env var.
+    if (-not [string]::IsNullOrEmpty($EnvVar)) {
+        $envVal = [Environment]::GetEnvironmentVariable($EnvVar)
+        if (-not [string]::IsNullOrEmpty($envVal)) {
+            Write-Info "$Name = (from `$env:$EnvVar)"
+            if ($Secure) {
+                return (ConvertTo-SecureString $envVal -AsPlainText -Force)
+            }
+            return $envVal
+        }
+    }
+
+    # 3. Interactive prompt.
+    $promptText = if ([string]::IsNullOrEmpty($Prompt)) { $Name } else { $Prompt }
+    if (-not [string]::IsNullOrEmpty($Default)) {
+        $promptText = "$promptText (default: $Default)"
+    }
+
+    if ($Secure) {
+        $secure = Read-Host -Prompt $promptText -AsSecureString
+        if ($null -eq $secure -or $secure.Length -eq 0) {
+            if (-not [string]::IsNullOrEmpty($Default)) {
+                return (ConvertTo-SecureString $Default -AsPlainText -Force)
+            }
+            Write-Fail "No value supplied for required secure parameter '$Name'."
+            exit 1
+        }
+        return $secure
+    }
+
+    $entered = Read-Host -Prompt $promptText
+    if ([string]::IsNullOrWhiteSpace($entered)) {
+        if (-not [string]::IsNullOrEmpty($Default)) {
+            return $Default
+        }
+        Write-Fail "No value supplied for required parameter '$Name'."
+        exit 1
+    }
+    return $entered.Trim()
+}
+
+function ConvertFrom-SecureStringPlain {
+    <#
+    .SYNOPSIS
+        Convert a [SecureString] back to plain text for use with az CLI
+        (which takes passwords as positional args). Avoid logging the
+        result.
+    #>
+    param([Parameter(Mandatory)][SecureString]$Secure)
+    $ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Secure)
+    try {
+        return [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+    } finally {
+        [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+    }
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Resource existence checks
+# ──────────────────────────────────────────────────────────────────────────────
+
+function Test-ResourceGroup {
+    <#
+    .SYNOPSIS
+        True if the resource group exists in the current subscription.
+    #>
+    param([Parameter(Mandatory)][string]$Name)
+    $exists = Invoke-Native { az group exists --name $Name --output tsv 2>$null }
+    return ($exists -eq 'true')
+}
+
+function Test-ResourceExists {
+    <#
+    .SYNOPSIS
+        Generic wrapper around `az resource show`. Returns $true if the
+        named resource exists in -ResourceGroup, $false otherwise.
+
+        Supported -ResourceType values (azure resource-type strings or
+        the short aliases below):
+
+          Alias               Azure resource type
+          ----------------    -----------------------------------------------
+          vnet                Microsoft.Network/virtualNetworks
+          containerappenv     Microsoft.App/managedEnvironments
+          containerapp        Microsoft.App/containerApps
+          acr                 Microsoft.ContainerRegistry/registries
+          postgres            Microsoft.DBforPostgreSQL/flexibleServers
+          foundry             Microsoft.CognitiveServices/accounts
+          cosmos              Microsoft.DocumentDB/databaseAccounts
+          keyvault            Microsoft.KeyVault/vaults
+          uami                Microsoft.ManagedIdentity/userAssignedIdentities
+
+        Any other -ResourceType is passed through to `az resource show`
+        as-is.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$ResourceGroup,
+        [Parameter(Mandatory)][string]$ResourceType,
+        [Parameter(Mandatory)][string]$Name
+    )
+
+    $typeMap = @{
+        vnet            = 'Microsoft.Network/virtualNetworks'
+        containerappenv = 'Microsoft.App/managedEnvironments'
+        containerapp    = 'Microsoft.App/containerApps'
+        acr             = 'Microsoft.ContainerRegistry/registries'
+        postgres        = 'Microsoft.DBforPostgreSQL/flexibleServers'
+        foundry         = 'Microsoft.CognitiveServices/accounts'
+        cosmos          = 'Microsoft.DocumentDB/databaseAccounts'
+        keyvault        = 'Microsoft.KeyVault/vaults'
+        uami            = 'Microsoft.ManagedIdentity/userAssignedIdentities'
+    }
+    $fullType = if ($typeMap.ContainsKey($ResourceType.ToLower())) {
+        $typeMap[$ResourceType.ToLower()]
+    } else { $ResourceType }
+
+    $null = Invoke-Native {
+        az resource show `
+            --resource-group $ResourceGroup `
+            --resource-type $fullType `
+            --name $Name `
+            --output none 2>$null
+    }
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Test-VnetSubnetExists {
+    <#
+    .SYNOPSIS
+        True if -SubnetName exists inside -VnetName in -ResourceGroup.
+
+        Use this instead of Test-ResourceExists for subnets — subnets are
+        child resources, so `az resource show` requires a different shape.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$ResourceGroup,
+        [Parameter(Mandatory)][string]$VnetName,
+        [Parameter(Mandatory)][string]$SubnetName
+    )
+    $null = Invoke-Native {
+        az network vnet subnet show `
+            --resource-group $ResourceGroup `
+            --vnet-name $VnetName `
+            --name $SubnetName `
+            --output none 2>$null
+    }
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Test-FoundryProject {
+    <#
+    .SYNOPSIS
+        Validates that an Azure AI Foundry account exists, has the named
+        project, and has at least one model deployment.
+
+    .OUTPUTS
+        [pscustomobject] with .Endpoint, .Deployments (string[]) on
+        success. $null on failure (caller decides whether to abort).
+    #>
+    param(
+        [Parameter(Mandatory)][string]$ResourceGroup,
+        [Parameter(Mandatory)][string]$AccountName,
+        [Parameter(Mandatory)][string]$ProjectName
+    )
+
+    # 1. Account.
+    $acctJson = Invoke-Native {
+        az cognitiveservices account show `
+            --resource-group $ResourceGroup `
+            --name $AccountName `
+            --output json 2>$null
+    }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($acctJson)) {
+        Write-Fail "Foundry account '$AccountName' not found in '$ResourceGroup'."
+        return $null
+    }
+    $acct = $acctJson | ConvertFrom-Json
+    $endpoint = $acct.properties.endpoint
+
+    # 2. Project (Foundry projects use the cognitiveservices/accounts/projects
+    # subresource; query directly via REST/CLI). The project list call is
+    # only available on AIServices SKUs.
+    $projJson = Invoke-Native {
+        az resource show `
+            --resource-group $ResourceGroup `
+            --resource-type "Microsoft.CognitiveServices/accounts/projects" `
+            --name "$AccountName/$ProjectName" `
+            --api-version 2025-04-01-preview `
+            --output json 2>$null
+    }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($projJson)) {
+        Write-Fail "Foundry project '$ProjectName' not found under account '$AccountName'."
+        return $null
+    }
+
+    # 3. Model deployments.
+    $depsJson = Invoke-Native {
+        az cognitiveservices account deployment list `
+            --resource-group $ResourceGroup `
+            --name $AccountName `
+            --output json 2>$null
+    }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($depsJson)) {
+        Write-Fail "Could not list model deployments on '$AccountName'."
+        return $null
+    }
+    $deps = @($depsJson | ConvertFrom-Json)
+    if ($deps.Count -eq 0) {
+        Write-Fail "Foundry account '$AccountName' has no model deployments. Deploy at least gpt-4.1 and text-embedding-ada-002 before continuing."
+        return $null
+    }
+
+    $depNames = @($deps | ForEach-Object { $_.name })
+    Write-Success "Foundry: account=$AccountName project=$ProjectName endpoint=$endpoint"
+    Write-Info "Deployments: $($depNames -join ', ')"
+
+    return [pscustomobject]@{
+        Endpoint    = $endpoint
+        Deployments = $depNames
+        AccountId   = $acct.id
+    }
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ACR helpers
+# ──────────────────────────────────────────────────────────────────────────────
+
+function Get-AcrLoginServer {
+    <#
+    .SYNOPSIS
+        Returns the loginServer string (e.g. 'acrxyz.azurecr.io') for an
+        existing ACR. Returns $null if not found.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$ResourceGroup,
+        [Parameter(Mandatory)][string]$AcrName
+    )
+    $login = (Invoke-Native {
+        az acr show `
+            --resource-group $ResourceGroup `
+            --name $AcrName `
+            --query loginServer -o tsv 2>$null `
+        | Where-Object { $_ -notmatch '^(WARNING|ERROR)' }
+    }) -join ""
+    $login = $login.Trim()
+    if ([string]::IsNullOrEmpty($login)) {
+        return $null
+    }
+    return $login
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Interactive confirmation
+# ──────────────────────────────────────────────────────────────────────────────
+
+function Confirm-Action {
+    <#
+    .SYNOPSIS
+        y/N prompt. Returns $true when the user confirms.
+
+        Auto-confirms (returns $true) when EITHER:
+          * The -Force switch is supplied.
+          * The CI env var is set (any value) — common CI convention.
+
+        Auto-denies (returns $false) when running non-interactively with
+        no -Force and no CI env var, to avoid hanging in pipelines.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Message,
+        [switch]$Force
+    )
+    if ($Force) {
+        Write-Info "Auto-confirmed (-Force): $Message"
+        return $true
+    }
+    if (-not [string]::IsNullOrEmpty($env:CI)) {
+        Write-Info "Auto-confirmed (`$env:CI is set): $Message"
+        return $true
+    }
+    if (-not [Environment]::UserInteractive) {
+        Write-Warn "Non-interactive session and no -Force / `$env:CI — denying: $Message"
+        return $false
+    }
+
+    $ans = Read-Host -Prompt "$Message [y/N]"
+    return ($ans -match '^(y|yes)$')
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Convenience: bulk-verify pre-existing infrastructure
+# ──────────────────────────────────────────────────────────────────────────────
+
+function Assert-PrerequisitesExist {
+    <#
+    .SYNOPSIS
+        Verifies a hashtable of expected resources all exist. Aborts the
+        script if any are missing.
+
+    .PARAMETER ResourceGroup
+        Resource group that should contain the resources (subnet checks
+        always use -VnetResourceGroup if supplied, otherwise this RG).
+
+    .PARAMETER VnetResourceGroup
+        Optional — RG holding the VNet (if different from -ResourceGroup).
+        Subnet checks query against this RG.
+
+    .PARAMETER Checks
+        Array of hashtables. Each entry has:
+          Type   = 'rg' | 'vnet' | 'subnet' | 'containerappenv' | 'acr' |
+                   'postgres' | 'foundry' | 'cosmos' | 'keyvault' | 'uami' |
+                   any other Azure resource-type string
+          Name   = the resource's name
+          Vnet   = (subnet only) parent vnet name
+          Label  = display label for log output (optional, defaults to Name)
+
+    .EXAMPLE
+        Assert-PrerequisitesExist -ResourceGroup 'rg-talent-prod' -VnetResourceGroup 'rg-network' -Checks @(
+            @{ Type='rg';              Name='rg-talent-prod' },
+            @{ Type='vnet';            Name='vnet-prod' },
+            @{ Type='subnet';          Vnet='vnet-prod'; Name='aca-subnet' },
+            @{ Type='subnet';          Vnet='vnet-prod'; Name='pe-subnet' },
+            @{ Type='containerappenv'; Name='cae-prod' },
+            @{ Type='acr';             Name='acrprod001' },
+            @{ Type='foundry';         Name='aif-prod' }
+        )
+    #>
+    param(
+        [Parameter(Mandatory)][string]$ResourceGroup,
+        [string]$VnetResourceGroup = "",
+        [Parameter(Mandatory)][array]$Checks
+    )
+
+    Write-Step "Verifying pre-existing infrastructure"
+    $vnetRg = if ([string]::IsNullOrEmpty($VnetResourceGroup)) { $ResourceGroup } else { $VnetResourceGroup }
+    $missing = @()
+
+    foreach ($c in $Checks) {
+        $type   = [string]$c.Type
+        $name   = [string]$c.Name
+        $label  = if ($c.Label) { [string]$c.Label } else { "$type/$name" }
+
+        switch ($type.ToLower()) {
+            'rg' {
+                if (Test-ResourceGroup -Name $name) {
+                    Write-Success "RG $name"
+                } else {
+                    Write-Fail "RG $name not found"
+                    $missing += $label
+                }
+            }
+            'subnet' {
+                if (Test-VnetSubnetExists -ResourceGroup $vnetRg -VnetName $c.Vnet -SubnetName $name) {
+                    Write-Success "Subnet $($c.Vnet)/$name"
+                } else {
+                    Write-Fail "Subnet $($c.Vnet)/$name not found in RG $vnetRg"
+                    $missing += $label
+                }
+            }
+            'vnet' {
+                if (Test-ResourceExists -ResourceGroup $vnetRg -ResourceType 'vnet' -Name $name) {
+                    Write-Success "VNet $name"
+                } else {
+                    Write-Fail "VNet $name not found in RG $vnetRg"
+                    $missing += $label
+                }
+            }
+            default {
+                if (Test-ResourceExists -ResourceGroup $ResourceGroup -ResourceType $type -Name $name) {
+                    Write-Success "$type $name"
+                } else {
+                    Write-Fail "$type $name not found in RG $ResourceGroup"
+                    $missing += $label
+                }
+            }
+        }
+    }
+
+    if ($missing.Count -gt 0) {
+        Write-Host ""
+        Write-Fail "$($missing.Count) pre-existing resource(s) missing:"
+        foreach ($m in $missing) { Write-Host "      - $m" -ForegroundColor Red }
+        Write-Host ""
+        Write-Host "These scripts assume RG / VNet / ACA env / ACR / Foundry already exist." -ForegroundColor Yellow
+        Write-Host "Provision the missing resources first (or use talent_infra_v2/ for full-stack azd deployment)." -ForegroundColor Yellow
+        exit 1
+    }
+}

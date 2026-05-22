@@ -1,0 +1,87 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "eastus"
+    },
+    "backendAppName": {
+      "value": ""
+    },
+    "backendImage": {
+      "value": ""
+    },
+    "mcpImage": {
+      "value": ""
+    },
+    "containerAppsEnvironmentId": {
+      "value": ""
+    },
+    "acrName": {
+      "value": ""
+    },
+    "pgFqdn": {
+      "value": ""
+    },
+    "pgDatabase": {
+      "value": "postgres"
+    },
+    "graphName": {
+      "value": "talent_graph"
+    },
+    "foundryEndpoint": {
+      "value": ""
+    },
+    "foundryAccountName": {
+      "value": ""
+    },
+    "chatModelDeployment": {
+      "value": "gpt-4.1"
+    },
+    "cosmosEndpoint": {
+      "value": ""
+    },
+    "cosmosAccountName": {
+      "value": ""
+    },
+    "cosmosDatabase": {
+      "value": "talent_db"
+    },
+    "cosmosContainer": {
+      "value": "chat_history_db"
+    },
+    "appInsightsConnectionString": {
+      "value": ""
+    },
+    "backendCpu": {
+      "value": "0.5"
+    },
+    "backendMemory": {
+      "value": "1Gi"
+    },
+    "mcpCpu": {
+      "value": "0.5"
+    },
+    "mcpMemory": {
+      "value": "1Gi"
+    },
+    "backendTargetPort": {
+      "value": 8000
+    },
+    "backendExternalIngress": {
+      "value": true
+    },
+    "minReplicas": {
+      "value": 1
+    },
+    "maxReplicas": {
+      "value": 3
+    },
+    "tags": {
+      "value": {
+        "talentiq-component": "02-backend",
+        "talentiq-managed-by": "talent_infra_modules"
+      }
+    }
+  }
+}

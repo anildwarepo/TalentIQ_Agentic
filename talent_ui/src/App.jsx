@@ -21,6 +21,25 @@ const AF_BACKEND_URL = import.meta.env.VITE_AF_BACKEND_URL ?? "/af";
 const AGENT_NAME = import.meta.env.VITE_AGENT_NAME ?? "talentiq-agent";
 const UPLOAD_ACCEPT = ".pdf,.docx,.doc,.txt,.rtf";
 
+// Demo / partial-environment auth bypass. When VITE_DISABLE_AUTH=true is set
+// at Docker build time by talent_infra_modules/03-frontend/deploy.ps1, MSAL
+// is not initialized (see main.jsx) and this component synthesizes an
+// authenticated demo user, skips token acquisition, and omits the
+// Authorization header on outbound API calls. The backend's auth.py
+// short-circuits to a synthetic "dev-user" when AZURE_TENANT_ID is unset.
+// See talent_infra_modules/AUTH-DISABLED.md for the full contract.
+//
+// AUTH_DISABLED is a build-time constant — Vite inlines import.meta.env.*
+// so dead-code elimination removes whichever branch is unused. The
+// eslint-disable comments below are because ESLint can't see through the
+// constant, but at runtime the hook call pattern is consistent every render.
+const AUTH_DISABLED = import.meta.env.VITE_DISABLE_AUTH === "true";
+const DEMO_ACCOUNT = {
+  name: "Demo User",
+  username: "demo@local",
+  homeAccountId: "demo",
+};
+
 const BACKENDS = [
   { id: "graph-search", label: "Graph Search (Talent Graph)" },
 ];
@@ -365,10 +384,18 @@ const QUICK_QUESTION_CATEGORIES = [
 // ——— Main App ———————————————————————————————————————————————
 
 export default function App() {
-  const { instance, accounts, inProgress } = useMsal();
-  const isAuthenticated = useIsAuthenticated();
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const msalCtx = AUTH_DISABLED
+    ? { instance: null, accounts: [], inProgress: InteractionStatus.None }
+    : useMsal();
+  const { instance, accounts, inProgress } = msalCtx;
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const isAuthenticated = AUTH_DISABLED ? true : useIsAuthenticated();
   const account = useMemo(
-    () => instance.getActiveAccount() ?? accounts?.[0] ?? null,
+    () =>
+      AUTH_DISABLED
+        ? DEMO_ACCOUNT
+        : instance.getActiveAccount() ?? accounts?.[0] ?? null,
     [instance, accounts]
   );
 
@@ -432,12 +459,18 @@ export default function App() {
   };
 
   const logout = () => {
+    if (AUTH_DISABLED) {
+      // No real MSAL session to tear down — just clear local state.
+      setMessages([]);
+      return;
+    }
     setAccessToken(null);
     setMessages([]);
     instance.logoutRedirect({ account });
   };
 
   const getToken = useCallback(async (forceRefresh = false) => {
+    if (AUTH_DISABLED) return null;
     if (!account) return null;
     try {
       const res = await instance.acquireTokenSilent({
@@ -476,15 +509,16 @@ export default function App() {
 
     let token = accessToken;
     if (!token) token = await getToken();
-    if (!token) { setUploading(false); return; }
+    if (!token && !AUTH_DISABLED) { setUploading(false); return; }
 
     try {
       const formData = new FormData();
       formData.append('file', file);
 
+      const headers = AUTH_DISABLED ? {} : { 'Authorization': `Bearer ${token}` };
       const res = await fetch(`${AF_BACKEND_URL}/upload`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers,
         body: formData,
       });
 
@@ -579,12 +613,11 @@ export default function App() {
     if (selectedBackend === "graph-search") {
       return callGraphBackendApi(body, setMessages, token);
     }
+    const headers = { "Content-Type": "application/json" };
+    if (!AUTH_DISABLED) headers["Authorization"] = `Bearer ${token}`;
     const res = await fetch(`${API_BASE}/chat`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(body),
     });
     if (!res.ok) {
@@ -794,7 +827,7 @@ export default function App() {
 
     let token = accessToken;
     if (!token) token = await getToken();
-    if (!token) {
+    if (!token && !AUTH_DISABLED) {
       setChatLoading(false);
       sendingRef.current = false;
       return;
@@ -847,7 +880,7 @@ export default function App() {
 
     let token = accessToken;
     if (!token) token = await getToken();
-    if (!token) {
+    if (!token && !AUTH_DISABLED) {
       setChatLoading(false);
       sendingRef.current = false;
       return;
@@ -894,7 +927,7 @@ export default function App() {
 
     let token = accessToken;
     if (!token) token = await getToken();
-    if (!token) return;
+    if (!token && !AUTH_DISABLED) return;
 
     setChatLoading(true);
     try {
@@ -926,7 +959,7 @@ export default function App() {
 
     let token = accessToken;
     if (!token) token = await getToken();
-    if (!token) return;
+    if (!token && !AUTH_DISABLED) return;
 
     setChatLoading(true);
     setOauthConsentLink(null);
@@ -970,13 +1003,12 @@ export default function App() {
   const loadThreads = useCallback(async () => {
     let token = accessToken;
     if (!token) token = await getToken();
-    if (!token) return;
+    if (!token && !AUTH_DISABLED) return;
 
     setThreadsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/threads?limit=20`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const headers = AUTH_DISABLED ? {} : { Authorization: `Bearer ${token}` };
+      const res = await fetch(`${API_BASE}/threads?limit=20`, { headers });
       if (res.ok) {
         const data = await res.json();
         setThreads(data.threads || []);
@@ -991,13 +1023,12 @@ export default function App() {
   const loadThread = async (threadId) => {
     let token = accessToken;
     if (!token) token = await getToken();
-    if (!token) return;
+    if (!token && !AUTH_DISABLED) return;
 
     setChatLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/threads/${threadId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const headers = AUTH_DISABLED ? {} : { Authorization: `Bearer ${token}` };
+      const res = await fetch(`${API_BASE}/threads/${threadId}`, { headers });
       if (res.ok) {
         const data = await res.json();
         setMessages(data.messages || []);
@@ -1016,7 +1047,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (isAuthenticated && accessToken) {
+    if (isAuthenticated && (accessToken || AUTH_DISABLED)) {
       loadThreads();
     }
   }, [isAuthenticated, accessToken, loadThreads]);

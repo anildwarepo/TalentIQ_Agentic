@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "_comment": "deploy.ps1 in this folder builds every required parameter inline via --parameters key=value and does not consume this file directly. It is shipped to (1) document the schema for anyone running 'az deployment group create --template-file infra/main.bicep --parameters @infra/main.parameters.json --parameters webappImage=... backendFqdn=...' manually, and (2) hold safe defaults that match deploy.ps1 so a hand-rolled invocation produces the same shape of Container App. Required (no safe default) parameters: containerAppsEnvironmentId, acrName, webappAppName, webappImage, backendFqdn.",
+  "parameters": {
+    "location": {
+      "value": "eastus"
+    },
+    "containerAppsEnvironmentId": {
+      "value": "REQUIRED — /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.App/managedEnvironments/<env-name>"
+    },
+    "acrName": {
+      "value": "REQUIRED — ACR short name (assumed in the same RG as the deployment)"
+    },
+    "webappAppName": {
+      "value": "REQUIRED — e.g. tiq-webapp-abcde (2-32 chars)"
+    },
+    "webappImage": {
+      "value": "REQUIRED — e.g. acrxyz.azurecr.io/webapp:abc1234"
+    },
+    "backendFqdn": {
+      "value": "REQUIRED — e.g. tiq-backend-xxxxx.delightfulwave-1234.eastus.azurecontainerapps.io"
+    },
+    "appInsightsConnectionString": {
+      "value": ""
+    },
+    "targetPort": {
+      "value": 80
+    },
+    "externalIngress": {
+      "value": true
+    },
+    "cpu": {
+      "value": "0.25"
+    },
+    "memory": {
+      "value": "0.5Gi"
+    },
+    "minReplicas": {
+      "value": 1
+    },
+    "maxReplicas": {
+      "value": 3
+    },
+    "tags": {
+      "value": {
+        "component": "talent_ui",
+        "deployedBy": "talent_infra_modules/03-frontend"
+      }
+    }
+  }
+}

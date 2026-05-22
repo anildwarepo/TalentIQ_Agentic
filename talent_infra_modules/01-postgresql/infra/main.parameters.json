@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "administratorLogin": { "value": "pgadmin" },
+    "postgresqlVersion": { "value": "16" },
+    "skuName": { "value": "Standard_B2s" },
+    "skuTier": { "value": "GeneralPurpose" },
+    "storageSizeGB": { "value": 32 },
+    "backupRetentionDays": { "value": 7 },
+    "disablePasswordAuth": { "value": false },
+    "enablePrivateEndpoint": { "value": true },
+    "peSubnetName": { "value": "pe-subnet" },
+    "allowAzureServices": { "value": false },
+    "tags": {
+      "value": {
+        "project": "talentiq",
+        "component": "01-postgresql"
+      }
+    }
+  }
+}

@@ -307,6 +307,108 @@ function Ensure-PostgresqlAllowAllIps {
     Invoke-NativeCommand { az postgres flexible-server firewall-rule create --resource-group $ResourceGroup --name $ServerName --rule-name "AllowAllIps" --start-ip-address "0.0.0.0" --end-ip-address "255.255.255.255" 2>&1 | Out-Null }
 }
 
+function Register-PgUamiAsEntraAdmin {
+    <#
+    .SYNOPSIS
+        Registers a user-assigned managed identity as a PostgreSQL Entra
+        ServicePrincipal administrator via the Azure control plane. This is the
+        fallback path for Phase 0.5 when `pgaadauth_create_principal_with_oid`
+        (the SQL approach) is unreachable from the deployer — e.g. ISP-level
+        port 5432 blocks (Comcast and many residential ISPs do this), or a
+        private endpoint that isn't exposed locally.
+
+        Idempotent — re-running for the same display-name+object-id is a no-op.
+        The UAMI receives **PG admin** privileges, which is broader than the
+        SQL path (which grants narrow per-schema privileges). This is
+        acceptable for unblocking container apps; deployers with full network
+        connectivity should still prefer the SQL path.
+    .PARAMETER ResourceGroup
+        Resource group containing the PG flexible server.
+    .PARAMETER ServerName
+        PG flexible server name (without FQDN suffix).
+    .PARAMETER UamiName
+        Display name to register. MUST equal the UAMI's name — that's the PG
+        username the container will present when authenticating.
+    .PARAMETER ObjectId
+        principalId of the UAMI.
+    .OUTPUTS
+        [bool] $true on success, $false on failure (logged but non-throwing
+        so the caller can continue with the remaining UAMIs).
+    #>
+    param(
+        [string]$ResourceGroup,
+        [string]$ServerName,
+        [string]$UamiName,
+        [string]$ObjectId
+    )
+    $savedEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $out = & az postgres flexible-server microsoft-entra-admin create `
+            --resource-group $ResourceGroup `
+            --server-name $ServerName `
+            --display-name $UamiName `
+            --object-id $ObjectId `
+            --type ServicePrincipal `
+            --only-show-errors `
+            --output none 2>&1
+        $exit = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $savedEAP
+    }
+    if ($exit -ne 0) {
+        Write-Host "    FAIL ($UamiName): control-plane admin create failed (exit $exit)" -ForegroundColor Red
+        if ($out) { Write-Host "      $out" -ForegroundColor DarkRed }
+        return $false
+    }
+    Write-Host "    OK ($UamiName): registered as PG Entra ServicePrincipal admin (control plane)" -ForegroundColor Green
+    return $true
+}
+
+function Ensure-PostgresqlConfigApplied {
+    <#
+    .SYNOPSIS
+        Restarts the PG flexible server if ANY server parameter is still
+        flagged ``isConfigPendingRestart=true``. AGE in particular requires
+        ``shared_preload_libraries=age`` to be applied via a restart — the
+        Bicep template sets it, but if a later step (re-deploy, parameter
+        update, manual ``az postgres ... parameter set``) re-touches it the
+        change is stuck in pending state and every ``cypher()`` call fails
+        with ``unhandled cypher(cstring) function call``.
+
+        This helper is the belt-and-braces final check: if anything is
+        pending, restart once and wait for Ready.
+    .PARAMETER ResourceGroup
+        Resource group containing the PG server.
+    .PARAMETER ServerName
+        PG flexible server name.
+    #>
+    param([string]$ResourceGroup, [string]$ServerName)
+    if ([string]::IsNullOrEmpty($ResourceGroup) -or [string]::IsNullOrEmpty($ServerName)) { return }
+    Write-Host "Checking for PostgreSQL parameters pending restart on '$ServerName'..."
+    $pendingJson = & az postgres flexible-server parameter list `
+        --resource-group $ResourceGroup `
+        --server-name $ServerName `
+        --query "[?isConfigPendingRestart].{name:name,value:value}" `
+        --output json 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrEmpty($pendingJson)) {
+        Write-Host "  (could not query pending-restart params — skipping)" -ForegroundColor DarkYellow
+        return
+    }
+    try { $pending = $pendingJson | ConvertFrom-Json } catch { $pending = @() }
+    if (-not $pending -or $pending.Count -eq 0) {
+        Write-Host "  No PG parameters pending restart." -ForegroundColor DarkGray
+        return
+    }
+    Write-Host "  Pending-restart parameters detected:" -ForegroundColor Yellow
+    foreach ($p in $pending) { Write-Host "    - $($p.name) = $($p.value)" -ForegroundColor Yellow }
+    Write-Host "  Restarting PostgreSQL to apply..." -ForegroundColor Yellow
+    Invoke-NativeCommand { az postgres flexible-server restart --resource-group $ResourceGroup --name $ServerName --output none 2>&1 | Out-Null }
+    Wait-PostgresqlReady -ResourceGroup $ResourceGroup -ServerName $ServerName
+    Write-Host "  PG restarted. NOTE: container apps with cached pools may need a revision restart:" -ForegroundColor Green
+    Write-Host "    az containerapp revision restart -n <app> -g $ResourceGroup --revision <active-revision>" -ForegroundColor DarkGray
+}
+
 function Get-PostgresqlPrivateEndpointInfo {
     <#
     .SYNOPSIS
@@ -696,33 +798,104 @@ function Invoke-ContainerAppsDeploy {
 
     Write-Host "  Resource Group:   $ResourceGroup"
     Write-Host "  Template:         $templateFile"
-    Write-Host "  Deploy flags:     MCP=true, Backend=true, Webapp=true"
+
+    # Determine MCP topology: sidecar (default) vs. standalone Container App.
+    # When sidecarMode=true the bicep skips the standalone MCP module (its
+    # condition includes `!mcpServerSidecar`), so we set deployMcpServerContainerApp
+    # to false here to make the intent explicit. Flip via `azd env set
+    # mcpServerSidecar false` to fall back to the legacy two-app topology.
+    $mcpServerSidecarRaw = Get-AzdEnvValue "mcpServerSidecar"
+    $sidecarMode = -not ($mcpServerSidecarRaw -eq "false" -or $mcpServerSidecarRaw -eq "False" -or $mcpServerSidecarRaw -eq "FALSE")
+    $mcpTopology = if ($sidecarMode) { "sidecar (inside backend Container App)" } else { "standalone Container App" }
+    $deployMcpAppFlag = -not $sidecarMode
+    Write-Host "  Deploy flags:     MCP=$deployMcpAppFlag, Backend=true, Webapp=true"
+    Write-Host "  MCP topology:     $mcpTopology"
     Write-Host ""
 
     # Create resolved parameters with deploy flags set to true
     $paramsJson = Get-Content $parametersFile -Raw | ConvertFrom-Json
+
+    # Generic resolver for azd-style placeholders (${VAR} and ${VAR=default}).
+    # azd expands these before handing params to ARM, but this hook calls
+    # `az deployment` directly which does NOT expand them — so any param
+    # left as a literal `${...}` string would be sent verbatim and rejected
+    # (e.g. `InvalidResourceName: ${ACA_SUBNET_NAME=...}` for the ACA subnet).
+    # The lookup pulls from process env (which azd populates from .env and
+    # `azd env set` values), so anything the deployer set via `azd env set`
+    # is honoured here.
+    $envLookup = @{}
+    Get-ChildItem env: | ForEach-Object { $envLookup[$_.Name] = $_.Value }
+
+    function Resolve-AzdPlaceholder {
+        param([string]$Text, [hashtable]$Env)
+        if ([string]::IsNullOrEmpty($Text)) { return $Text }
+        if ($Text -notmatch '\$\{') { return $Text }
+        $prev = ''
+        $current = $Text
+        $iter = 0
+        # Iterate to allow nested defaults like ${A=${B}}.
+        while ($current -ne $prev -and $iter -lt 10) {
+            $prev = $current
+            $current = [regex]::Replace($current, '\$\{([A-Za-z_][A-Za-z0-9_]*)(?:=([^${}]*))?\}', {
+                param($m)
+                $name = $m.Groups[1].Value
+                $hasDefault = $m.Groups[2].Success
+                $default = if ($hasDefault) { $m.Groups[2].Value } else { '' }
+                if ($Env.ContainsKey($name) -and -not [string]::IsNullOrEmpty($Env[$name])) {
+                    return $Env[$name]
+                }
+                return $default
+            })
+            $iter++
+        }
+        return $current
+    }
+
+    foreach ($prop in $paramsJson.parameters.PSObject.Properties) {
+        $paramObj = $prop.Value
+        if ($null -ne $paramObj -and $paramObj.PSObject.Properties.Name -contains 'value') {
+            $val = $paramObj.value
+            if ($val -is [string] -and $val -match '\$\{') {
+                $paramObj.value = Resolve-AzdPlaceholder -Text $val -Env $envLookup
+            }
+        }
+    }
+
     $paramsJson.parameters.postgresqlAdminPassword.value = $PostgresqlAdminPassword
     $paramsJson.parameters.clientIpAddress.value = $clientIp
     $paramsJson.parameters.deployContainerAppsEnv.value = $true
-    $paramsJson.parameters.deployMcpServerContainerApp.value = $true
+    $paramsJson.parameters.deployMcpServerContainerApp.value = $deployMcpAppFlag
     $paramsJson.parameters.deployBackendContainerApp.value = $true
     $paramsJson.parameters.deployWebappContainerApp.value = $true
+    if ($paramsJson.parameters.PSObject.Properties.Name -contains "mcpServerSidecar") {
+        $paramsJson.parameters.mcpServerSidecar.value = $sidecarMode
+    }
 
     # Resolve azd-substituted Entra admin params. The on-disk parameter file
     # has placeholders like `${POSTGRESQL_ENTRA_ADMIN_OBJECT_ID=}` that only
     # azd knows how to expand — `az deployment` would treat them as literals.
-    $entraAdminId = Get-AzdEnvValue "POSTGRESQL_ENTRA_ADMIN_OBJECT_ID"
-    $entraAdminName = Get-AzdEnvValue "POSTGRESQL_ENTRA_ADMIN_PRINCIPAL_NAME"
-    $entraAdminType = Get-AzdEnvValue "POSTGRESQL_ENTRA_ADMIN_PRINCIPAL_TYPE"
-    if ([string]::IsNullOrEmpty($entraAdminType)) { $entraAdminType = "User" }
+    #
+    # IMPORTANT: We intentionally pass EMPTY values for the Entra admin params
+    # during this postprovision redeploy. The bicep declares the PG admin child
+    # resource as conditional on `!empty(entraAdminObjectId)`, so empty values
+    # cause it to be skipped entirely — which is what we want, because:
+    #   1. Phase 1 (`azd provision`) already created the Entra admin via the
+    #      same bicep with real values.
+    #   2. Re-evaluating the admin in a second deployment can race with the
+    #      PG server's restart/state transitions and fail with
+    #      `AadAuthOperationCannotBePerformedWhenServerIsNotAccessible`.
+    #   3. `Initialize-PostgresqlAgeAndData` re-asserts the admin via `az`
+    #      after the deploy if needed.
+    # We still need to clear the placeholder so `az deployment` doesn't try to
+    # use the literal `${POSTGRESQL_ENTRA_ADMIN_OBJECT_ID=}` as an objectId.
     if ($paramsJson.parameters.PSObject.Properties.Name -contains "postgresqlEntraAdminObjectId") {
-        $paramsJson.parameters.postgresqlEntraAdminObjectId.value = $entraAdminId
+        $paramsJson.parameters.postgresqlEntraAdminObjectId.value = ""
     }
     if ($paramsJson.parameters.PSObject.Properties.Name -contains "postgresqlEntraAdminPrincipalName") {
-        $paramsJson.parameters.postgresqlEntraAdminPrincipalName.value = $entraAdminName
+        $paramsJson.parameters.postgresqlEntraAdminPrincipalName.value = ""
     }
     if ($paramsJson.parameters.PSObject.Properties.Name -contains "postgresqlEntraAdminPrincipalType") {
-        $paramsJson.parameters.postgresqlEntraAdminPrincipalType.value = $entraAdminType
+        $paramsJson.parameters.postgresqlEntraAdminPrincipalType.value = "User"
     }
     if ($paramsJson.parameters.PSObject.Properties.Name -contains "postgresqlDisablePasswordAuth") {
         $disablePw = Get-AzdEnvValue "POSTGRESQL_DISABLE_PASSWORD_AUTH"
@@ -966,59 +1139,120 @@ if (-not [string]::IsNullOrEmpty($postgresqlServerName)) {
     Write-Host "PHASE 0.5: Registering container app UAMIs as PG Entra roles"
     Write-Host "=========================================="
 
-    if ([string]::IsNullOrEmpty($entraAdminUpn)) {
-        Write-Host "  SKIP: Entra admin UPN not resolved — cannot bootstrap UAMI roles." -ForegroundColor Yellow
-        Write-Host "  Set POSTGRESQL_ENTRA_ADMIN_PRINCIPAL_NAME via preprovision and rerun." -ForegroundColor Yellow
-    } else {
-        $mcpAppName = Get-AzdEnvValue "mcpServerContainerAppName"
-        $backendAppName = Get-AzdEnvValue "backendContainerAppName"
+    # Always discover UAMIs first — they're needed for both SQL and control-plane paths.
+    # In MCP sidecar mode (default), `mcpServerContainerAppName` is empty because the
+    # standalone MCP module is gated off in bicep. The loop below naturally skips empty
+    # app names, so only the backend UAMI is registered — which the MCP sidecar reuses
+    # via the shared pod identity (AZURE_CLIENT_ID is injected into both containers).
+    $mcpServerSidecarRaw = Get-AzdEnvValue "mcpServerSidecar"
+    $sidecarMode = -not ($mcpServerSidecarRaw -eq "false" -or $mcpServerSidecarRaw -eq "False" -or $mcpServerSidecarRaw -eq "FALSE")
+    if ($sidecarMode) {
+        Write-Host "  MCP sidecar mode: only registering backend UAMI (MCP shares it via sidecar pattern)." -ForegroundColor Cyan
+    }
+    $mcpAppName = Get-AzdEnvValue "mcpServerContainerAppName"
+    $backendAppName = Get-AzdEnvValue "backendContainerAppName"
 
-        $principals = @()
-        foreach ($app in @($mcpAppName, $backendAppName)) {
-            if ([string]::IsNullOrEmpty($app)) { continue }
-            $uamiName = "$app-identity"
-            Write-Host "  Looking up UAMI '$uamiName'..."
-            $oid = (& az identity show --resource-group $resourceGroup --name $uamiName --query principalId -o tsv 2>$null)
-            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrEmpty($oid)) {
-                Write-Host "    WARNING: could not resolve principalId for '$uamiName'. Skipping." -ForegroundColor Yellow
-                continue
-            }
-            Write-Host "    principalId: $oid"
-            $principals += [ordered]@{ name = $uamiName; oid = $oid.Trim(); type = "service" }
+    $principals = @()
+    foreach ($app in @($mcpAppName, $backendAppName)) {
+        if ([string]::IsNullOrEmpty($app)) { continue }
+        $uamiName = "$app-identity"
+        Write-Host "  Looking up UAMI '$uamiName'..."
+        $oid = (& az identity show --resource-group $resourceGroup --name $uamiName --query principalId -o tsv 2>$null)
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrEmpty($oid)) {
+            Write-Host "    WARNING: could not resolve principalId for '$uamiName'. Skipping." -ForegroundColor Yellow
+            continue
         }
+        Write-Host "    principalId: $oid"
+        $principals += [ordered]@{ name = $uamiName; oid = $oid.Trim(); type = "service" }
+    }
 
-        if ($principals.Count -gt 0) {
-            $principalsJson = $principals | ConvertTo-Json -Compress
-            if ($principals.Count -eq 1) {
-                # ConvertTo-Json emits a single object instead of a 1-element array
-                $principalsJson = "[$principalsJson]"
-            }
+    if ($principals.Count -eq 0) {
+        Write-Host "  No container app UAMIs found to register."
+    } else {
+        # Strategy:
+        #   1. Preferred: pgaadauth_create_principal_with_oid via SQL (narrow grants).
+        #      Requires the deployer to have outbound TCP/5432 to PG.
+        #   2. Fallback: az postgres flexible-server microsoft-entra-admin create
+        #      --type ServicePrincipal (Azure control plane, no PG SQL hop).
+        #      Grants ADMIN — broader than SQL, but unblocks containers when
+        #      port 5432 is filtered (Comcast and many residential ISPs do this).
+        #
+        # Set POSTGRESQL_USE_CONTROL_PLANE_UAMI=true to skip the SQL attempt
+        # entirely (saves ~30s when you know your network blocks 5432).
+        $forceControlPlane = (Get-AzdEnvValue "POSTGRESQL_USE_CONTROL_PLANE_UAMI") -eq "true"
+        $sqlSucceeded = $false
 
-            $repoRoot = Resolve-Path (Join-Path $scriptDir "../..")
-            $venvPython = Join-Path $repoRoot ".venv/Scripts/python.exe"
-            $pythonExe = if (Test-Path $venvPython) { $venvPython } else { "python" }
-            $provisionScript = Join-Path $scriptDir "../scripts/provision_pg_entra_roles.py"
-            $provisionScript = Resolve-Path $provisionScript
-
-            $connectHost = if (-not [string]::IsNullOrEmpty($connectFqdn)) { $connectFqdn } else { $postgresqlServerFqdn }
-
-            Write-Host "  Provisioning $($principals.Count) Entra role(s) on $connectHost..."
-            & $pythonExe $provisionScript `
-                --host $connectHost `
-                --database "postgres" `
-                --admin-upn $entraAdminUpn `
-                --graph-name $graphName `
-                --principals $principalsJson
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host "  ERROR: UAMI role provisioning failed (exit $LASTEXITCODE)." -ForegroundColor Red
-                Write-Host "  Container apps will fail to connect to PostgreSQL until you re-run this step." -ForegroundColor Yellow
+        if (-not $forceControlPlane) {
+            if ([string]::IsNullOrEmpty($entraAdminUpn)) {
+                Write-Host "  Cannot attempt SQL path: POSTGRESQL_ENTRA_ADMIN_PRINCIPAL_NAME is empty." -ForegroundColor Yellow
+                Write-Host "  Skipping straight to control-plane fallback." -ForegroundColor Yellow
             } else {
-                Write-Host "  UAMI roles provisioned successfully."
+                $principalsJson = $principals | ConvertTo-Json -Compress
+                if ($principals.Count -eq 1) {
+                    # ConvertTo-Json emits a single object instead of a 1-element array
+                    $principalsJson = "[$principalsJson]"
+                }
+
+                $repoRoot = Resolve-Path (Join-Path $scriptDir "../..")
+                $venvPython = Join-Path $repoRoot ".venv/Scripts/python.exe"
+                $pythonExe = if (Test-Path $venvPython) { $venvPython } else { "python" }
+                $provisionScript = Join-Path $scriptDir "../scripts/provision_pg_entra_roles.py"
+                $provisionScript = Resolve-Path $provisionScript
+
+                $connectHost = if (-not [string]::IsNullOrEmpty($connectFqdn)) { $connectFqdn } else { $postgresqlServerFqdn }
+
+                Write-Host "  Attempting SQL path: provisioning $($principals.Count) Entra role(s) on $connectHost..."
+                & $pythonExe $provisionScript `
+                    --host $connectHost `
+                    --database "postgres" `
+                    --admin-upn $entraAdminUpn `
+                    --graph-name $graphName `
+                    --principals $principalsJson
+                if ($LASTEXITCODE -eq 0) {
+                    $sqlSucceeded = $true
+                    Write-Host "  UAMI roles provisioned successfully via SQL." -ForegroundColor Green
+                } else {
+                    Write-Host "  SQL path failed (exit $LASTEXITCODE). Falling back to control-plane admin registration." -ForegroundColor Yellow
+                    Write-Host "  Common cause: deployer network blocks outbound TCP/5432 to PG (Comcast and many ISPs do this)." -ForegroundColor Yellow
+                }
             }
         } else {
-            Write-Host "  No container app UAMIs found to register."
+            Write-Host "  POSTGRESQL_USE_CONTROL_PLANE_UAMI=true — skipping SQL path." -ForegroundColor Cyan
+        }
+
+        if (-not $sqlSucceeded) {
+            Write-Host ""
+            Write-Host "  Control-plane fallback: registering UAMIs as ServicePrincipal admins on $postgresqlServerName..."
+            Write-Host "  NOTE: this grants PG ADMIN privileges (broader than the SQL path's narrow grants)." -ForegroundColor DarkYellow
+            $allOk = $true
+            foreach ($p in $principals) {
+                $ok = Register-PgUamiAsEntraAdmin `
+                    -ResourceGroup $resourceGroup `
+                    -ServerName $postgresqlServerName `
+                    -UamiName $p.name `
+                    -ObjectId $p.oid
+                if (-not $ok) { $allOk = $false }
+            }
+            if ($allOk) {
+                Write-Host "  All UAMIs registered as PG Entra admins via control plane." -ForegroundColor Green
+                Write-Host "  Restart container revisions to pick up the new PG roles:" -ForegroundColor DarkGray
+                foreach ($p in $principals) {
+                    $appName = $p.name -replace '-identity$', ''
+                    Write-Host "    az containerapp revision restart -n $appName -g $resourceGroup --revision <active-revision>" -ForegroundColor DarkGray
+                }
+            } else {
+                Write-Host "  ERROR: one or more UAMI control-plane registrations failed." -ForegroundColor Red
+                Write-Host "  Container apps will fail to connect to PostgreSQL until you re-register them." -ForegroundColor Yellow
+            }
         }
     }
+}
+
+# Final defensive check: if any PG server parameter (e.g. shared_preload_libraries=age)
+# is still flagged pending restart, restart now so AGE actually loads. Without this,
+# every cypher() call fails with `unhandled cypher(cstring) function call`.
+if (-not [string]::IsNullOrEmpty($postgresqlServerName)) {
+    Ensure-PostgresqlConfigApplied -ResourceGroup $resourceGroup -ServerName $postgresqlServerName
 }
 
 Write-Host "=========================================="
