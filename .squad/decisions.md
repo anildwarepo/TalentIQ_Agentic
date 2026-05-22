@@ -5,6 +5,42 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-22T12:30:00Z: Every PaaS Private Endpoint module must discover-and-reuse its `privatelink.<service>.*` Private DNS zone before creating one
+
+**By:** Bishop (Deployment Engineer) — captured at Anil's direction after the `01-postgresql` overlapping-namespaces failure.
+
+**What:** When a per-component deploy module provisions a Private Endpoint for an Azure PaaS service, it MUST first discover whether a Private DNS zone of the canonical `privatelink.<service>.*` name (a) is already linked to the target VNet, or (b) exists unlinked anywhere in the subscription, and REUSE that zone instead of creating a duplicate. The component module only creates a fresh zone when neither check finds anything.
+
+**Why:** Azure enforces *at most one Private DNS zone per namespace per VNet* via `Microsoft.Network/privateDnsZones/virtualNetworkLinks`. A second zone of the same name linked to the same VNet — even from a different RG, even with the original link untouched — is rejected at create time with `BadRequest — A virtual network cannot be linked to multiple zones with overlapping namespaces`. Shared-tenant subs (where a central network team owns the canonical zones in an RG like `vnet`) hit this every time a new per-component deploy lands. Discover-and-reuse is the only resilient fix; pre-conditioning operators on env-var overrides is brittle.
+
+**Where:** Pattern lives in `talent_infra_modules/shared/common.ps1` as two helpers:
+- `Get-LinkedPrivateDnsZoneId -SubscriptionId -ZoneName -VnetId` — returns zone ID when any zone of that name is already linked to the VNet, else `$null`.
+- `Get-PrivateDnsZoneIdByName -SubscriptionId -ZoneName` — fallback returning the first zone of that name anywhere in the sub, else `$null`.
+
+Bicep contract at every PE module:
+- Param: `param existingPrivateDnsZoneId string = ''`
+- Param: `param existingPrivateDnsZoneLinked bool = true` (true = skip link creation; false = create link in zone's RG via a nested module deployed with `scope: resourceGroup(split(existingPrivateDnsZoneId, '/')[4])`).
+- Conditional creation: `resource privateDnsZone ... = if (empty(existingPrivateDnsZoneId)) { ... }` and matching `if` on the in-RG `virtualNetworkLinks`.
+
+Deploy script contract: discover before confirm, pass both params via `--parameters` overrides, preserve any explicit env-var override (e.g. `POSTGRESQL_DNS_ZONE_ID`, `COSMOS_DNS_ZONE_ID`) as the highest-priority signal (skip discovery when set).
+
+**Reference implementation (done):** `talent_infra_modules/01-postgresql/` — `deploy.ps1` Section 6b, `infra/main.bicep` + `infra/modules/private-endpoint.bicep` + new `infra/modules/private-dns-zone-vnet-link.bicep`. Validated by `mcp_bicep_build_bicep` with zero diagnostics and live-tested against Anil's subscription where the canonical zone in RG `vnet` was correctly discovered as already linked.
+
+**Applies to (future modules — apply when adding PE for the service):**
+| Service | Zone name |
+|---------|-----------|
+| Postgres Flex Server | `privatelink.postgres.database.azure.com` (DONE — 01-postgresql) |
+| Cosmos DB SQL API | `privatelink.documents.azure.com` |
+| Azure AI Foundry / Cognitive Services | `privatelink.cognitiveservices.azure.com` |
+| Azure OpenAI sub-resource | `privatelink.openai.azure.com` |
+| Key Vault | `privatelink.vaultcore.azure.net` |
+| ACR Premium | `privatelink.azurecr.io` |
+| Container Apps Env (when on internal ingress) | `privatelink.<region>.azurecontainerapps.io` |
+
+**Does NOT apply to:** modules that do not create a PE (e.g., `00-container-apps-env` external-only path, anything using service endpoints or public endpoints). Does NOT apply to `talent_infra_v2/` — that lives untouched as the working reference; per-component re-implementations carry the pattern.
+
+**Skill captured:** `.squad/skills/azure-private-dns-discover-reuse/SKILL.md`.
+
 ### 2026-05-22T00:30:00Z: ARM/Bicep parameter files — no comment keys allowed
 
 **By:** Bishop (Deployment Engineer) — requested by Anil
