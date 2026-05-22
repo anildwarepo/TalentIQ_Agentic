@@ -158,3 +158,55 @@ Built the standalone backend deployment for the per-component chain. Produces a 
 - **Active revision restart** uses `--query "[?properties.active].name | [0]"` rather than the bicep-output `latestRevisionName` because a bicep deploy creates a NEW revision; the "latest" output is the post-deploy revision but the "active" one may differ in edge cases (e.g. multi-revision modes).
 - **`Resolve-Path` + `?.Path` + `??`** requires PowerShell 7. `Stop = 'Continue'` inside `Invoke-Native` allows native non-zero exits to propagate via `0` rather than throwing.
 - **`az deployment group create` argument shape**: each `--parameters key=value` override must be its OWN argv slot. Build the argv array explicitly (`@(...)`); PowerShell native-command splatting works correctly when each override is added as two consecutive elements (`--parameters`, `key=value`).
+
+---
+
+## Learnings (Archived)
+
+> Three deep-dive Learnings entries from 2026-05-21 moved here by Scribe on 2026-05-22 (Bishop's history.md crossed the 15,360-byte gate after appending the 2026-05-22 RBAC-asymmetry Learning). Entries appear in the same order they had in history.md.
+### 2026-05-21 — PowerShell case-insensitive variable/parameter shadowing in `Get-ParameterValue`
+
+- **Symptom:** `01-postgresql/deploy.ps1` blew up at the secure-password prompt with two cascading errors:
+  - `Cannot convert the "System.Security.SecureString" value of type "System.Security.SecureString" to type "System.Management.Automation.SwitchParameter"` (origin: `shared/common.ps1:219`)
+  - `Cannot convert "System.Management.Automation.SwitchParameter" to "System.Security.SecureString"` (cascade: `01-postgresql/deploy.ps1:123` on the typed `[SecureString]$AdminPassword` assignment)
+- **Root cause:** Inside `Get-ParameterValue` the `if ($Secure) {...}` branch assigned `$secure = Read-Host -AsSecureString`. PowerShell variable identifiers are **case-insensitive**, so `$secure` (local) and the `[switch]$Secure` parameter are the **same variable**. Assigning a `[SecureString]` to a slot already typed as `[switch]` failed type coercion, the function never returned a real value, and the caller's `[SecureString]$AdminPassword` then received a `[switch]` — second error.
+- **Fix (single-point cure for all 5 components dot-sourcing `common.ps1`):** Renamed the local in the `if ($Secure) {...}` block from `$secure` → `$secureValue` (3 references: assignment, null/Length guard, return). Added an in-source `# NOTE:` warning explaining the case-insensitivity trap so future edits don't regress.
+- **Audit performed:**
+  - Grepped `common.ps1` for any other `$(name|prompt|value|default|envVar|secure) =` assignments. Only the buggy line and one harmless `$name = [string]$c.Name` inside `Assert-PrerequisitesExist` (which has no `$Name` parameter, so no collision).
+  - `ConvertFrom-SecureStringPlain` reads its `[SecureString]$Secure` parameter directly — no local shadow.
+- **Verified:** `[System.Management.Automation.Language.Parser]::ParseFile(...)` under **pwsh 7** reports `PARSE OK`. (Windows PowerShell 5.1 reports 12 comment-block parser-noise errors at lines 458/482/511/512/562 — these are pre-existing and unrelated; the toolkit targets pwsh 7.)
+- **Rule for the `talent_infra_modules/` codebase:** PowerShell locals MUST NOT case-insensitively collide with a parameter name in the same scope. Prefer suffixed names (`$secureValue`, `$nameStr`, `$promptText`) when the natural local name would equal a parameter.
+- **Files touched:** `talent_infra_modules/shared/common.ps1` only. No caller changes needed — fix is transparent to all 5 components (`00-container-apps-env`, `01-postgresql`, `02-backend`, `03-frontend`, `04-data-loading`) and to any future component using `Get-ParameterValue -Secure`.
+
+### 2026-05-21 (later): `00-container-apps-env/` — standalone ACA env deployer (follow-on, silent-success)
+Anil added a 5th component to the toolkit after Lambert's APPROVED verdict: an optional standalone deployer for the Container Apps Environment itself. This closes the last greenfield gap — operators on a brand-new tenant can now bring up `00 + 01 + 02 + 03 + 04` end-to-end through `talent_infra_modules/` without falling back to `talent_infra_v2/`.
+
+- **Files produced (new):** `talent_infra_modules/00-container-apps-env/{README.md, deploy.ps1, infra/main.bicep, infra/main.parameters.json, infra/modules/container-apps-environment.bicep, infra/modules/aca-subnet.bicep}`.
+- **Cross-folder edits:** `talent_infra_modules/README.md` (added `00` to component table + prerequisites), `DEPLOYMENT-ORDER.md` (added Step 0 — foundational, parallel-with-`01`, blocks `02` + `03`), `02-backend/deploy.ps1` and `03-frontend/deploy.ps1` (soft-fallback: when `ContainerAppsEnvName` not provided, read `../00-container-apps-env/.outputs.json` — operators no longer need to copy CAE names between commands).
+- **Key choice — subnet handling lives in `deploy.ps1`, not Bicep.** The pre-existing-or-create branch validates delegation to `Microsoft.App/environments`, soft-lock awareness, and CIDR membership before any control-plane call. Bicep only ever receives a resolved `subnetId`, so the Bicep is a clean module take-or-create-CAE-against-a-subnet — single source of truth for subnet shape lives in PowerShell where it can talk to the control plane.
+- **No data-plane operations.** This module never touches PG, Cosmos, or Foundry; it just produces a CAE id + subnet id that 02 and 03 will consume.
+- **Validation (coordinator-side).** `az bicep build` against `00-container-apps-env/infra/main.bicep` → zero diagnostics. PowerShell AST parser against `00-container-apps-env/deploy.ps1` → zero parse errors.
+- **Silent-success caveat — read this if you re-open the 00 work.** My spawn for this module returned no chat text and produced no `decisions/inbox/` drop file, but all 10 affected paths landed on disk correctly. Squad coordinator filesystem-verified everything per the `<!-- KNOWN PLATFORM BUGS -->` workaround in `squad.agent.md`, then handed Scribe a recovery manifest. The `decisions.md` entry for this work is attributed to Bishop with explicit `(recovered by Squad coordinator — Bishop spawn returned silent success; all artifacts verified on filesystem and validated)` status so the audit trail is honest — that decision was authored from the recovery manifest, not by me directly. If you re-spawn me on this module, the artifacts and design choices recorded here are authoritative; the silent-success episode is a platform symptom, not missing work.
+
+### 2026-05-21 — Postgres SKU/tier parity: `01-postgresql/` must mirror `talent_infra_v2/`
+
+- **Symptom:** Azure deploy of `talent_infra_modules/01-postgresql/` failed with `ServerEditionIncompatibleWithSkuSize: The requested server edition is incompatible with requested Sku Size.`
+- **Root cause:** `01-postgresql/{deploy.ps1, infra/main.bicep, infra/main.parameters.json}` all defaulted to `skuName=Standard_B2s` + `skuTier=GeneralPurpose`. **`Standard_B2s` is Burstable-only.** The valid PG Flexible Server pairings are:
+  - `Burstable` ↔ `Standard_B*` (B1ms, B2s, B2ms, B4ms, …)
+  - `GeneralPurpose` ↔ `Standard_D*ds_v4/v5` (D2ds_v4, D4ds_v5, …)
+  - `MemoryOptimized` ↔ `Standard_E*ds_v4/v5`
+- **Why v2 didn't hit this:** `talent_infra_v2/infra/main.bicep:146` has the **same broken default** (`Standard_B2s`/`GeneralPurpose`), but `talent_infra_v2/infra/main.parameters.json:86–91` overrides it with `Standard_D4ds_v5`/`GeneralPurpose`. The standalone modules folder had no such override, so the broken Bicep default reached Azure.
+- **Canonical source-of-truth for postgres SKU:** **`talent_infra_v2/infra/main.parameters.json`**, fields `postgresqlSkuName` / `postgresqlSkuTier` / `postgresqlStorageSizeGB` / `postgresqlVersion`. As of 2026-05-21: `Standard_D4ds_v5` / `GeneralPurpose` / `32` / `"16"`.
+- **Fix applied to 01-postgresql:**
+  - `deploy.ps1` param block: `$SkuName="Standard_D4ds_v5"`, `$SkuTier="GeneralPurpose"` (was `Standard_B2s`). Added a comment block above the params citing v2 parity + the Burstable/GeneralPurpose hazard.
+  - `deploy.ps1` `Get-ParameterValue` calls: `-Default "Standard_D4ds_v5"` / `-Default "GeneralPurpose"`. Env-var overrides `POSTGRESQL_SKU_NAME` / `POSTGRESQL_SKU_TIER` still take precedence.
+  - `infra/main.bicep`: `param skuName string = 'Standard_D4ds_v5'`. Rewrote `@description` to enumerate the valid `tier ↔ family` pairings so the next reader can't repeat the mistake.
+  - `infra/main.parameters.json`: `skuName.value = "Standard_D4ds_v5"`. Added a `_comment_sku` field pointing to the v2 source file.
+- **Files INTENTIONALLY NOT touched (verbatim-parity discipline):**
+  - `infra/modules/postgresql-flexible-server.bicep` keeps its own `Standard_B2s` default — `main.bicep:112-113` always passes explicit `skuName`/`skuTier` into the module call, so the submodule default is unreachable. Leaving it identical to the v2 submodule keeps the diff surface clean.
+  - `talent_infra_v2/` (read-only canonical source).
+- **Validation:**
+  - `bicep build` on the modified `infra/main.bicep` → `success=true`, 0 errors, 0 warnings.
+  - PowerShell 7 AST parser on `deploy.ps1` → zero parse errors (2455 tokens).
+- **Rule for this toolkit:** Postgres SKU/tier/version/storage in `talent_infra_modules/01-postgresql/` is a downstream mirror of `talent_infra_v2/infra/main.parameters.json`. Treat any divergence as a bug-in-waiting; reviewers should diff the two at PR time. Decision drop: `.squad/decisions/inbox/bishop-postgres-sku-parity.md`.
+- **Deploy NOT re-run** — Anil owns deploys; the fix is staged but unexecuted on the live RG.

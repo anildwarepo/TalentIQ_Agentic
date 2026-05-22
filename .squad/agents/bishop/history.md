@@ -1,6 +1,6 @@
 # Bishop — History
 
-> Older entries archived to `history-archive.md` on 2026-05-21 by Scribe (originally truncated 2026-05-16; second pass moved 2026-05-21 deep-dive entries).
+> Older entries archived to `history-archive.md` on 2026-05-21 by Scribe (originally truncated 2026-05-16; 2026-05-22 pass moved 2026-05-21 deep-dive Learnings).
 
 ## Project Context
 - **Project:** TalentIQ — Talent Matching/Searching platform
@@ -46,15 +46,17 @@ Owned three of the four component folders:
 
 **See history-archive.md for the full per-folder flow narratives and the ~25 learnings (cross-RG BCP139/BCP120, AZURE_TENANT_ID omission contract, PE detection via private IP, deterministic naming SHA recipes, psql here-string dollar-quoting, env-var hygiene, etc.).**
 
-### 2026-05-21 (later): `00-container-apps-env/` — standalone ACA env deployer (follow-on, silent-success)
-Anil added a 5th component to the toolkit after Lambert's APPROVED verdict: an optional standalone deployer for the Container Apps Environment itself. This closes the last greenfield gap — operators on a brand-new tenant can now bring up `00 + 01 + 02 + 03 + 04` end-to-end through `talent_infra_modules/` without falling back to `talent_infra_v2/`.
+## Learnings
 
-- **Files produced (new):** `talent_infra_modules/00-container-apps-env/{README.md, deploy.ps1, infra/main.bicep, infra/main.parameters.json, infra/modules/container-apps-environment.bicep, infra/modules/aca-subnet.bicep}`.
-- **Cross-folder edits:** `talent_infra_modules/README.md` (added `00` to component table + prerequisites), `DEPLOYMENT-ORDER.md` (added Step 0 — foundational, parallel-with-`01`, blocks `02` + `03`), `02-backend/deploy.ps1` and `03-frontend/deploy.ps1` (soft-fallback: when `ContainerAppsEnvName` not provided, read `../00-container-apps-env/.outputs.json` — operators no longer need to copy CAE names between commands).
-- **Key choice — subnet handling lives in `deploy.ps1`, not Bicep.** The pre-existing-or-create branch validates delegation to `Microsoft.App/environments`, soft-lock awareness, and CIDR membership before any control-plane call. Bicep only ever receives a resolved `subnetId`, so the Bicep is a clean module take-or-create-CAE-against-a-subnet — single source of truth for subnet shape lives in PowerShell where it can talk to the control plane.
-- **No data-plane operations.** This module never touches PG, Cosmos, or Foundry; it just produces a CAE id + subnet id that 02 and 03 will consume.
-- **Validation (coordinator-side).** `az bicep build` against `00-container-apps-env/infra/main.bicep` → zero diagnostics. PowerShell AST parser against `00-container-apps-env/deploy.ps1` → zero parse errors.
-- **Silent-success caveat — read this if you re-open the 00 work.** My spawn for this module returned no chat text and produced no `decisions/inbox/` drop file, but all 10 affected paths landed on disk correctly. Squad coordinator filesystem-verified everything per the `<!-- KNOWN PLATFORM BUGS -->` workaround in `squad.agent.md`, then handed Scribe a recovery manifest. The `decisions.md` entry for this work is attributed to Bishop with explicit `(recovered by Squad coordinator — Bishop spawn returned silent success; all artifacts verified on filesystem and validated)` status so the audit trail is honest — that decision was authored from the recovery manifest, not by me directly. If you re-spawn me on this module, the artifacts and design choices recorded here are authoritative; the silent-success episode is a platform symptom, not missing work.
+> Deep-dive Learnings entries from 2026-05-21 (PowerShell case-insensitive shadowing in `Get-ParameterValue`; 00-container-apps-env follow-on silent-success postmortem; Postgres SKU/tier parity for `01-postgresql/`) moved to `history-archive.md` on 2026-05-22 by Scribe.
+
+### 2026-05-22T00:00:00Z — Asymmetric RBAC: `az resource show` vs `az <rp> show` for prereq checks
+
+- **Symptom:** Deploying `01-postgresql` produced a contradictory verification report — VNet `vnet-westus` in RG `vnet` reported "not found" while its child subnet `pe-subnet` in the same VNet reported "found" on the same RBAC principal. Logically impossible if both checks hit the same code path.
+- **Root cause:** `Assert-PrerequisitesExist` was asymmetric. The `'vnet'` branch called `Test-ResourceExists` → `az resource show`, which goes through the generic ARM `Microsoft.Resources/resources` endpoint and requires broader RBAC than the resource-provider-specific call. The `'subnet'` branch called `Test-VnetSubnetExists` → `az network vnet subnet show`, which only needs `Microsoft.Network/virtualNetworks/subnets/read` (and implicitly verifies the parent VNet). Anil has Network-RP read on the cross-tenant `vnet` RG but not generic `Microsoft.Resources/resources/read`, so the VNet check 403'd silently (treated as 404) while the subnet check succeeded.
+- **Fix:** Added `Test-VnetExists` (`az network vnet show ...`) alongside `Test-VnetSubnetExists`. Switched the `'vnet'` branch in `Assert-PrerequisitesExist` to use it. Kept `Test-ResourceExists` and its `vnet → Microsoft.Network/virtualNetworks` alias intact for any external callers using it directly. Success/failure messages unchanged so log scrapers and docs aren't disturbed.
+- **Rule of thumb for this codebase:** Prereq existence checks should use **resource-provider-specific `az <rp> show` calls**, not `az resource show`. The minimum RBAC for the RP-specific call is the same RBAC the actual deploy needs (read on the same resource type), so if the prereq check passes, the deploy can also see the resource. `az resource show` adds a generic ARM read requirement that's strictly extra and frequently missing on cross-team / cross-tenant network RGs.
+- **Applies to future modules:** 02-backend, 03-frontend, 04-data-loading prereq checks against the VNet, ACR, Container Apps env, Foundry, Cosmos, Postgres should all migrate to RP-specific helpers as needs arise (don't refactor preemptively — only when a real RBAC mismatch surfaces, since `Test-ResourceExists` is still fine for the common case where the operator has full RG read).
 
 ## Cross-agent note — 2026-05-21 (Scribe)
 - **Auth-disable contract is a two-agent deliverable.** Bishop owns the Container App env-vars + deploy scripts (omit `AZURE_TENANT_ID` on backend; pass `VITE_DISABLE_AUTH=true` to the frontend Docker build); Dallas owns the React source change (conditional `<MsalProvider>`, suppressed bearer header, synthetic demo account in `talent_ui/`). Both halves must move together to deliver the "auth-off demo deploy" promised by `talent_infra_modules/AUTH-DISABLED.md`. Changing the contract requires coordinated edits across both surfaces — never one in isolation.

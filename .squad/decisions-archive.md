@@ -4,6 +4,257 @@
 
 ---
 
+> **Batch 3 archived 2026-05-22 by Scribe** (Tier 2: file exceeded 51,200-byte threshold at 51,383 bytes after the 2026-05-22 Bishop vnet-prereq fix entry; all 2026-05-12 entries — 10 total — moved here. Entries 2026-05-15 and newer remain in decisions.md.)
+### 2026-05-12T21:40:00Z: HARD RULE — Reference code patterns are authoritative
+**By:** Anil Dwarakanath (via Copilot Coordinator)
+**Status:** Documented
+
+**What:** The patterns in `talentiq_requirements/reference_code/` (and the mirror at `C:\repos\TalentIQFoundry\af-backend`) are the canonical implementation reference. When implementing or fixing any feature that has a corresponding pattern in `reference_code/` (Azure OpenAI / Foundry client construction, MCP client, telemetry, Cosmos service, AGE/MCP server, etc.), agents MUST replicate the reference pattern as-is — same env var names, same precedence order, same audience scopes, same client class, same constructor kwargs.
+
+**Specifically:** Azure OpenAI client uses `AZURE_OPENAI_ENDPOINT` (Cognitive Services route, `*.openai.azure.com`), NOT the Foundry project URL. Do not invent new env var names, alternative audiences, or wrapper token providers when the reference pattern already works.
+
+**Enforcement:** Before any agent writes or modifies Foundry/OpenAI/MCP/Cosmos/telemetry client code, they must first read the corresponding file in `talentiq_requirements/reference_code/` and mirror it. Deviations require explicit user approval.
+
+**Why:** Divergence from the reference code caused Foundry client 401 audience mismatch and Cosmos endpoint precedence inversion. Reference code is battle-tested.
+
+**Note:** Supersedes and strengthens the earlier "2026-05-09: User directive — reference_code is pattern-only" entry.
+
+### 2026-05-12T03:00:00Z: VNet-aware smoke suite — Mechanism A/B/C strategy
+**By:** Lambert (Tester)
+**Status:** Implemented
+
+**What:**
+Refactored `tests/deployment/` smoke suite so every test that touches a private
+resource runs INSIDE the VNet.  The laptop is not on the VNet — direct Postgres /
+Cosmos / Foundry / KV connections from the laptop would time out.
+
+**Three mechanisms (A + B cover everything, C not needed):**
+
+| Mechanism | Description | Used by |
+|-----------|-------------|---------|
+| **A — Container App exec** | `az containerapp exec` runs a probe module (`talent_backend.probes.*`) inside a running CA.  The CA is on-VNet with its UAMI. | test_02 (Postgres), test_03 (Foundry), test_04 (MCP→PG) |
+| **B — Control plane CLI** | `az` commands against ARM (public API, works from anywhere) | test_01 (Entra/UAMI), test_03 (CA status), test_04 (CA status, PG Entra admin), test_05 (CA status) |
+| **C — Dedicated probe CA** | NOT USED.  A + B cover all checks.  Documented as fallback. | — |
+
+**Probe modules added** (`talent_backend/talent_backend/probes/`):
+- `smoke_pg.py` — Postgres connect, extensions, AGE graph, Cypher count, vector top-K, FTS
+- `smoke_foundry.py` — Foundry gpt-5.4 chat completion via UAMI
+- `smoke_mcp_pg.py` — MCP→Postgres connect, AGE, Cypher count
+
+**Why probes-in-the-app (not inline `python -c`):**
+- Inline strings are quoting nightmares across PowerShell/bash
+- Probes are versioned with the app code (release-correct)
+- Reusable by future health endpoints (`/health/pg`, `/health/foundry`)
+- Debuggable: `az containerapp exec --command "python -m talent_backend.probes.smoke_pg"`
+
+**Bicep output mapping fixed:**
+- Old: `BACKEND_CONTAINER_APP_NAME` / `MCP_CONTAINER_APP_NAME` / `FRONTEND_CONTAINER_APP_NAME`
+- New: `AZURE_CONTAINER_APP_BACKEND_NAME` / `AZURE_CONTAINER_APP_MCP_NAME` / `AZURE_CONTAINER_APP_FRONTEND_NAME` (matches actual main.bicep outputs)
+- Convention fallback retained for backward compat.
+
+**MCP UAMI Entra admin check (test_04):**
+Switched from `SELECT rolname FROM pg_roles` (requires VNet) to
+`az postgres flexible-server ad-admin list` (Mechanism B, works from laptop).
+Uses `POSTGRES_FQDN` to derive server name.
+
+**Impact:** All agents — Container App name env vars are now tested via the
+Bicep output names.  Probes are a new package in the backend image — no Docker
+image change needed (they ship with the existing `talent_backend` wheel).
+
+**Open items / follow-on for Bishop:**
+None critical.  All required Bicep outputs already exist: `AZURE_CONTAINER_APP_BACKEND_NAME`,
+`AZURE_CONTAINER_APP_MCP_NAME`, `AZURE_CONTAINER_APP_FRONTEND_NAME`, `POSTGRES_FQDN`.
+
+### 2026-05-12T02:30:00Z: Deployment smoke test suite — contracts and strategy
+**By:** Lambert (Tester)
+**Status:** Implemented
+
+**What:**
+Created `tests/deployment/` — an ordered, fail-fast smoke test suite that gates go/no-go after `azd up`.
+
+**Test order (earlier failures block later tests):**
+1. Entra auth (DefaultAzureCredential token, principal ID match, 3 UAMIs exist)
+2. PostgreSQL (connect via Brett's `db.connect()`, extensions, AGE graph, Cypher count, vector search, FTS)
+3. Backend Container App (running status, Foundry gpt-5.4 chat completion)
+4. MCP Container App (running status, UAMI in pg_roles)
+5. Frontend Container App (running status, SPA served, `/af/health` proxy to backend)
+
+**Infra contracts the tests assume (env var names from Bishop's Pass 3):**
+- `AZURE_ENV_NAME`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP` — from `azd env`
+- `PGHOST`/`POSTGRES_HOST`, `PGDATABASE`/`POSTGRES_DB`, `PGUSER`/`POSTGRES_USER` — PG connection
+- `FOUNDRY_ENDPOINT`, `FOUNDRY_DEPLOYMENT_NAME` — Foundry model
+- `AZURE_PRINCIPAL_ID` (optional) — deploying user OID sanity check
+- Container App names default to `ca-talentiq-{backend|frontend|mcp}-{env}` — overridable via `BACKEND_CONTAINER_APP_NAME`, `MCP_CONTAINER_APP_NAME`, `FRONTEND_CONTAINER_APP_NAME`
+- UAMI names: `uami-talentiq-{backend|frontend|mcp}-{env}`
+
+**Design choice — no `az containerapp exec`:**
+Container exec requires TTY + running replica + VNet access. Instead: `az containerapp show` for status, deployer-credential Foundry check for AI connectivity. Cypher/vector/FTS validated via Brett's `db.connect()` (same path the pipeline uses). Documents the future requirement for a `/health/foundry` backend endpoint.
+
+**Why:** Deployment verification must be deterministic, fast, and require zero manual inspection. Fail-fast ensures the first broken layer is immediately visible.
+
+**Impact:** All agents — Container App names, UAMI names, and azd env var names are now tested contracts. Changing them requires updating the smoke suite (or the overridable env vars).
+
+### 2026-05-12T01:35:00Z: Frontend runtime config strategy
+**By:** Dallas (Frontend Dev)
+**What:** Runtime configuration for the talent_ui production container image uses a `window.__ENV__` pattern injected at container start, not baked at build time.
+
+#### Decision
+
+The Vite SPA is built once (static `dist/`) and shipped in a multi-stage Docker image. Runtime environment values (backend URL, MSAL client ID, App Insights connection string) vary per deployment target and cannot be baked into the Vite bundle with `VITE_*` vars.
+
+**Pattern chosen:** `envsubst` templating at container start.
+
+1. `config.js.template` lives at `/etc/talentiq/config.js.template` inside the image (outside the nginx `root`, so never served raw).
+2. `entrypoint.sh` runs `envsubst '${BACKEND_URL} ${AZURE_CLIENT_ID} ${APPLICATIONINSIGHTS_CONNECTION_STRING}'` to write `/usr/share/nginx/html/config.js`.
+3. `index.html` loads `/config.js` via a plain `<script src="/config.js">` **before** the main ESM bundle, so `window.__ENV__` is set before any React code executes.
+
+Container App injects: `BACKEND_URL`, `KEY_VAULT_URI`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, `AZURE_CLIENT_ID`.
+
+#### Caveats / Follow-on work
+
+- `telemetry.js` currently reads `import.meta.env.VITE_APPINSIGHTS_CONNECTION_STRING` (baked at build). Future pass: change to `window.__ENV__.APPLICATIONINSIGHTS_CONNECTION_STRING`.
+- `authConfig.js` has hardcoded clientId and tenantId. Future pass: change to read from `window.__ENV__.AZURE_CLIENT_ID` (tenantId can come from MSAL authority metadata or a separate env var).
+- The `/config.js` endpoint will return a 404 in local Vite dev mode (no nginx, no entrypoint.sh). Wrap reads with `window.__ENV__ ?? {}` in source to degrade gracefully.
+
+#### Nginx proxy path
+
+Proxied prefix is `/af/` (not `/api/`). The frontend codebase routes all backend calls under `/af/`. The task spec mentioned `/api/*` — this was not applied to avoid breaking existing API calls.
+**Why:** `proxy_buffering off` + `proxy_read_timeout 300s` on the `/af/` location ensures NDJSON SSE streaming (run-log panel) is not buffered or prematurely closed by nginx.
+
+### 2026-05-12T01:30:00Z: Passwordless auth pattern — azure_clients.py
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+
+**What:**
+- Created `talent_backend/talent_backend/azure_clients.py` as the single source of truth for all Azure service connections.
+- `get_credential()` — process-wide `DefaultAzureCredential` singleton with pre-warm. In Azure: `AZURE_CLIENT_ID` env var auto-selects the UAMI. Locally: falls back to `az login`.
+- `PostgresPoolManager` — async psycopg3 pool with Entra token-as-password refresh. Gets token from scope `https://ossrdbms-aad.database.windows.net/.default`. Recreates the pool 5 minutes before token expiry (~1h TTL). Thread-safe with asyncio.Lock.
+- `get_cosmos_client()` — singleton `CosmosClient` with `DefaultAzureCredential`. RBAC-only (no key).
+- `get_keyvault_client()` / `get_secret()` — lazy `SecretClient` with `DefaultAzureCredential`.
+- `configure_app_insights()` — idempotent OTel setup via `azure-monitor-opentelemetry`. No-op if `APPLICATIONINSIGHTS_CONNECTION_STRING` unset.
+- `get_foundry_token_provider()` — returns a bearer-token callable for `AzureOpenAI(azure_ad_token_provider=...)`.
+
+**Why:** Centralizes credential management. Eliminates duplicate `DefaultAzureCredential()` instantiations (pre-existing in vector_tools.py, chat_history.py). Enables token rotation without changing callers.
+
+**Impact:**
+- `pg_age_helper.py` — delegates to `PostgresPoolManager` when `IS_AZURE_DEPLOY`. Local dev path unchanged.
+- `chat_history.py` — uses `get_cosmos_client()` instead of its own `CosmosClient(credential=DefaultAzureCredential())`.
+- `vector_tools.py` — uses `get_credential()` singleton instead of creating a new `DefaultAzureCredential()`.
+- `api.py` lifespan + `mcp_server/__main__.py` — call `configure_app_insights()` at startup.
+
+### 2026-05-12T01:30:00Z: Dockerfile strategy — backend + MCP
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+
+**What:**
+- `talent_backend/Dockerfile` — backend service (port 8000, `python -m talent_backend`).
+- `talent_backend/Dockerfile.mcp` — MCP service (port 3002, `python -m talent_backend.mcp_server`).
+- Both use multi-stage build: `python:3.11-slim` builder + runtime, uv-based install.
+- Build pattern: `uv venv /opt/venv && . /opt/venv/bin/activate && uv pip install --no-cache .` using pyproject.toml as the manifest.
+- Non-root `app` user in runtime stage.
+- `talent_backend/.dockerignore` excludes .venv, __pycache__, *.env, tests, logs, docs.
+- HEALTHCHECK left as TODO comment — needs curl/wget in image or Python urllib check against `/health`.
+
+**Why:**
+- azure.yaml `project: ../talent_backend` for both backend and mcp services → build context is `talent_backend/`. Both Dockerfiles live there.
+- `uv pip install .` (not `uv sync`) avoids needing the workspace-root `uv.lock` inside the `talent_backend/` build context.
+
+**Outstanding action for Bishop/infra:**
+- `talent_infra/azure.yaml` mcp service needs `docker.dockerfile: Dockerfile.mcp` added so azd uses the correct Dockerfile for the MCP Container App. Without it, azd defaults to `Dockerfile` and starts the backend entrypoint for both services.
+
+### 2026-05-12T01:30:00Z: azure_clients module — shape and import contract
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+
+**What:**
+- Module: `talent_backend/talent_backend/azure_clients.py`
+- Public API:
+  - `get_credential()` → `DefaultAzureCredential` singleton
+  - `get_pg_pool_manager()` → `PostgresPoolManager` singleton (Azure Postgres token rotation)
+  - `get_cosmos_client()` → `CosmosClient` singleton
+  - `get_keyvault_client()` → `SecretClient` singleton (lazy)
+  - `get_secret(name)` → `str` (on-demand Key Vault read)
+  - `configure_app_insights()` → void (OTel setup, idempotent)
+  - `get_foundry_token_provider()` → `Callable[[], str]` (for AzureOpenAI SDK)
+- `IS_AZURE_DEPLOY` in `config.py`: `True` when `AZURE_CLIENT_ID` + `POSTGRES_HOST` env vars are both present.
+- `config.py` env var aliases: `FOUNDRY_ENDPOINT` → `AZURE_OPENAI_ENDPOINT`, `COSMOS_ENDPOINT` → `COSMOS_CHAT_ENDPOINT`, `POSTGRES_HOST` → `PGHOST`, etc. All old names still work for local dev.
+- No passwords are logged or committed. Token values are ephemeral (only in conninfo strings, never stored).
+
+**Why:** Single place for Azure credential lifecycle. Prevents duplicate `DefaultAzureCredential` instantiations and redundant IMDS probe races.
+
+**Import pattern for all new code:**
+```python
+from talent_backend.azure_clients import get_credential, get_cosmos_client, get_keyvault_client, configure_app_insights, get_foundry_token_provider
+```
+
+### 2026-05-12T01:30:00Z: Data pipeline Entra ID token auth for Azure PostgreSQL
+**By:** Brett (Data Generator & Loader)
+**Status:** Implemented
+
+**What:**
+1. Created `talent_data_pipeline/talent_data_pipeline/db.py` — centralized connection helper with dual-mode auth (password vs Entra ID token). Auto-detects Azure target via `IS_AZURE_DEPLOY=true` or `PGHOST` suffix `.postgres.database.azure.com`.
+2. Token caching: Entra access tokens cached in-process with thread-safe refresh 5 minutes before expiry. `DefaultAzureCredential` is only imported when Entra mode is active (zero overhead for local dev).
+3. `ManagedConnectionPool` wrapper: rebuilds the `ThreadedConnectionPool` when the underlying token nears expiry, ensuring fresh connections get valid tokens during long parallel loads.
+4. Refactored all 6 connection call sites (connectivity_test, validate, create_relational_tables, create_indexes, base_loader) to use `db.connect()` or `ManagedConnectionPool` instead of raw `psycopg2.connect(**db_config.connection_dict)`.
+5. Connectivity test now prints auth mode ("Entra ID (passwordless)" or "Password") at the top of its output.
+6. Both outer stub files and inner package files updated and kept in sync.
+7. `AZURE.md` added with 30-line usage note.
+
+**Why:** Bishop's infra Pass 3 provisions PostgreSQL in Entra-only mode (no password auth). Pipeline must use Entra tokens against Azure PG while preserving local password-based dev flow.
+
+**Impact:** All pipeline operations (connectivity test, schema creation, index creation, data loading, validation) now work against both local PG (password) and Azure PG (Entra token). No changes to `talent_backend/`, `talent_infra/`, or `talent_ui/`.
+
+### 2026-05-12T01:00:00Z: Container App workloads + UAMI + RBAC wiring (Pass 3)
+**By:** Bishop (Deployment Engineer)
+**Status:** Implemented
+
+**What:**
+1. **User-Assigned Managed Identities** — 3 UAMIs created per environment: `uami-talentiq-backend-{env}`, `uami-talentiq-frontend-{env}`, `uami-talentiq-mcp-{env}`. Created before Container Apps so RBAC assignments propagate before app startup.
+
+2. **RBAC assignments wired into existing data modules:**
+   - Cosmos DB: Built-in Data Contributor (`00000000-0000-0000-0000-000000000002`) → backend + MCP UAMIs
+   - Foundry: Cognitive Services OpenAI User (`5e0bd9bd-7b93-4f28-af87-19fc36ad61bd`) → backend + MCP UAMIs
+   - Key Vault: Key Vault Secrets User (`4633458b-17de-408a-b874-0445c86b69e6`) → all 3 UAMIs
+   - ACR: AcrPull (`7f951dda-4ed3-4680-a7ca-43fe172d538d`) → all 3 UAMIs
+   - PostgreSQL: Entra Admin (server-level) → backend UAMI + MCP UAMI + deploying user (principalType: 'User')
+
+3. **Container App module** — Generic `container-app.bicep` used 3 times. UAMI-only identity, ACR pull via UAMI, configurable external/internal ingress, env vars with KV secret reference support, bootstrap image `mcr.microsoft.com/k8se/quickstart:latest`.
+
+4. **Env var contract:**
+   - Backend (8000) & MCP (3002): POSTGRES_HOST, POSTGRES_DB, COSMOS_ENDPOINT, FOUNDRY_ENDPOINT, FOUNDRY_DEPLOYMENT_NAME, KEY_VAULT_URI, APPLICATIONINSIGHTS_CONNECTION_STRING, AZURE_CLIENT_ID
+   - Frontend (80): BACKEND_URL, KEY_VAULT_URI, APPLICATIONINSIGHTS_CONNECTION_STRING, AZURE_CLIENT_ID
+   - Apps use `DefaultAzureCredential` with `AZURE_CLIENT_ID` set to UAMI clientId — NO passwords.
+
+5. **azure.yaml** — `resourceName` activated for all 3 services. Dockerfiles marked TODO (not in Bishop's scope).
+
+**Why:** Pass 3 completes the infrastructure stack. `azd up` now provisions the entire topology: networking + data + supporting services + container apps. Apps start with quickstart placeholder; `azd deploy` builds + pushes real images.
+
+**Impact:** All agents — env var names above are the contract between infra and app code. Kane/Dallas/Brett must implement `DefaultAzureCredential` in backend, frontend, and MCP using `AZURE_CLIENT_ID` for identity selection. Dockerfiles are the remaining blocker before a full `azd up && azd deploy` cycle works end to end.
+
+### 2026-05-12T00:00:00Z: Data + supporting service modules deployed
+**By:** Bishop (Deployment Engineer)
+**Status:** Implemented
+
+**What:**
+1. **Cosmos DB** — SQL API, `publicNetworkAccess: 'Disabled'`, `disableLocalAuth: true` (RBAC-only via Cosmos SQL role assignments, not Azure RBAC). Built-in Data Contributor role `00000000-0000-0000-0000-000000000002`. Default database `talentiq` with `sessions` container (autoscale 1000 RU/s, partition key `/sessionId`).
+
+2. **PostgreSQL Flexible Server** — PG 16, VNet-integrated via delegated subnet `snet-db` (NOT private endpoint). Entra ID-only auth (`passwordAuth: 'Disabled'`, `activeDirectoryAuth: 'Enabled'`). Extensions allowlisted: `age`, `vector`, `pg_trgm`, `pg_stat_statements`. Burstable B2ms SKU for dev. `entraAdmins` array param for server-level Entra admins (empty by default — wire MIs in Container Apps pass).
+
+3. **Azure AI Foundry** — Cognitive Services account kind `AIServices`, system-assigned MI, `publicNetworkAccess: 'Disabled'`, `disableLocalAuth: true`. Single PE with dual DNS zones (cognitive + openai). `gpt-5.4` model deployment (GlobalStandard, 30K TPM default). `principalIds` array for Cognitive Services OpenAI User role.
+
+4. **App Insights** — Log Analytics workspace + workspace-based Application Insights. Workspace shared key passed to Container Apps Environment via module output with `#disable-next-line outputs-should-not-contain-secrets` (no secrets in files, deployment-time only).
+
+5. **Key Vault** — RBAC authorization mode, soft-delete + purge protection, `publicNetworkAccess: 'disabled'`. Name truncated to 24 chars via `take()`. `principalIds` for Key Vault Secrets User role.
+
+6. **ACR** — Premium SKU, `adminUserEnabled: false`, `publicNetworkAccess: 'Disabled'`. Alphanumeric name (no hyphens). `principalIds` for AcrPull role.
+
+**All modules:** Private endpoints (or VNet integration for PG) + private DNS zone linking. All `principalIds` arrays empty — wired when Container App MIs land.
+
+**Why:** Pass 2 of the infra build-out. Networking foundation (Pass 1) is in place; data + supporting services now deployed. Container App workloads are next (Pass 3).
+
+**Impact:** All agents — Bicep template is now a complete infrastructure-minus-apps deployment. `azd up` will provision networking + all PaaS services. Container App modules + MI RBAC wiring are the remaining gap.
+
+
 > **Batch 2 archived 2026-05-21 by Scribe** (Tier 2: file exceeded 50KB after the 2026-05-21 toolkit-build burst; entries dated 2026-05-12 and earlier moved here).
 
 ### 2026-05-12: Charter clarification — talentiq_requirements READ-ONLY
