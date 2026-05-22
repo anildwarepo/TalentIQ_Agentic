@@ -5,6 +5,49 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-22T23:59:00Z: Phase 1 connectivity test — `PGUSER` must be the full Entra principal; `pg_entra` now emits an actionable hint on libpq `password authentication failed`
+
+**By:** Brett (Data Generator & Loader) — requested by Anil
+**Status:** Implemented — awaiting Anil review
+
+**Symptom (Anil's box, 2026-05-22):** `uv run --package talent_data_pipeline python -m talent_data_pipeline.main --mode manual` against `tiqpg9a6d3.postgres.database.azure.com` failed at Phase 1 with libpq `FATAL: password authentication failed for user "anildwa"`. Bewildering because the codebase has been Entra-token-only since 2026-05-12 (no `PGPASSWORD`) and Anil's `talent_infra_v2/scripts/test_pg_entra_connection.py --user anildwa@MngEnvMCAP347541.onmicrosoft.com` proved Entra auth works.
+
+**H1 (Phase 1 bypasses Entra) — FALSIFIED.** `talent_data_pipeline/talent_data_pipeline/main.py:14` imports the inner-package `connectivity_test`; its `_connect()` returns `pg_entra.pg_connect()`. Repo-wide grep of the inner package found exactly one `psycopg2.connect()` call (inside `pg_entra.pg_connect`) and zero `PGPASSWORD` references.
+
+**H2 (PGUSER misconfigured) — CONFIRMED, more pernicious than "short name":**
+- `app_config/.env` line 55 is literally `PGUSER=` (empty value).
+- `config.DatabaseConfig.user` defaults to `os.getenv("PGUSER", "")`.
+- `db_config.connection_dict` passes `user=""` to `psycopg2.connect(...)`.
+- libpq treats empty `user` as "use the OS account" → on Anil's Windows box that is `anildwa`.
+- The Entra bearer token was issued correctly for `anildwa@MngEnvMCAP347541.onmicrosoft.com`, but PG looked up the role bound to libpq's `user="anildwa"` (not the principal name in the token) and rejected → `password authentication failed for user "anildwa"`.
+
+**Decision:**
+1. **Phase 1's connectivity test MUST route through `pg_entra.pg_connect()`** (already true — reaffirmed).
+2. **`PGUSER` MUST be the full Entra principal name** that owns the PG role — **UPN** for a human, **UAMI name** for app-hosted compute. Empty / short usernames are operator errors. **NEVER** the object ID or client GUID.
+3. **`pg_entra` now wraps `psycopg2.OperationalError` with an actionable hint** when libpq says `password authentication failed` (case-insensitive). Original exception is chained via `raise ... from exc`. Hint surfaces three cases: empty PGUSER (OS-fallback), PGUSER without `@` (short name), PGUSER with `@` (re-raise with host/user context). All other operational errors propagate untouched.
+4. **No password fallback introduced. No auto-mutation of PGUSER.** Pipeline still requires the operator to set `PGUSER` correctly in `.env`; we just stop pretending the failure is about a missing password.
+
+**Code changes (Brett, awaiting Anil commit — owner of `talent_data_pipeline/*`):**
+- `talent_data_pipeline/talent_data_pipeline/pg_entra.py` — new module-level `_build_pguser_hint(pg_user, host, libpq_message)`. Both `pg_connect()` and `EntraThreadedConnectionPool._connect()` wrap the `psycopg2.connect(**kwargs)` call in `try/except psycopg2.OperationalError`, re-raising with the hint when the message matches `password authentication failed`. No other files touched. No success-path behavior change.
+
+**Operator action required (NOT done by Brett — Anil owns `.env`):** Edit `app_config/.env` line 55 from `PGUSER=` to the full Entra principal name. For Anil's local box: `PGUSER=anildwa@MngEnvMCAP347541.onmicrosoft.com`. For app-hosted compute (Container Apps / Functions), set PGUSER to the UAMI **name** — never the OID or client ID.
+
+**Validation:** `py_compile` on `pg_entra.py` after edits: OK. Isolated Phase-1-only re-run after `.env` update:
+```
+c:\repos\TalentIQ_Agentic\.venv\Scripts\python.exe -c "from talent_data_pipeline.connectivity_test import run_connectivity_test; import sys; sys.exit(0 if run_connectivity_test() else 1)"
+```
+(Do NOT run the full pipeline — load takes 60-90 min.)
+
+**Forward guardrail (cross-agent):** Any future module that opens a PG connection inside the pipeline MUST go through `pg_entra.pg_connect()` or `EntraThreadedConnectionPool`. Direct `psycopg2.connect()` calls bypass both the Entra token injection AND this hint — they will silently fall back to libpq password auth and break against the Entra-only server. Pre-commit grep:
+```
+grep -RInE "psycopg2\.connect\(|psycopg2\.pool" talent_data_pipeline/talent_data_pipeline/
+```
+should continue to return exactly one match (the call inside `pg_entra.pg_connect`).
+
+**Cross-agent impact:**
+- **Bishop (Deployment Engineer):** Every UAMI-bound role provisioned by `talent_infra_modules/01-postgresql/` and `talent_infra_modules/02-backend/` MUST set the consumer's `PGUSER` env var to the **UAMI resource name** (which equals the PG role name after `microsoft-entra-admin create --display-name <UAMI-name>`). Never leave `PGUSER` empty in any Container App env array, Functions app setting, or `.env` template. The decision 2026-05-21 (`talent_infra_modules/02-backend` — Container App + sidecar) already does this (`PGUSER=${backendAppName}-identity`); reaffirmed here for any new compute the toolkit adds.
+- **Parker (Data Engineer):** Co-owns the pipeline. Aware of the new hint behavior. Any new connectivity helper or batch loader added to `talent_data_pipeline/talent_data_pipeline/` should route through `pg_entra.pg_connect()` to inherit the hint automatically.
+
 ### 2026-05-22T23:55:00Z: `talent_data_pipeline.main` gains `--mode {env,manual}` flag + `DATALOAD_MODE` env var
 
 **By:** Brett (Data Generator & Loader) — requested by Anil
