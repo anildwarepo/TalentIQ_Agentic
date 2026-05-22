@@ -1,0 +1,8 @@
+{
+  "postgresqlServerName": "tiqpg9a6d3",
+  "postgresqlServerFqdn": "tiqpg9a6d3.postgres.database.azure.com",
+  "postgresqlPrivateFqdn": "tiqpg9a6d3.privatelink.postgres.database.azure.com",
+  "postgresqlPrivateIp": "10.0.4.16",
+  "deployerEntraUpn": "anildwa@MngEnvMCAP347541.onmicrosoft.com",
+  "tenantId": "150305b3-cc4b-46dd-9912-425678db1498"
+}

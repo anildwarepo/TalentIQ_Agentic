@@ -64,6 +64,7 @@ Deploy a single **Azure Database for PostgreSQL Flexible Server** with:
 | ClientIpAddress            | `POSTGRESQL_CLIENT_IP`           | auto-detected        | Used for AllowClientIp firewall rule. |
 | UamiPrincipalIds           | `POSTGRESQL_UAMI_PRINCIPALS`     | empty                | JSON list `[{ "name": "...", "objectId": "..." }, ...]`. Registered as ServicePrincipal Entra admins. |
 | EntraOnly                  | `POSTGRESQL_ENTRA_ONLY`          | `false`              | When `true`, disables password auth. Do not flip until all clients (UAMIs + deployer) are registered. |
+| FixStaleDnsZoneGroup       | —                                | `false`              | Self-heal switch. When set (or with `-Force`), Section 7b deletes any `privateDnsZoneGroup` on the existing PE whose `privateDnsZoneId` no longer matches the resolved canonical zone, so Bicep can recreate it. Without it, the script fails fast with instructions. See "Deployment lessons encoded". |
 
 ## Outputs
 
@@ -103,6 +104,21 @@ reads all four FQDN-related values plus `deployerEntraUpn`.
   is broader privileges (PG admin instead of narrow schema grants); the
   per-schema narrowing happens in 04-data-loading once an Entra token
   works. The display-name-equals-UAMI-name rule is **mandatory**.
+- **Private DNS zone group is immutable — self-heal on redeploy**
+  *(added 2026-05-22)*. Azure rejects in-place mutation of
+  `privateDnsZoneConfigs[*].properties.privateDnsZoneId` with
+  `UpdatingPrivateDnsZoneIdOnPrivateDnsZoneConfigNotAllowed`. This
+  surfaces when the discover-and-reuse logic in Section 6b lands on a
+  canonical zone in the shared network RG, but the PE's existing
+  `default` zone group was wired (by a pre-fix deploy) to a duplicate
+  zone in the local RG. Section 6c detects the mismatch read-only;
+  Section 7b deletes the stale zone group when `-FixStaleDnsZoneGroup`
+  (or `-Force`) is set, then Bicep recreates it pointing at the
+  canonical zone. Section 7c best-effort deletes the orphan duplicate
+  zone only when it has zero VNet links AND at most one record set (the
+  SOA); anything else is left for a manual cleanup hint. Without the
+  switch, the script fails fast with rerun instructions instead of
+  letting Bicep error out half-way.
 
 ## Re-running
 

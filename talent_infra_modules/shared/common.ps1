@@ -216,15 +216,18 @@ function Get-ParameterValue {
     }
 
     if ($Secure) {
-        $secure = Read-Host -Prompt $promptText -AsSecureString
-        if ($null -eq $secure -or $secure.Length -eq 0) {
+        # NOTE: local must NOT be named $secure — PowerShell is case-insensitive
+        # for variables, so $secure would shadow/overwrite the [switch]$Secure
+        # parameter and trip a SwitchParameter↔SecureString type-coercion error.
+        $secureValue = Read-Host -Prompt $promptText -AsSecureString
+        if ($null -eq $secureValue -or $secureValue.Length -eq 0) {
             if (-not [string]::IsNullOrEmpty($Default)) {
                 return (ConvertTo-SecureString $Default -AsPlainText -Force)
             }
             Write-Fail "No value supplied for required secure parameter '$Name'."
             exit 1
         }
-        return $secure
+        return $secureValue
     }
 
     $entered = Read-Host -Prompt $promptText
@@ -323,6 +326,31 @@ function Test-ResourceExists {
     return ($LASTEXITCODE -eq 0)
 }
 
+function Test-VnetExists {
+    <#
+    .SYNOPSIS
+        True if -VnetName exists in -ResourceGroup.
+
+        Use this instead of Test-ResourceExists -ResourceType 'vnet' when
+        the caller may only have Microsoft.Network/virtualNetworks/read
+        on the VNet's resource group (e.g. cross-tenant / cross-team
+        network RGs). `az resource show` hits the generic ARM
+        Microsoft.Resources endpoint and requires broader RBAC than the
+        resource-provider-specific `az network vnet show`.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$ResourceGroup,
+        [Parameter(Mandatory)][string]$VnetName
+    )
+    $null = Invoke-Native {
+        az network vnet show `
+            --resource-group $ResourceGroup `
+            --name $VnetName `
+            --output none 2>$null
+    }
+    return ($LASTEXITCODE -eq 0)
+}
+
 function Test-VnetSubnetExists {
     <#
     .SYNOPSIS
@@ -344,6 +372,155 @@ function Test-VnetSubnetExists {
             --output none 2>$null
     }
     return ($LASTEXITCODE -eq 0)
+}
+
+function Get-LinkedPrivateDnsZoneId {
+    <#
+    .SYNOPSIS
+        Return the resource ID of a Private DNS zone named -ZoneName that
+        is already linked to -VnetId. Returns $null if no such zone is
+        linked, OR if the lister hits an RBAC wall.
+
+    .DESCRIPTION
+        Azure enforces "at most one Private DNS zone per namespace per
+        VNet" — attempting to link a second zone with the same name to
+        the same VNet fails with:
+
+            "A virtual network cannot be linked to multiple zones with
+             overlapping namespaces."
+
+        Before a per-component deploy creates a brand-new
+        privatelink.<service>.<region>.azure.com zone + VNet link, it
+        should ask: "Is there already a zone of that name linked to my
+        target VNet?" — and reuse it if so.
+
+        This is the resource-provider-specific call (`az network
+        private-dns ...`) — same RBAC posture as Test-VnetExists /
+        Test-VnetSubnetExists, so it works in shared-tenant subs where
+        the existing zone lives in a network team's RG and the deployer
+        only has Microsoft.Network/privateDnsZones/read scoped there.
+
+        Implementation: list all zones across the subscription, filter
+        by exact name, then per-zone enumerate virtualNetworkLinks and
+        case-insensitively compare each link's virtualNetwork.id to the
+        passed -VnetId.
+
+    .PARAMETER SubscriptionId
+        Subscription to search. Must already be set as the active
+        subscription (call Test-AzSubscription first).
+
+    .PARAMETER ZoneName
+        Exact zone DNS name, e.g. 'privatelink.postgres.database.azure.com'.
+
+    .PARAMETER VnetId
+        Full ARM resource ID of the target VNet, e.g.
+        /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Network/virtualNetworks/{name}.
+        Comparison is case-insensitive (Azure resource IDs are not
+        case-sensitive in practice).
+
+    .OUTPUTS
+        [string] zone resource ID when found AND linked.
+        $null otherwise.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$SubscriptionId,
+        [Parameter(Mandatory)][string]$ZoneName,
+        [Parameter(Mandatory)][string]$VnetId
+    )
+
+    $zonesJson = Invoke-Native {
+        az network private-dns zone list `
+            --subscription $SubscriptionId `
+            --output json 2>$null
+    }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($zonesJson)) {
+        return $null
+    }
+    try { $zones = @($zonesJson | ConvertFrom-Json) } catch { return $null }
+
+    $matching = @($zones | Where-Object { $_.name -eq $ZoneName })
+    foreach ($zone in $matching) {
+        $zoneId = [string]$zone.id
+        # /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Network/privateDnsZones/{name}
+        $segments = $zoneId.Split('/')
+        if ($segments.Length -lt 5) { continue }
+        $zoneRg = $segments[4]
+        $zoneNm = [string]$zone.name
+
+        $linksJson = Invoke-Native {
+            az network private-dns link vnet list `
+                --subscription $SubscriptionId `
+                --resource-group $zoneRg `
+                --zone-name $zoneNm `
+                --output json 2>$null
+        }
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($linksJson)) {
+            continue
+        }
+        try { $links = @($linksJson | ConvertFrom-Json) } catch { continue }
+
+        foreach ($link in $links) {
+            $linkVnetId = [string]$link.virtualNetwork.id
+            if ($linkVnetId -ieq $VnetId) {
+                return $zoneId
+            }
+        }
+    }
+    return $null
+}
+
+function Get-PrivateDnsZoneIdByName {
+    <#
+    .SYNOPSIS
+        Return the resource ID of ANY Private DNS zone named -ZoneName
+        in the subscription, regardless of whether it is linked to a
+        particular VNet. Returns $null when no zone of that name exists
+        (or the lister hits an RBAC wall).
+
+    .DESCRIPTION
+        Use this as the second-tier check after Get-LinkedPrivateDnsZoneId
+        — when no zone of that name is linked to the target VNet, an
+        UNLINKED zone may still exist somewhere in the subscription
+        (typical for fresh shared infra where the network team has
+        created the zone but not yet linked it). Reuse that zone and
+        let Bicep create the VNet link.
+
+        When multiple zones with the same name exist in different
+        resource groups (rare — happens in subs that mix per-app and
+        shared private DNS), returns the FIRST one returned by Azure.
+        Operators who need deterministic selection should set the
+        env-var override (e.g. POSTGRESQL_DNS_ZONE_ID) instead of
+        relying on auto-discovery.
+
+    .PARAMETER SubscriptionId
+        Subscription to search. Must already be set as the active
+        subscription (call Test-AzSubscription first).
+
+    .PARAMETER ZoneName
+        Exact zone DNS name, e.g. 'privatelink.postgres.database.azure.com'.
+
+    .OUTPUTS
+        [string] zone resource ID when any zone with that name exists.
+        $null otherwise.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$SubscriptionId,
+        [Parameter(Mandatory)][string]$ZoneName
+    )
+
+    $zonesJson = Invoke-Native {
+        az network private-dns zone list `
+            --subscription $SubscriptionId `
+            --output json 2>$null
+    }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($zonesJson)) {
+        return $null
+    }
+    try { $zones = @($zonesJson | ConvertFrom-Json) } catch { return $null }
+
+    $match = $zones | Where-Object { $_.name -eq $ZoneName } | Select-Object -First 1
+    if ($null -eq $match) { return $null }
+    return [string]$match.id
 }
 
 function Test-FoundryProject {
@@ -556,7 +733,7 @@ function Assert-PrerequisitesExist {
                 }
             }
             'vnet' {
-                if (Test-ResourceExists -ResourceGroup $vnetRg -ResourceType 'vnet' -Name $name) {
+                if (Test-VnetExists -ResourceGroup $vnetRg -VnetName $name) {
                     Write-Success "VNet $name"
                 } else {
                     Write-Fail "VNet $name not found in RG $vnetRg"

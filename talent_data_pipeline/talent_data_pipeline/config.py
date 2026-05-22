@@ -65,3 +65,26 @@ class PipelineConfig:
 # Singletons
 db_config = DatabaseConfig()
 pipeline_config = PipelineConfig()
+
+
+def apply_host_override(host: str) -> None:
+    """Override the effective PostgreSQL host at runtime.
+
+    Mutates ``os.environ["PGHOST"]`` AND the existing ``db_config`` singleton's
+    ``host`` field (bypassing ``frozen=True`` via ``object.__setattr__``) so that:
+
+    - Modules that already imported ``db_config`` by reference (e.g. ``base_loader``)
+      see the new host through their existing reference.
+    - Future re-imports / lazy reads of ``db_config.host`` see the new host.
+    - The Entra-token connect path in ``pg_entra.pg_connect`` is preserved — only
+      the ``host`` field changes; ``user``, ``port``, ``dbname``, ``sslmode``, and
+      the bearer-token password injection are untouched.
+
+    Intended to be called from an entry-point script (e.g. ``main.py``) BEFORE
+    any connection is opened, after CLI/prompt resolution of the target host.
+    """
+    host = host.strip()
+    if not host:
+        raise ValueError("apply_host_override: host must be a non-empty string")
+    os.environ["PGHOST"] = host
+    object.__setattr__(db_config, "host", host)

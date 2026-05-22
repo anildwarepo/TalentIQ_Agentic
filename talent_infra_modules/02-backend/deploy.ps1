@@ -30,7 +30,7 @@
 param(
     [string]$SubscriptionId,
     [string]$ResourceGroup,
-    [string]$Location = "eastus",
+    [string]$Location = "westus",
 
     [string]$AcrName,
     [string]$AcrResourceGroup,
@@ -141,7 +141,7 @@ if (-not [string]::IsNullOrEmpty($pgPrivateIp)) {
 
 $SubscriptionId = Get-ParameterValue -Name 'Subscription ID' -EnvVar 'AZURE_SUBSCRIPTION_ID' -Value $SubscriptionId
 $ResourceGroup = Get-ParameterValue -Name 'Resource group' -EnvVar 'AZURE_RESOURCE_GROUP' -Value $ResourceGroup
-$Location = Get-ParameterValue -Name 'Location' -EnvVar 'AZURE_LOCATION' -Value $Location -Default 'eastus'
+$Location = Get-ParameterValue -Name 'Location' -EnvVar 'AZURE_LOCATION' -Value $Location -Default 'westus'
 $AcrName = Get-ParameterValue -Name 'ACR name' -EnvVar 'AZURE_ACR_NAME' -Value $AcrName
 
 # Soft fallback: read 00-container-apps-env/.outputs.json when the ACA env

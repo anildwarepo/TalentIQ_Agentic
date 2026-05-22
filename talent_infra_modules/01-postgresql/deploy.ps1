@@ -39,7 +39,7 @@
     pwsh ./deploy.ps1 `
         -SubscriptionId e4718866-... `
         -ResourceGroup rg-talent-modular `
-        -Location eastus `
+        -Location westus `
         -AdminPassword (ConvertTo-SecureString 'P@ssw0rd!Strong!' -AsPlainText -Force) `
         -VnetName vnet-talent-shared `
         -VnetResourceGroup rg-network `
@@ -54,12 +54,17 @@
 param(
     [string]$SubscriptionId,
     [string]$ResourceGroup,
-    [string]$Location = "eastus",
+    [string]$Location = "westus",
     [string]$ServerName,
     [string]$AdminLogin = "pgadmin",
     [SecureString]$AdminPassword,
     [string]$PostgresqlVersion = "16",
-    [string]$SkuName = "Standard_B2s",
+    # SKU defaults mirror talent_infra_v2/infra/main.parameters.json — D-series
+    # is the only D/E size that is actually GeneralPurpose; Standard_B* sizes
+    # are Burstable tier and produce ServerEditionIncompatibleWithSkuSize when
+    # paired with -SkuTier GeneralPurpose. See decision
+    # 'postgres-sku-parity' (2026-05-21).
+    [string]$SkuName = "Standard_D4ds_v5",
     [string]$SkuTier = "GeneralPurpose",
     [int]$StorageSizeGB = 32,
     [bool]$EnablePrivateEndpoint = $true,
@@ -70,6 +75,17 @@ param(
     [string]$ClientIpAddress,
     [string]$UamiPrincipalIds,
     [switch]$EntraOnly,
+    # Self-heal flag for the
+    #   UpdatingPrivateDnsZoneIdOnPrivateDnsZoneConfigNotAllowed
+    # redeploy failure that surfaces when the PE already has a
+    # privateDnsZoneGroup wired to a zone that no longer matches the
+    # resolved $ExistingDnsZoneId (typical after the discover-and-reuse
+    # logic in Section 6b lands on top of artifacts from a pre-fix
+    # deploy). When set (or -Force is set), Section 7b deletes the
+    # stale zone group so Section 8's Bicep can recreate it cleanly.
+    # When NOT set, Section 7b refuses the destructive cleanup and
+    # exits with instructions. See Section 6c for detection logic.
+    [switch]$FixStaleDnsZoneGroup,
     [switch]$Force
 )
 
@@ -98,13 +114,16 @@ $SubscriptionId = Get-ParameterValue -Name "Subscription ID" `
 $ResourceGroup = Get-ParameterValue -Name "Resource group" `
     -Value $ResourceGroup -EnvVar "AZURE_RESOURCE_GROUP"
 $Location = Get-ParameterValue -Name "Location" `
-    -Value $Location -EnvVar "AZURE_LOCATION" -Default "eastus"
+    -Value $Location -EnvVar "AZURE_LOCATION" -Default "westus"
 $AdminLogin = Get-ParameterValue -Name "PG admin login" `
     -Value $AdminLogin -EnvVar "POSTGRESQL_ADMIN_LOGIN" -Default "pgadmin"
 $PostgresqlVersion = Get-ParameterValue -Name "PostgreSQL version" `
     -Value $PostgresqlVersion -EnvVar "POSTGRESQL_VERSION" -Default "16"
+# SKU defaults mirror talent_infra_v2/infra/main.parameters.json. Standard_D4ds_v5
+# is GeneralPurpose; Standard_B* sizes are Burstable and would require
+# -SkuTier Burstable. Env-var overrides still win.
 $SkuName = Get-ParameterValue -Name "SKU name" `
-    -Value $SkuName -EnvVar "POSTGRESQL_SKU_NAME" -Default "Standard_B2s"
+    -Value $SkuName -EnvVar "POSTGRESQL_SKU_NAME" -Default "Standard_D4ds_v5"
 $SkuTier = Get-ParameterValue -Name "SKU tier" `
     -Value $SkuTier -EnvVar "POSTGRESQL_SKU_TIER" -Default "GeneralPurpose"
 
@@ -216,6 +235,103 @@ Assert-PrerequisitesExist `
     -Checks $checks
 
 # ──────────────────────────────────────────────────────────────────────────
+# 6b. Auto-discover existing 'privatelink.postgres.database.azure.com' zone
+#
+# Azure rejects "a virtual network cannot be linked to multiple zones
+# with overlapping namespaces". If a zone of that name is already linked
+# to the target VNet (typical in shared-tenant subs where a network team
+# owns the zone), we must REUSE it instead of creating a duplicate. We
+# only discover when (a) PE is enabled, (b) the operator did NOT pass an
+# explicit -ExistingDnsZoneId or POSTGRESQL_DNS_ZONE_ID override — those
+# are trusted as-is.
+# ──────────────────────────────────────────────────────────────────────────
+$ExistingDnsZoneLinked = $true   # default matches Bicep — skip link creation
+if ($EnablePrivateEndpoint -and [string]::IsNullOrEmpty($ExistingDnsZoneId)) {
+    Write-Step "Discovering existing 'privatelink.postgres.database.azure.com' Private DNS zone"
+
+    $vnetId = "/subscriptions/$SubscriptionId/resourceGroups/$VnetResourceGroup/providers/Microsoft.Network/virtualNetworks/$VnetName"
+
+    $linkedZoneId = Get-LinkedPrivateDnsZoneId `
+        -SubscriptionId $SubscriptionId `
+        -ZoneName 'privatelink.postgres.database.azure.com' `
+        -VnetId $vnetId
+
+    if (-not [string]::IsNullOrEmpty($linkedZoneId)) {
+        $ExistingDnsZoneId = $linkedZoneId
+        $ExistingDnsZoneLinked = $true
+        Write-Success "Reusing existing linked Private DNS zone: $linkedZoneId"
+    } else {
+        $unlinkedZoneId = Get-PrivateDnsZoneIdByName `
+            -SubscriptionId $SubscriptionId `
+            -ZoneName 'privatelink.postgres.database.azure.com'
+        if (-not [string]::IsNullOrEmpty($unlinkedZoneId)) {
+            $ExistingDnsZoneId = $unlinkedZoneId
+            $ExistingDnsZoneLinked = $false
+            Write-Success "Reusing existing Private DNS zone (no current VNet link): $unlinkedZoneId"
+            Write-Info "Bicep will create the VNet link in the zone's resource group."
+        } else {
+            Write-Info "No existing zone found — Bicep will create one and link it."
+        }
+    }
+}
+
+# ──────────────────────────────────────────────────────────────────────────
+# 6c. Detect stale Private DNS zone group on existing PE
+#
+# Azure rejects in-place mutation of
+#   privateDnsZoneConfigs[*].properties.privateDnsZoneId
+# with UpdatingPrivateDnsZoneIdOnPrivateDnsZoneConfigNotAllowed.
+# This surfaces when a previous (pre-discover-and-reuse) deploy wired
+# the PE's 'default' zone group to a zone in $ResourceGroup, and the
+# current run resolves a different canonical zone in 6b. The only fix
+# is to delete the stale zone group so Section 8's Bicep recreates it.
+# We DETECT here (read-only) and stash $script:StaleZoneGroup for
+# Section 7's plan summary and Section 7b's repair step. Skipped if
+# PE is disabled, no zone was resolved, or the PE doesn't exist yet
+# (first run is a no-op).
+# ──────────────────────────────────────────────────────────────────────────
+$StaleZoneGroup = $null            # name of stale zone group to delete (e.g. 'default')
+$StaleZoneGroupOldZoneId = $null   # zone ID it currently (wrongly) points at
+$peName = "${ServerName}-pe"
+
+if ($EnablePrivateEndpoint -and -not [string]::IsNullOrEmpty($ExistingDnsZoneId)) {
+    Write-Step "Checking for stale Private DNS zone group on PE '$peName'"
+
+    $peJson = Invoke-Native {
+        az network private-endpoint show -g $ResourceGroup -n $peName -o json 2>$null
+    }
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($peJson)) {
+        $zgJson = Invoke-Native {
+            az network private-endpoint dns-zone-group list `
+                -g $ResourceGroup --endpoint-name $peName -o json 2>$null
+        }
+        $zgList = @()
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($zgJson)) {
+            try { $zgList = @($zgJson | ConvertFrom-Json) } catch { $zgList = @() }
+        }
+        foreach ($zg in $zgList) {
+            foreach ($cfg in @($zg.privateDnsZoneConfigs)) {
+                $currentZoneId = [string]$cfg.privateDnsZoneId
+                if (-not ($currentZoneId -ieq $ExistingDnsZoneId)) {
+                    $StaleZoneGroup = [string]$zg.name
+                    $StaleZoneGroupOldZoneId = $currentZoneId
+                    Write-Warn "Stale zone group '$($zg.name)' points at: $currentZoneId"
+                    Write-Warn "Resolved canonical zone is        : $ExistingDnsZoneId"
+                    Write-Warn "Azure forbids in-place repointing — zone group must be deleted and recreated."
+                    break
+                }
+            }
+            if ($null -ne $StaleZoneGroup) { break }
+        }
+        if ($null -eq $StaleZoneGroup) {
+            Write-Success "No stale zone group detected on PE '$peName'."
+        }
+    } else {
+        Write-Info "PE '$peName' not present yet (first run) — nothing to repair."
+    }
+}
+
+# ──────────────────────────────────────────────────────────────────────────
 # 7. Confirm
 # ──────────────────────────────────────────────────────────────────────────
 Write-Host ""
@@ -235,6 +351,14 @@ if ($EnablePrivateEndpoint) {
     Write-Host ("    VNet                  : {0}/{1}" -f $VnetResourceGroup, $VnetName)
     Write-Host ("    PE subnet             : {0}" -f $PeSubnetName)
     Write-Host ("    Existing DNS zone ID  : {0}" -f $(if ([string]::IsNullOrEmpty($ExistingDnsZoneId)) { '(create new)' } else { $ExistingDnsZoneId }))
+    if (-not [string]::IsNullOrEmpty($ExistingDnsZoneId)) {
+        Write-Host ("    DNS zone link status  : {0}" -f $(if ($ExistingDnsZoneLinked) { 'already linked (no link will be created)' } else { 'unlinked (Bicep will create the VNet link)' }))
+    }
+    if ($null -ne $StaleZoneGroup) {
+        $gate = if ($FixStaleDnsZoneGroup -or $Force) { 'auto-approved (-FixStaleDnsZoneGroup or -Force)' } else { 'BLOCKED — rerun with -FixStaleDnsZoneGroup' }
+        Write-Host ("    Stale PE zone group   : '{0}' WILL BE DELETED [{1}]" -f $StaleZoneGroup, $gate) -ForegroundColor Yellow
+        Write-Host ("      currently points at : {0}" -f $StaleZoneGroupOldZoneId) -ForegroundColor DarkYellow
+    }
 }
 Write-Host ("    Client IP firewall    : {0}" -f $(if ([string]::IsNullOrEmpty($ClientIpAddress)) { '(none)' } else { $ClientIpAddress }))
 Write-Host ("    Deployer admin (Entra): {0}" -f $account.user.name)
@@ -251,6 +375,138 @@ Write-Host ""
 if (-not (Confirm-Action -Message "Proceed with deployment?" -Force:$Force)) {
     Write-Warn "Aborted by user."
     exit 1
+}
+
+# ──────────────────────────────────────────────────────────────────────────
+# 7b. Repair stale Private DNS zone group on existing PE
+#
+# If Section 6c detected a mismatched privateDnsZoneConfig and the
+# operator opted in (via -FixStaleDnsZoneGroup or -Force), delete the
+# offending zone group so Section 8's Bicep recreates it pointing at
+# the canonical zone. Without this, az deployment group create fails
+# with UpdatingPrivateDnsZoneIdOnPrivateDnsZoneConfigNotAllowed.
+# ──────────────────────────────────────────────────────────────────────────
+if ($null -ne $StaleZoneGroup) {
+    if (-not ($FixStaleDnsZoneGroup -or $Force)) {
+        Write-Fail "Stale Private DNS zone group '$StaleZoneGroup' on PE '$peName' would block this deploy."
+        Write-Info  "Azure forbids in-place mutation of privateDnsZoneConfigs[*].privateDnsZoneId."
+        Write-Info  "Rerun with -FixStaleDnsZoneGroup (or -Force) to delete and recreate it."
+        exit 1
+    }
+
+    Write-Step "Deleting stale Private DNS zone group '$StaleZoneGroup' on PE '$peName'"
+    $delOut = Invoke-Native {
+        az network private-endpoint dns-zone-group delete `
+            -g $ResourceGroup `
+            --endpoint-name $peName `
+            -n $StaleZoneGroup `
+            --output none 2>&1
+    }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "Could not delete stale zone group (exit $LASTEXITCODE):"
+        $delOut | ForEach-Object { Write-Host "      $_" -ForegroundColor DarkRed }
+        exit 1
+    }
+    Write-Success "Stale zone group deleted. Bicep will recreate it pointing at the canonical zone."
+}
+
+# ──────────────────────────────────────────────────────────────────────────
+# 7c. Best-effort cleanup of the orphan Private DNS zone (when safe)
+#
+# When the stale zone group pointed at a zone that lives in
+# $ResourceGroup (i.e. NOT the canonical zone in the shared network RG),
+# that zone is almost certainly an orphan left over from the pre-fix
+# deploy. We offer to delete it ONLY when it is provably safe:
+#   * It lives in $ResourceGroup (separate from canonical).
+#   * It has zero VNet links (canonical zone owns linking).
+#   * It has at most one record set left (just the SOA after the
+#     zone-group delete in 7b reclaimed the A record).
+# Anything else → log a manual-cleanup hint and move on. Failure here
+# is non-fatal — Section 8's Bicep does not depend on this.
+# ──────────────────────────────────────────────────────────────────────────
+if ($null -ne $StaleZoneGroup -and ($FixStaleDnsZoneGroup -or $Force) -and -not [string]::IsNullOrEmpty($StaleZoneGroupOldZoneId)) {
+    $segments = $StaleZoneGroupOldZoneId.Split('/')
+    if ($segments.Length -ge 9) {
+        $orphanRg   = $segments[4]
+        $orphanName = $segments[8]
+        if ($orphanRg -ieq $ResourceGroup) {
+            Write-Step "Checking orphan Private DNS zone '$orphanName' in '$orphanRg'"
+            $zoneJson = Invoke-Native {
+                az network private-dns zone show -g $orphanRg -n $orphanName -o json 2>$null
+            }
+            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($zoneJson)) {
+                # Authoritative record-set check via `record-set list` —
+                # the `numberOfRecordSets` / `numberOfVirtualNetworkLinks`
+                # counters on `zone show` (and the listing returned by
+                # `link vnet list`) can lag the Azure RP's actual state
+                # by several minutes after a link delete. Trusting them
+                # for a delete decision led to a CannotDeleteResource
+                # error in the prior run because a freshly orphaned link
+                # was still held by the RP even though both list endpoints
+                # reported 0. We therefore:
+                #   1. Guard on real record-set contents (only SOA is OK).
+                #   2. Loop any visible VNet links and delete each by
+                #      name (delete is idempotent and authoritative).
+                #   3. Attempt the zone delete unconditionally — if Azure
+                #      still holds nested links we log a manual-cleanup
+                #      hint and move on (non-fatal; Bicep does not depend
+                #      on this cleanup).
+                $rsListJson = Invoke-Native {
+                    az network private-dns record-set list `
+                        -g $orphanRg --zone-name $orphanName `
+                        --query "[?type!='Microsoft.Network/privateDnsZones/SOA'].{n:name,t:type}" `
+                        -o json 2>$null
+                }
+                $nonSoaRecords = @()
+                if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($rsListJson)) {
+                    try { $nonSoaRecords = @($rsListJson | ConvertFrom-Json) } catch { $nonSoaRecords = @() }
+                }
+                if ($nonSoaRecords.Count -gt 0) {
+                    Write-Warn "Orphan zone has $($nonSoaRecords.Count) non-SOA record set(s) — leaving in place to avoid accidental data loss."
+                    Write-Info  "Inspect: az network private-dns record-set list -g $orphanRg --zone-name $orphanName -o table"
+                    Write-Info  "Delete manually only if safe: az network private-dns zone delete -g $orphanRg -n $orphanName --yes"
+                } else {
+                    Write-Step "Orphan zone has only SOA — clearing any visible VNet links"
+                    $linkListJson = Invoke-Native {
+                        az network private-dns link vnet list `
+                            -g $orphanRg --zone-name $orphanName `
+                            --query "[].name" -o json 2>$null
+                    }
+                    $linkNames = @()
+                    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($linkListJson)) {
+                        try { $linkNames = @($linkListJson | ConvertFrom-Json) } catch { $linkNames = @() }
+                    }
+                    Write-Info "Visible VNet links: $($linkNames.Count) ($(if ($linkNames.Count -gt 0) { $linkNames -join ', ' } else { 'none' }))"
+                    foreach ($lname in $linkNames) {
+                        Write-Info "  Deleting link '$lname' (idempotent)"
+                        Invoke-Native {
+                            az network private-dns link vnet delete `
+                                -g $orphanRg --zone-name $orphanName `
+                                -n $lname --yes --output none 2>$null
+                        } | Out-Null
+                    }
+                    Write-Step "Attempting orphan zone delete"
+                    $delZoneOut = Invoke-Native {
+                        az network private-dns zone delete `
+                            -g $orphanRg -n $orphanName `
+                            --yes --output none 2>&1
+                    }
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Success "Orphan zone '$orphanName' deleted from '$orphanRg'."
+                    } else {
+                        Write-Warn "Orphan zone delete failed (exit $LASTEXITCODE). Non-fatal — Bicep will still succeed."
+                        $delZoneOut | ForEach-Object { Write-Host "      $_" -ForegroundColor DarkYellow }
+                        Write-Info "Manual cleanup (Azure RP cache can lag — retry after a few minutes):"
+                        Write-Info "  az network private-dns link vnet list -g $orphanRg --zone-name $orphanName -o table"
+                        Write-Info "  # for each link: az network private-dns link vnet delete -g $orphanRg --zone-name $orphanName -n <name> --yes"
+                        Write-Info "  az network private-dns zone delete -g $orphanRg -n $orphanName --yes"
+                    }
+                }
+            } else {
+                Write-Info "Orphan zone not found (already deleted?) — nothing to clean up."
+            }
+        }
+    }
 }
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -287,8 +543,20 @@ if ($EnablePrivateEndpoint) {
     $overrides += "peSubnetName=$PeSubnetName"
     if (-not [string]::IsNullOrEmpty($ExistingDnsZoneId)) {
         $overrides += "existingPrivateDnsZoneId=$ExistingDnsZoneId"
+        $overrides += "existingPrivateDnsZoneLinked=$($ExistingDnsZoneLinked.ToString().ToLower())"
     }
 }
+
+# Capture stdout (JSON) and stderr SEPARATELY. Merging them with 2>&1
+# breaks ConvertFrom-Json on success because `az` writes incidental
+# notices (e.g. "A new Bicep release is available") and ARM diagnostic
+# warnings to stderr, which then interleave with the JSON body on stdout.
+# Force `-o json` defensively in case AZURE_DEFAULTS_OUTPUT is set to
+# table/yaml in the operator's environment.
+$logDir = Join-Path $scriptDir ".deploy-logs"
+if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
+$logStamp  = Get-Date -Format 'yyyyMMdd-HHmmss'
+$stderrLog = Join-Path $logDir "$logStamp-bicep-stderr.txt"
 
 $deployOut = Invoke-Native {
     az deployment group create `
@@ -297,22 +565,53 @@ $deployOut = Invoke-Native {
         --template-file $bicepFile `
         --parameters "@$paramsFile" `
         --parameters $overrides `
-        --output json 2>&1
+        --output json 2>$stderrLog
 }
 # Scrub the password from anything we might log on failure.
 $plainPw = $null
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Fail "Bicep deployment FAILED (exit $LASTEXITCODE). Full output below:"
-    $deployOut | ForEach-Object { Write-Host "      $_" -ForegroundColor DarkRed }
+    Write-Fail "Bicep deployment FAILED (exit $LASTEXITCODE)."
+    if (Test-Path $stderrLog) {
+        Write-Info "stderr captured to: $stderrLog"
+        Get-Content $stderrLog | ForEach-Object { Write-Host "      $_" -ForegroundColor DarkRed }
+    }
+    if ($deployOut) {
+        $stdoutLog = Join-Path $logDir "$logStamp-bicep-stdout.txt"
+        ($deployOut -join "`n") | Out-File -FilePath $stdoutLog -Encoding utf8
+        Write-Info "stdout captured to: $stdoutLog"
+    }
     exit 1
 }
 Write-Success "Bicep deployment succeeded ($deploymentName)"
 
-try { $deployJson = ($deployOut -join "`n") | ConvertFrom-Json } catch {
-    Write-Fail "Could not parse az deployment output as JSON."
+# Validate non-empty BEFORE parsing — an empty stdout on a success exit
+# is itself a bug worth surfacing rather than silently NPE'ing below.
+$deployRaw = ($deployOut -join "`n").Trim()
+if ([string]::IsNullOrWhiteSpace($deployRaw)) {
+    Write-Fail "Bicep deploy succeeded (exit 0) but produced empty stdout — cannot read outputs."
+    if (Test-Path $stderrLog) {
+        Write-Info "stderr captured to: $stderrLog"
+    }
     exit 1
 }
+try {
+    $deployJson = $deployRaw | ConvertFrom-Json
+} catch {
+    # Dump raw stdout to disk for post-mortem; DO NOT echo inline (could
+    # be hundreds of KB and may contain whatever polluted the stream).
+    $stdoutLog = Join-Path $logDir "$logStamp-bicep-stdout-unparseable.txt"
+    $deployRaw | Out-File -FilePath $stdoutLog -Encoding utf8
+    Write-Fail "Could not parse az deployment output as JSON."
+    Write-Info "Raw stdout dumped to: $stdoutLog"
+    if (Test-Path $stderrLog) {
+        Write-Info "stderr captured to:    $stderrLog"
+    }
+    exit 1
+}
+# Success path: stderr log only holds the incidental Bicep notice (if any).
+# Remove it to keep .deploy-logs/ from accumulating noise.
+if (Test-Path $stderrLog) { Remove-Item $stderrLog -Force -ErrorAction SilentlyContinue }
 $bicepOutputs   = $deployJson.properties.outputs
 $serverFqdn     = $bicepOutputs.serverFqdn.value
 $serverId       = $bicepOutputs.serverId.value

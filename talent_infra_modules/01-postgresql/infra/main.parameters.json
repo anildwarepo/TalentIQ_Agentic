@@ -4,7 +4,7 @@
   "parameters": {
     "administratorLogin": { "value": "pgadmin" },
     "postgresqlVersion": { "value": "16" },
-    "skuName": { "value": "Standard_B2s" },
+    "skuName": { "value": "Standard_D4ds_v5" },
     "skuTier": { "value": "GeneralPurpose" },
     "storageSizeGB": { "value": 32 },
     "backupRetentionDays": { "value": 7 },

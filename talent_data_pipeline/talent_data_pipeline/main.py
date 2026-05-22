@@ -9,7 +9,7 @@ import time
 
 import psycopg2
 
-from talent_data_pipeline.config import db_config, pipeline_config
+from talent_data_pipeline.config import apply_host_override, db_config, pipeline_config
 from talent_data_pipeline.pg_entra import pg_connect
 from talent_data_pipeline.connectivity_test import run_connectivity_test
 from talent_data_pipeline.schema.create_relational_tables import run_schema_creation
@@ -27,6 +27,62 @@ from talent_data_pipeline.loaders.vector_loader import VectorLoader
 from talent_data_pipeline.loaders.fts_loader import FTSLoader
 from talent_data_pipeline.loaders.entity_search_loader import EntitySearchLoader
 from talent_data_pipeline.validate import run_validation
+
+
+_VALID_MODES = ("env", "manual")
+_MAX_HOST_PROMPT_ATTEMPTS = 3
+
+
+def _resolve_mode(cli_mode: str | None) -> str:
+    """Resolve the dataload mode using the documented precedence.
+
+    Order: ``--mode`` CLI flag > ``DATALOAD_MODE`` env var > default ``"env"``.
+    Invalid env-var values produce a fatal error rather than silently falling
+    back, so an automation typo does not accidentally trigger a prompt path
+    (or skip one that was expected).
+    """
+    if cli_mode is not None:
+        return cli_mode
+    env_mode = os.getenv("DATALOAD_MODE", "").strip().lower()
+    if env_mode:
+        if env_mode not in _VALID_MODES:
+            print(
+                f"FATAL: DATALOAD_MODE={env_mode!r} is invalid. "
+                f"Expected one of: {', '.join(_VALID_MODES)}."
+            )
+            sys.exit(2)
+        return env_mode
+    return "env"
+
+
+def _resolve_manual_host() -> str:
+    """Prompt the operator for the PG hostname.
+
+    Shows the current ``PGHOST`` value (if any) as the default in square
+    brackets. Pressing Enter accepts the default; otherwise the typed value
+    (whitespace-trimmed) is used. Re-prompts on empty input when no default
+    is available, up to ``_MAX_HOST_PROMPT_ATTEMPTS`` total attempts before
+    exiting non-zero.
+    """
+    current = os.getenv("PGHOST", "").strip()
+    prompt_suffix = f" [{current}]" if current else ""
+    for attempt in range(_MAX_HOST_PROMPT_ATTEMPTS):
+        raw = input(f"PG host{prompt_suffix}: ").strip()
+        if raw:
+            return raw
+        if current:
+            return current
+        remaining = _MAX_HOST_PROMPT_ATTEMPTS - attempt - 1
+        if remaining > 0:
+            print(
+                f"  ERROR: empty input and no PGHOST default in .env. "
+                f"({remaining} attempt(s) remaining)"
+            )
+    print(
+        "FATAL: no PG host provided after "
+        f"{_MAX_HOST_PROMPT_ATTEMPTS} attempts. Exiting."
+    )
+    sys.exit(2)
 
 
 def _data_already_loaded() -> tuple[bool, dict[str, int]]:
@@ -317,6 +373,42 @@ if __name__ == "__main__":
             "Can also be enabled via the FORCE_REGENERATE environment variable."
         ),
     )
+    parser.add_argument(
+        "--mode",
+        choices=("env", "manual"),
+        default=None,
+        help=(
+            "Dataload mode selecting how the PostgreSQL host is resolved. "
+            "'env' (default) reads PGHOST and all other connection settings "
+            "from .env / environment with no prompts. 'manual' prompts the "
+            "operator interactively for the PG hostname at startup (everything "
+            "else still comes from .env). Resolution order: --mode flag > "
+            "DATALOAD_MODE env var > 'env'."
+        ),
+    )
     args = parser.parse_args()
+
+    mode = _resolve_mode(args.mode)
+    if mode == "manual":
+        if not sys.stdin.isatty():
+            print(
+                "FATAL: --mode manual requires an interactive terminal "
+                "(stdin is not a TTY)."
+            )
+            print(
+                "For non-interactive automation, use --mode env or set "
+                "DATALOAD_MODE=env."
+            )
+            sys.exit(2)
+        override_host = _resolve_manual_host()
+        apply_host_override(override_host)
+        host_origin = "overridden via prompt"
+    else:
+        host_origin = "from .env"
+
+    print(
+        f"[pipeline] mode={mode}  host={db_config.host}  ({host_origin})"
+    )
+
     main(force=args.force)
 

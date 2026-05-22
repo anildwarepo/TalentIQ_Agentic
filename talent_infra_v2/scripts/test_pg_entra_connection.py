@@ -6,11 +6,23 @@ PostgreSQL password to connect to an Azure Database for PostgreSQL Flexible
 Server. Supports both interactive sign-in (az CLI / VS Code) and
 managed identities, by using `DefaultAzureCredential`.
 
+Path-aware and PRIVATE-BY-DEFAULT:
+    Before connecting, the script resolves the server FQDN via the system
+    resolver and classifies the first returned address as PRIVATE (RFC1918
+    10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16; RFC6598 CGNAT 100.64.0.0/10)
+    or PUBLIC. By default a public-IP resolution fails fast with an
+    explanatory message; only private resolution proceeds to the actual
+    connection. "Private path" means the client is either VNet-resident OR
+    has the Private DNS zone (`privatelink.postgres.database.azure.com`)
+    configured for its resolver -- otherwise the public PaaS IP is returned
+    and the connection silently traverses the server-level firewall, which
+    is what this gate exists to prevent.
+
 References:
 - https://learn.microsoft.com/azure/postgresql/security/security-entra-configure
 
 Usage:
-    # Use the current `az login` user (default)
+    # Use the current `az login` user (default; private path required)
     python test_pg_entra_connection.py
 
     # Override host / db / user
@@ -24,17 +36,27 @@ Usage:
         --client-id <UAMI clientId> \\
         --user <MSI display name registered as Entra admin>
 
+    # Bypass private-only gate (dev path through public firewall)
+    python test_pg_entra_connection.py --allow-public
+
+    # Diagnose network path only (resolve + classify + exit; no token, no
+    # connection -- fast network diagnostic that does not burn an Entra token)
+    python test_pg_entra_connection.py --show-path-only
+
 Exit codes:
-    0  success
-    1  connection / auth failure
+    0  success (or successful classification when --show-path-only)
+    1  connection / auth / path failure (incl. public resolution without
+       --allow-public, or DNS failure)
     2  invalid arguments
 """
 
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
+import socket
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -61,6 +83,75 @@ def _red(msg: str) -> str:
 
 def _cyan(msg: str) -> str:
     return f"\033[96m{msg}\033[0m"
+
+
+def _yellow(msg: str) -> str:
+    return f"\033[93m{msg}\033[0m"
+
+
+def resolve_host(host: str, port: int) -> list[str]:
+    """Resolve `host` via the system resolver and return unique IPs.
+
+    The system resolver implicitly walks any CNAME chain (e.g.
+    `<srv>.postgres.database.azure.com` ->
+    `<srv>.privatelink.postgres.database.azure.com` -> A record). We take
+    whatever it returns; the first IP is the one we classify.
+
+    Raises `socket.gaierror` on DNS failure (caller decides what to do).
+    """
+    infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    seen: set[str] = set()
+    ips: list[str] = []
+    for info in infos:
+        ip = info[4][0]
+        if ip not in seen:
+            seen.add(ip)
+            ips.append(ip)
+    return ips
+
+
+def classify_ip(ip: str) -> str:
+    """Classify `ip` as 'private', 'public', or 'other'.
+
+    'private' covers RFC1918 (10/8, 172.16/12, 192.168/16) AND RFC6598 CGNAT
+    (100.64/10) -- both fall under `ipaddress.is_private`. Loopback,
+    link-local, multicast, and unspecified are treated as 'other' (they
+    should not appear here; if they do, refuse to connect).
+    """
+    addr = ipaddress.ip_address(ip)
+    if (
+        addr.is_loopback
+        or addr.is_link_local
+        or addr.is_multicast
+        or addr.is_unspecified
+    ):
+        return "other"
+    if addr.is_private:
+        return "private"
+    return "public"
+
+
+def _print_path_indicator(ips: list[str], classification: str) -> None:
+    """Print a single line stating the resolved IP(s) and the network path."""
+    primary = ips[0]
+    extras = (
+        f" (+ {len(ips) - 1} more: {', '.join(ips[1:])})" if len(ips) > 1 else ""
+    )
+    if classification == "private":
+        print(_green(
+            f"    Resolved: {primary}{extras} "
+            f"\u2014 PRIVATE path (Private DNS / VNet-resident client) \u2713"
+        ))
+    elif classification == "public":
+        print(_red(
+            f"    Resolved: {primary}{extras} "
+            f"\u2014 PUBLIC path (server-level firewall) \u26A0"
+        ))
+    else:
+        print(_red(
+            f"    Resolved: {primary}{extras} "
+            f"\u2014 OTHER path (loopback/link-local/multicast) \u2717"
+        ))
 
 
 def _resolve_user_from_az_cli() -> str | None:
@@ -107,6 +198,7 @@ def test_connection(
     user: str,
     token: str,
     sslmode: str = "require",
+    resolved_classification: str = "unknown",
 ) -> int:
     """Open a connection and run a few sanity queries. Returns exit code."""
     print(_cyan(f"==> Connecting to {host}:{port}/{dbname} as '{user}' (sslmode={sslmode})"))
@@ -123,7 +215,7 @@ def test_connection(
         )
     except psycopg2.OperationalError as exc:
         print(_red(f"    FAILED: {exc}"))
-        _diagnose(str(exc), user)
+        _diagnose(str(exc), user, resolved_classification)
         return 1
 
     try:
@@ -157,7 +249,7 @@ def test_connection(
     return 0
 
 
-def _diagnose(err: str, user: str) -> None:
+def _diagnose(err: str, user: str, resolved_classification: str = "unknown") -> None:
     """Print actionable hints based on the libpq error text."""
     e = err.lower()
     print()
@@ -185,6 +277,12 @@ def _diagnose(err: str, user: str) -> None:
             "    * For private access, ensure outbound to the `AzureActiveDirectory`\n"
             "      service tag is allowed (needed for token validation by the server)."
         )
+        if resolved_classification == "public":
+            print(
+                "    * You resolved to a PUBLIC IP -- the server-level firewall may not\n"
+                "      include your client IP. Check with:\n"
+                "        az postgres flexible-server firewall-rule list -g <rg> -n <server>"
+            )
     if "ssl" in e:
         print("    * SSL is required. Make sure sslmode=require (or stronger).")
 
@@ -209,9 +307,61 @@ def main(argv: list[str] | None = None) -> int:
              "ManagedIdentityCredential instead of DefaultAzureCredential.",
     )
     p.add_argument("--sslmode", default=os.getenv("PGSSLMODE", "require"))
+    p.add_argument(
+        "--allow-public",
+        action="store_true",
+        help="Allow the connection to proceed when the host resolves to a public IP "
+             "(server-level firewall path). Default: false -- fail fast on public.",
+    )
+    p.add_argument(
+        "--show-path-only",
+        action="store_true",
+        help="Resolve the host, classify the network path (private/public), print, and exit. "
+             "Skips Entra token acquisition and the actual PG connection. "
+             "Exit 0 on successful classification, 1 on DNS failure.",
+    )
     args = p.parse_args(argv)
 
-    # Resolve username if not supplied
+    # --- Path resolution + classification (always runs, even for --show-path-only) ---
+    print(_cyan(f"==> Resolving {args.host}:{args.port}"))
+    try:
+        ips = resolve_host(args.host, args.port)
+    except socket.gaierror as exc:
+        print(_red(f"ERROR: Could not resolve host '{args.host}': {exc}"))
+        return 1
+
+    if not ips:
+        print(_red(f"ERROR: No A/AAAA records returned for '{args.host}'."))
+        return 1
+
+    classification = classify_ip(ips[0])
+    _print_path_indicator(ips, classification)
+
+    if args.show_path_only:
+        return 0
+
+    if classification == "other":
+        print(_red(
+            f"ERROR: Resolved to a non-routable IP ({ips[0]}) -- loopback/link-local/multicast.\n"
+            "       Refusing to connect."
+        ))
+        return 1
+
+    if classification == "public" and not args.allow_public:
+        print(_red(
+            f"ERROR: Resolved to a PUBLIC IP ({ips[0]}). This server should be reached privately.\n"
+            "       You are not VNet-resident or your DNS isn't pointing at the Private DNS zone.\n"
+            "       To bypass intentionally (e.g. dev connection through public firewall),\n"
+            "       pass --allow-public."
+        ))
+        return 1
+
+    if classification == "public" and args.allow_public:
+        print(_yellow(
+            f"    WARNING: proceeding over PUBLIC path ({ips[0]}) because --allow-public was set."
+        ))
+
+    # --- Username resolution ---
     user = args.user or _resolve_user_from_az_cli()
     if not user:
         print(_red(
@@ -233,6 +383,7 @@ def main(argv: list[str] | None = None) -> int:
         user=user,
         token=token,
         sslmode=args.sslmode,
+        resolved_classification=classification,
     )
 
 

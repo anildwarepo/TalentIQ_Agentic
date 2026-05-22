@@ -65,7 +65,7 @@ and `03-frontend`.
 |----------------------------|----------------------------------|----------------------------------------|-------|
 | SubscriptionId             | `AZURE_SUBSCRIPTION_ID`          | active `az` account                    | Required. |
 | ResourceGroup              | `AZURE_RESOURCE_GROUP`           | —                                      | Must exist. Hosts the ACA env. |
-| Location                   | `AZURE_LOCATION`                 | `eastus`                               | Region for the env + LA workspace. |
+| Location                   | `AZURE_LOCATION`                 | `westus`                               | Region for the env + LA workspace. **Must match the region of `-VnetName`** — Azure rejects an env in region X with a subnet in region Y. |
 | EnvName                    | `AZURE_ACA_ENV_NAME`             | `cae-<5-char SHA256(subId\|rg\|loc)>`  | 2-32 chars, region-unique. Deterministic default ⇒ idempotent re-runs. |
 | VnetResourceGroup          | `AZURE_VNET_RESOURCE_GROUP`      | = ResourceGroup                        | RG of the VNet. |
 | VnetName                   | `AZURE_VNET_NAME`                | —                                      | Required. Must exist. |

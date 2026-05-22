@@ -32,7 +32,7 @@
     Defaults to AZURE_RESOURCE_GROUP env var. Required.
 
 .PARAMETER Location
-    Azure region. Defaults to AZURE_LOCATION env var or 'eastus'.
+    Azure region. Defaults to AZURE_LOCATION env var or 'westus'. (Canonical region for this project — VNet 'vnet-westus' lives in westus.)
 
 .PARAMETER EnvName
     Container Apps Environment name (2-32 chars). Defaults to
@@ -120,7 +120,9 @@ if ([string]::IsNullOrWhiteSpace($SubscriptionId)) {
 
 $ResourceGroup = Get-ParameterValue -Name 'Resource group' -EnvVar 'AZURE_RESOURCE_GROUP' -Value $ResourceGroup
 if ([string]::IsNullOrWhiteSpace($Location)) {
-    $Location = if ($env:AZURE_LOCATION) { $env:AZURE_LOCATION } else { 'eastus' }
+    # Canonical region for this project is westus (VNet 'vnet-westus', talent_infra_v2 baseline).
+    # Override via -Location <region> or $env:AZURE_LOCATION when targeting a different region.
+    $Location = if ($env:AZURE_LOCATION) { $env:AZURE_LOCATION } else { 'westus' }
 }
 $VnetResourceGroup = Get-ParameterValue -Name 'VNet resource group' -EnvVar 'AZURE_VNET_RESOURCE_GROUP' -Value $VnetResourceGroup -Default $ResourceGroup
 $VnetName          = Get-ParameterValue -Name 'VNet name' -EnvVar 'AZURE_VNET_NAME' -Value $VnetName
@@ -352,6 +354,13 @@ if ($createSubnet) {
             --parameters vnetName=$VnetName subnetName=$AcaSubnetName addressPrefix=$AcaSubnetAddressPrefix `
             -o json
     } | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "Subnet sidecar deployment FAILED (exit $LASTEXITCODE). az error printed above. Common causes:"
+        Write-Info "  * VNet '$VnetName' is in a different region than -Location '$Location' (ACA infra subnet must live inside a VNet in the same region as the env)."
+        Write-Info "  * Requested CIDR $AcaSubnetAddressPrefix overlaps an existing subnet in '$VnetName'."
+        Write-Info "  * Caller lacks Microsoft.Network/virtualNetworks/subnets/write on RG '$VnetResourceGroup'."
+        exit 1
+    }
     Write-Success "Subnet '$AcaSubnetName' created."
 }
 
@@ -364,6 +373,7 @@ $subnetId = az network vnet subnet show `
     --query id -o tsv
 if ([string]::IsNullOrWhiteSpace($subnetId)) {
     Write-Fail "Could not resolve subnet ID for '$AcaSubnetName' after creation/lookup."
+    exit 1
 }
 Write-Info "Resolved subnet ID: $subnetId"
 
@@ -391,8 +401,47 @@ $deploymentJson = Invoke-Native {
         -o json
 }
 
-$deployment = $deploymentJson | ConvertFrom-Json
-$out        = $deployment.properties.outputs
+# ----------------------------------------------------------------------------
+# 8a. Validate the deployment ACTUALLY succeeded before claiming so.
+#     Invoke-Native deliberately runs with $ErrorActionPreference='Continue'
+#     so az non-zero exits do not blow up the surrounding script — the caller
+#     (this code) is responsible for inspecting $LASTEXITCODE. Skipping these
+#     checks is how a failed `az deployment group create` (e.g. region
+#     mismatch between the ACA env and its VNet subnet) silently fell through
+#     to a green "deployment complete" banner with an all-null .outputs.json.
+# ----------------------------------------------------------------------------
+if ($LASTEXITCODE -ne 0) {
+    Write-Fail "az deployment group create FAILED (exit $LASTEXITCODE). Azure error printed above."
+    Write-Info "Inspect: az deployment group show -g $ResourceGroup -n <name> --query properties.error"
+    Write-Info "Common cause: VNet '$VnetName' is in a different region than -Location '$Location'."
+    Write-Info "             Either pass -Location <vnet-region> or set `$env:AZURE_LOCATION=<vnet-region> before re-running."
+    exit 1
+}
+if ([string]::IsNullOrWhiteSpace($deploymentJson)) {
+    Write-Fail "az deployment group create returned empty output despite exit code 0. Treating as failure."
+    exit 1
+}
+try {
+    $deployment = $deploymentJson | ConvertFrom-Json -ErrorAction Stop
+} catch {
+    Write-Fail "Could not parse az deployment output as JSON: $($_.Exception.Message)"
+    exit 1
+}
+if ($null -eq $deployment -or $null -eq $deployment.properties) {
+    Write-Fail "az deployment output missing 'properties' envelope. Treating as failure."
+    exit 1
+}
+if ($deployment.properties.provisioningState -ne 'Succeeded') {
+    $state = $deployment.properties.provisioningState
+    Write-Fail "Deployment did not reach Succeeded (provisioningState: $state)."
+    exit 1
+}
+$out = $deployment.properties.outputs
+if ($null -eq $out -or $null -eq $out.containerAppsEnvName -or [string]::IsNullOrWhiteSpace($out.containerAppsEnvName.value)) {
+    Write-Fail "Deployment reported Succeeded but main.bicep returned no outputs (or containerAppsEnvName is empty). Refusing to write a hand-off file with null values."
+    exit 1
+}
+Write-Success "Container Apps Environment deployment succeeded ($($out.containerAppsEnvName.value))."
 
 # -----------------------------------------------------------------------------
 # 9. Emit .outputs.json hand-off for 02-backend & 03-frontend

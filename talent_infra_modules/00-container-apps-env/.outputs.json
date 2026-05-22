@@ -1,0 +1,15 @@
+{
+  "containerAppsEnvName": "cae-9a6d3",
+  "containerAppsEnvId": "/subscriptions/e4718866-4e88-411f-a0b8-10c8051dc165/resourceGroups/rg-talent-devtest-11/providers/Microsoft.App/managedEnvironments/cae-9a6d3",
+  "containerAppsEnvResourceGroup": "rg-talent-devtest-11",
+  "containerAppsEnvDefaultDomain": "jollyground-2bba8e12.westus.azurecontainerapps.io",
+  "containerAppsEnvStaticIp": "20.253.147.173",
+  "acaSubnetId": "/subscriptions/e4718866-4e88-411f-a0b8-10c8051dc165/resourceGroups/vnet/providers/Microsoft.Network/virtualNetworks/vnet-westus/subnets/talent-subnet",
+  "acaSubnetName": "talent-subnet",
+  "vnetName": "vnet-westus",
+  "vnetResourceGroup": "vnet",
+  "logAnalyticsWorkspaceId": "/subscriptions/e4718866-4e88-411f-a0b8-10c8051dc165/resourceGroups/rg-talent-devtest-11/providers/Microsoft.OperationalInsights/workspaces/cae-9a6d3-logs",
+  "internalOnly": false,
+  "location": "westus",
+  "subscriptionId": "e4718866-4e88-411f-a0b8-10c8051dc165"
+}

@@ -18,6 +18,36 @@ uv run --package talent_data_pipeline python -m talent_data_pipeline.main
 5. Index creation (DiskANN, GIN, B-tree, AGE property indexes)
 6. Validation (counts, index verification)
 
+### Dataload mode (`--mode env|manual`)
+
+By default the pipeline reads every PostgreSQL connection field (host, port, database, user, sslmode) from `app_config/.env` and runs non-interactively. Use `--mode manual` when you need to point a single run at a different PG host (e.g. a freshly-deployed devtest server) without editing `.env`. Only the **host** is overridable — port, database, user, and sslmode still come from `.env`, and the Entra ID auth path is unchanged (see [Authentication](#authentication)).
+
+```bash
+# Default — reads PGHOST from .env, no prompts. Identical to omitting the flag.
+uv run --package talent_data_pipeline python -m talent_data_pipeline.main --mode env
+
+# Interactive — prompts "PG host [<current PGHOST>]: " at startup.
+# Press Enter to accept the default; type a new host to override for this run only.
+uv run --package talent_data_pipeline python -m talent_data_pipeline.main --mode manual
+```
+
+The non-interactive fallback is the `DATALOAD_MODE` env var (CLI flag wins when both are set):
+
+```bash
+DATALOAD_MODE=manual uv run --package talent_data_pipeline python -m talent_data_pipeline.main
+```
+
+Precedence: `--mode` CLI flag > `DATALOAD_MODE` env var > default (`env`). An invalid `DATALOAD_MODE` value (typo) exits 2 — typos in automation must not silently re-route the control path.
+
+**Non-TTY guard:** `--mode manual` without an interactive stdin exits 2 immediately with a redirect message to `--mode env` / `DATALOAD_MODE=env`. CI pipelines can never hang on `input()`.
+
+A banner prints once before any DB connection opens so the chosen mode and effective host are visible in logs:
+
+```
+[pipeline] mode=env     host=<host>  (from .env)
+[pipeline] mode=manual  host=<host>  (overridden via prompt)
+```
+
 ## Incremental Updates
 
 When you only need to add new entities or refresh specific components, run targeted scripts instead of the full pipeline.
@@ -198,11 +228,19 @@ All config from `app_config/.env`:
 PGHOST=...          # PostgreSQL host
 PGPORT=5432         # PostgreSQL port
 PGDATABASE=postgres # Database name
-PGUSER=...          # Database user
-PGPASSWORD=...      # Database password (or use managed identity)
+PGUSER=...          # Database user (Entra ID principal — see Authentication below)
 PGSSLMODE=require   # SSL mode
 GRAPH_NAME=talent_graph_dev  # AGE graph name
 ```
+
+### Authentication
+
+The pipeline uses **Entra ID auth only** via `azure.identity.DefaultAzureCredential`. There is no password fallback — `PGPASSWORD` is **not read** and must not be set. On every physical connect the pipeline acquires a fresh Entra bearer token for the PostgreSQL scope `https://ossrdbms-aad.database.windows.net/.default` and injects it as the connection password; `PGUSER` is the Entra principal name (user, group, or managed-identity name) that has been granted a PG role on the target server.
+
+- **Locally:** requires `az login` as a principal that has been granted a PG role on the target server (`az login` → `az account show` to confirm). The local credential chain explicitly **excludes** the managed-identity probe, so there is no 5-second IMDS timeout on every connect when running outside Azure.
+- **In Azure (Container Apps):** uses the container app's User-Assigned Managed Identity (UAMI) via IMDS automatically — no `az login`, no env vars beyond the standard `AZURE_CLIENT_ID` hint that `DefaultAzureCredential` honors.
+- **Override (rarely needed):** set `AZURE_FORCE_FULL_CREDENTIAL_CHAIN=1` to re-enable the full `DefaultAzureCredential` chain locally (slower; only useful when debugging a non-default credential source such as VS Code or Azure CLI extensions).
+- **Token lifetime:** Entra tokens have ~60 min TTL. The pool refreshes the token per new physical connection — long-lived pooled connections do not need mid-stream refresh because the token is only validated at PG's auth handshake.
 
 ## Troubleshooting
 
@@ -220,3 +258,6 @@ create_relational_tables()
 
 ### Full pipeline crashed mid-load
 The graph loader uses MERGE (idempotent) — re-running won't duplicate data. But it will re-process everything from the beginning. Use incremental scripts for just the missing parts.
+
+### `FATAL: password authentication failed for user …` / no Entra token
+You're not `az login`'d, or your principal isn't a PG role on the target server. Confirm your identity with `az account show`, then run `talent_data_pipeline/connectivity_test.py` (or the v2 infra `test_pg_entra_connection.py`) to verify Entra → PG end-to-end. If you need to point at a different PG server temporarily without editing `.env`, use `--mode manual` (see [Dataload mode](#dataload-mode---mode-envmanual)).

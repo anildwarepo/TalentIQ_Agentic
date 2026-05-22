@@ -40,10 +40,10 @@ param administratorLoginPassword string
 ])
 param postgresqlVersion string = '16'
 
-@description('SKU name (e.g. Standard_B2s, Standard_D2s_v3).')
-param skuName string = 'Standard_B2s'
+@description('SKU name. Must be compatible with skuTier: Burstable=Standard_B* (e.g. Standard_B2ms), GeneralPurpose=Standard_D*ds_v4/v5 (e.g. Standard_D4ds_v5), MemoryOptimized=Standard_E*ds_v4/v5. Default mirrors talent_infra_v2/infra/main.parameters.json.')
+param skuName string = 'Standard_D4ds_v5'
 
-@description('SKU tier.')
+@description('SKU tier. Must match skuName family — Burstable for Standard_B*, GeneralPurpose for Standard_D*, MemoryOptimized for Standard_E*. Mismatched pairs produce ServerEditionIncompatibleWithSkuSize at deploy time.')
 @allowed([
   'Burstable'
   'GeneralPurpose'
@@ -84,6 +84,9 @@ param peSubnetName string = 'pe-subnet'
 
 @description('Optional resource ID of an existing privatelink.postgres.database.azure.com DNS zone. Empty = create a new zone and link it to the VNet.')
 param existingPrivateDnsZoneId string = ''
+
+@description('Whether the existing Private DNS zone (when existingPrivateDnsZoneId is set) is already linked to the target VNet. When true (default), no link is created. When false, the private-endpoint module creates the link in the existing zone\'s RG via a nested module. Ignored when existingPrivateDnsZoneId is empty.')
+param existingPrivateDnsZoneLinked bool = true
 
 @description('Tags applied to all resources.')
 param tags object = {}
@@ -134,6 +137,7 @@ module postgresqlPrivateEndpoint './modules/private-endpoint.bicep' = if (enable
     groupIds: ['postgresqlServer']
     privateDnsZoneName: 'privatelink.postgres.database.azure.com'
     existingPrivateDnsZoneId: existingPrivateDnsZoneId
+    existingPrivateDnsZoneLinked: existingPrivateDnsZoneLinked
     vnetId: vnet!.id
     vnetName: vnetName
     tags: tags
