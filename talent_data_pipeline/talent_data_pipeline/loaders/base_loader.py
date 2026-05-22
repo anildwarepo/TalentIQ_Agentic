@@ -10,6 +10,7 @@ import psycopg2
 from psycopg2 import pool
 
 from talent_data_pipeline.config import db_config, pipeline_config
+from talent_data_pipeline.pg_entra import EntraThreadedConnectionPool
 
 
 class BaseLoader:
@@ -20,7 +21,7 @@ class BaseLoader:
 
     def _get_pool(self) -> pool.ThreadedConnectionPool:
         if self._pool is None:
-            self._pool = pool.ThreadedConnectionPool(
+            self._pool = EntraThreadedConnectionPool(
                 minconn=db_config.pool_min,
                 maxconn=db_config.pool_max,
                 **db_config.connection_dict,

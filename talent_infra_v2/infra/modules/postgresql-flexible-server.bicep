@@ -117,6 +117,11 @@ resource postgresqlServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-
 // The deploying user (or a designated group) is added here so the
 // postprovision hook can connect with an Entra token and then provision
 // additional principals (container app managed identities, app users, etc.).
+//
+// dependsOn the config resources because PG flex server allows only ONE
+// data-plane operation at a time; if the admin PUT fires while azureExtensions
+// or sharedPreloadLibraries is still applying, it fails with
+// 'AadAuthOperationCannotBePerformedWhenServerIsNotAccessible'.
 resource entraAdministrator 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2023-12-01-preview' = if (enableEntraAuth && !empty(entraAdminObjectId)) {
   parent: postgresqlServer
   name: entraAdminObjectId
@@ -125,6 +130,10 @@ resource entraAdministrator 'Microsoft.DBforPostgreSQL/flexibleServers/administr
     principalName: empty(entraAdminPrincipalName) ? entraAdminObjectId : entraAdminPrincipalName
     tenantId: entraTenantId
   }
+  dependsOn: [
+    sharedPreloadLibraries
+    azureExtensions
+  ]
 }
 
 // Server Parameter: azure.extensions - Enable AGE, vector, pg_trgm, pg_diskann extensions.

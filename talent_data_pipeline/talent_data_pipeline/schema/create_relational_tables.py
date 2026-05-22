@@ -6,6 +6,7 @@ import psycopg2
 from psycopg2 import sql
 
 from talent_data_pipeline.config import db_config, pipeline_config
+from talent_data_pipeline.pg_entra import pg_connect
 
 NODE_LABELS = [
     "Employee", "Location", "Country", "Subregion",
@@ -47,7 +48,7 @@ def _ensure_label(cur, conn, graph: str, label: str, is_edge: bool = False) -> N
 
 def create_graph_labels() -> None:
     """Create all node and edge labels in the AGE graph."""
-    conn = psycopg2.connect(**db_config.connection_dict)
+    conn = pg_connect()
     conn.autocommit = False
     cur = conn.cursor()
     cur.execute("SET search_path = ag_catalog, '$user', public;")
@@ -70,7 +71,7 @@ def create_graph_labels() -> None:
 
 def create_relational_tables() -> None:
     """Create relational support tables for vectors and full-text search."""
-    conn = psycopg2.connect(**db_config.connection_dict)
+    conn = pg_connect()
     conn.autocommit = True
     cur = conn.cursor()
     cur.execute("SET search_path = public, ag_catalog;")

@@ -21,26 +21,29 @@ class DatabaseConfig:
     port: int = field(default_factory=lambda: int(os.getenv("PGPORT", "5432")))
     database: str = field(default_factory=lambda: os.getenv("PGDATABASE", "postgres"))
     user: str = field(default_factory=lambda: os.getenv("PGUSER", ""))
-    password: str = field(default_factory=lambda: os.getenv("PGPASSWORD", ""))
     sslmode: str = field(default_factory=lambda: os.getenv("PGSSLMODE", "require"))
     pool_min: int = 2
     pool_max: int = 10
 
     @property
     def dsn(self) -> str:
-        base = f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
+        # NOTE: password intentionally omitted. Callers must use
+        # ``pg_entra.pg_connect`` (or ``EntraThreadedConnectionPool``)
+        # to attach a fresh Entra ID token at connect time.
+        base = f"postgresql://{self.user}@{self.host}:{self.port}/{self.database}"
         if self.sslmode:
             base += f"?sslmode={self.sslmode}"
         return base
 
     @property
     def connection_dict(self) -> dict[str, str | int]:
+        # NOTE: password intentionally omitted. ``pg_entra`` injects a fresh
+        # OSSRDBMS bearer token immediately before each ``psycopg2.connect``.
         d: dict[str, str | int] = {
             "host": self.host,
             "port": self.port,
             "dbname": self.database,
             "user": self.user,
-            "password": self.password,
         }
         if self.sslmode:
             d["sslmode"] = self.sslmode

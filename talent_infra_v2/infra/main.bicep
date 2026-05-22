@@ -75,7 +75,7 @@ param embeddingModelVersion string = '2'
 param embeddingModelSkuName string = 'Standard'
 
 @description('The capacity of the embedding model deployment in TPM (thousands)')
-param embeddingModelCapacity int = 60
+param embeddingModelCapacity int = 20
 
 @description('Tags for all resources')
 param tags object = {}
@@ -157,6 +157,9 @@ param postgresqlEnablePrivateEndpoint bool = true
 @description('Resource ID of an existing Private DNS Zone for PostgreSQL. If empty, a new zone is created.')
 param postgresqlExistingDnsZoneId string = ''
 
+@description('Resource ID of an existing privatelink.azurecr.io Private DNS Zone. If empty, a new zone is created and linked to the target VNet. Required when the target VNet is already linked to a privatelink.azurecr.io zone in another resource group (Azure forbids two same-namespace zones on one VNet).')
+param acrExistingDnsZoneId string = ''
+
 @description('Client IP address to allow through PostgreSQL firewall')
 param clientIpAddress string = ''
 
@@ -230,6 +233,9 @@ param deployContainerAppsEnv bool = true
 
 @description('Deploy MCP Server Container App')
 param deployMcpServerContainerApp bool = false
+
+@description('Run MCP as a sidecar inside the backend Container App instead of as its own Container App. When true (default), the backend Container App is created with the MCP container co-located and MCP_ENDPOINT is set to http://localhost:3002/mcp. The standalone mcpServerContainerApp module and its OpenAI role are skipped. This eliminates the MCP→backend restart cascade, internal FQDN resolution, and the separate UAMI/PG-role for MCP. Set to false to keep the legacy two-app topology.')
+param mcpServerSidecar bool = true
 
 @description('Deploy Backend Container App')
 param deployBackendContainerApp bool = false
@@ -329,8 +335,13 @@ module aiProject 'modules/ai-project.bicep' = {
   }
 }
 
+// Chat model deployment. dependsOn aiProject because both modules modify the
+// same Cognitive Services account in parallel — ARM uses optimistic concurrency
+// (ETag/If-Match) on the parent account and rejects the racing write with
+// 'IfMatchPreconditionFailed'. Serializing project → chat → embedding avoids it.
 module modelDeployment 'modules/ai-model-deployment.bicep' = {
   name: 'model-deployment'
+  dependsOn: [ aiProject ]
   params: {
     accountName: aiServices.outputs.name
     deploymentName: modelName
@@ -372,6 +383,7 @@ module acrVnet 'modules/acr-vnet.bicep' = if (deployAcrVnet) {
     containerAppsSubnetAddressPrefix: acaSubnetAddressPrefix
     acrName: acrName
     enableAcrBuildTasks: buildMcpServerContainer
+    existingAcrDnsZoneId: acrExistingDnsZoneId
     tags: tags
   }
 }
@@ -470,8 +482,10 @@ module containerAppsEnv 'modules/container-apps-environment.bicep' = if ((deploy
   }
 }
 
-// ── MCP Server Container App ────────────────────────────────
-module mcpServerContainerApp 'modules/container-app.bicep' = if (deployMcpServerContainerApp && deployAcrVnet) {
+// ── MCP Server Container App (legacy standalone topology) ──────────
+// Only deployed when mcpServerSidecar = false. Default (sidecar=true) skips
+// this entirely and runs MCP inside the backend Container App.
+module mcpServerContainerApp 'modules/container-app.bicep' = if (deployMcpServerContainerApp && !mcpServerSidecar && deployAcrVnet) {
   name: 'mcp-server-container-app-deployment'
   params: {
     location: location
@@ -589,10 +603,12 @@ module backendContainerApp 'modules/container-app.bicep' = if (deployBackendCont
         name: 'COSMOS_CHAT_CONTAINER'
         value: cosmosContainerName
       }
-      // MCP Server endpoint (internal)
+      // MCP Server endpoint (internal). When sidecar mode is on, MCP runs
+      // in the same pod as backend, reachable via localhost. Otherwise we
+      // resolve the standalone MCP Container App's internal FQDN.
       {
         name: 'MCP_ENDPOINT'
-        value: 'https://${mcpServerContainerAppName}.internal.${containerAppsEnv!.outputs.defaultDomain}/mcp'
+        value: mcpServerSidecar ? 'http://localhost:3002/mcp' : 'https://${mcpServerContainerAppName}.internal.${containerAppsEnv!.outputs.defaultDomain}/mcp'
       }
       // Application Insights
       {
@@ -612,6 +628,52 @@ module backendContainerApp 'modules/container-app.bicep' = if (deployBackendCont
         value: 'rediss://:${redisAccount!.listKeys().primaryKey}@${redisCache!.outputs.hostName}:${redisCache!.outputs.sslPort}/0'
       }
     ] : []
+    // ── MCP Sidecar ────────────────────────────────────────────
+    // When mcpServerSidecar=true, the MCP server runs as a second container
+    // inside this Container App. Backend reaches it via http://localhost:3002.
+    // Both containers share the backend UAMI (AZURE_CLIENT_ID is injected by
+    // the container-app module), so MCP uses the SAME PG role as backend
+    // (`<backendContainerAppName>-identity`). This eliminates the separate
+    // MCP UAMI, MCP PG role, MCP→backend restart cascade, and internal FQDN
+    // resolution that the legacy two-app topology required.
+    sidecarContainer: mcpServerSidecar ? {
+      name: 'mcp-server'
+      image: '${acrVnet!.outputs.acrLoginServer}/${mcpServerImageName}:${mcpServerImageTag}'
+      cpu: mcpServerCpu
+      memory: mcpServerMemory
+      env: [
+        {
+          name: 'PGHOST'
+          value: deployPostgresql ? (postgresqlEnablePrivateEndpoint ? '${postgresqlServerName}.privatelink.postgres.database.azure.com' : postgresql!.outputs.fqdn) : ''
+        }
+        {
+          name: 'PGPORT'
+          value: '5432'
+        }
+        {
+          name: 'PGDATABASE'
+          value: 'postgres'
+        }
+        {
+          // Shared PG role with backend — both containers authenticate as
+          // `<backendContainerAppName>-identity` using the backend UAMI.
+          name: 'PGUSER'
+          value: '${backendContainerAppName}-identity'
+        }
+        {
+          name: 'GRAPH_NAME'
+          value: graphName
+        }
+        {
+          name: 'AZURE_OPENAI_ENDPOINT'
+          value: !empty(azureOpenAiEndpoint) ? azureOpenAiEndpoint : aiServices.outputs.endpoint
+        }
+        {
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: appInsightsConnectionString
+        }
+      ]
+    } : {}
     tags: tags
   }
 }
@@ -649,8 +711,10 @@ resource cosmosDataRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = i
   }
 }
 
-// Grant MCP Server managed identity Cognitive Services OpenAI User role
-resource mcpServerOpenAiUserRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (deployMcpServerContainerApp && deployAcrVnet) {
+// Grant MCP Server managed identity Cognitive Services OpenAI User role.
+// Skipped when MCP is a sidecar (the backend UAMI already has this role and
+// the sidecar uses the same UAMI client ID via AZURE_CLIENT_ID injection).
+resource mcpServerOpenAiUserRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (deployMcpServerContainerApp && !mcpServerSidecar && deployAcrVnet) {
   name: guid(accountName, mcpServerContainerAppName, 'cognitive-services-openai-user')
   scope: aiServicesAccount
   properties: {
@@ -724,8 +788,9 @@ output webappFullImageName string = deployAcrVnet ? '${acrVnet!.outputs.acrLogin
 output buildWebappContainer string = string(buildWebappContainer)
 output containerAppsEnvName string = ((deployContainerAppsEnv || deployMcpServerContainerApp || deployBackendContainerApp || deployWebappContainerApp) && deployAcrVnet) ? containerAppsEnv!.outputs.name : ''
 output containerAppsEnvDefaultDomain string = ((deployContainerAppsEnv || deployMcpServerContainerApp || deployBackendContainerApp || deployWebappContainerApp) && deployAcrVnet) ? containerAppsEnv!.outputs.defaultDomain : ''
-output mcpServerContainerAppName string = (deployMcpServerContainerApp && deployAcrVnet) ? mcpServerContainerApp!.outputs.name : ''
-output mcpServerContainerAppFqdn string = (deployMcpServerContainerApp && deployAcrVnet) ? mcpServerContainerApp!.outputs.fqdn : ''
+output mcpServerContainerAppName string = (deployMcpServerContainerApp && !mcpServerSidecar && deployAcrVnet) ? mcpServerContainerApp!.outputs.name : ''
+output mcpServerContainerAppFqdn string = (deployMcpServerContainerApp && !mcpServerSidecar && deployAcrVnet) ? mcpServerContainerApp!.outputs.fqdn : ''
+output mcpServerSidecar string = string(mcpServerSidecar)
 output backendContainerAppName string = (deployBackendContainerApp && deployAcrVnet && buildBackendContainer) ? backendContainerApp!.outputs.name : ''
 output backendContainerAppFqdn string = (deployBackendContainerApp && deployAcrVnet && buildBackendContainer) ? backendContainerApp!.outputs.fqdn : ''
 output webappContainerAppName string = (deployWebappContainerApp && deployAcrVnet && buildWebappContainer && deployBackendContainerApp) ? webappContainerApp!.outputs.name : ''

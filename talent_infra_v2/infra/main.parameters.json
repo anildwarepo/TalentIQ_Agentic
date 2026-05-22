@@ -30,7 +30,7 @@
       "value": "GlobalStandard"
     },
     "modelCapacity": {
-      "value": 165
+      "value": 2
     },
     "deployAcrVnet": {
       "value": true
@@ -48,10 +48,10 @@
       "value": "pe-subnet"
     },
     "acaSubnetName": {
-      "value": "talentiq-aca"
+      "value": "${ACA_SUBNET_NAME=talentiq-aca-${AZURE_ENV_NAME}}"
     },
     "acaSubnetAddressPrefix": {
-      "value": "10.0.6.0/23"
+      "value": "${ACA_SUBNET_ADDRESS_PREFIX=10.0.1.64/27}"
     },
     "acrNamePrefix": {
       "value": "tiqacr"
@@ -97,6 +97,9 @@
     },
     "postgresqlExistingDnsZoneId": {
       "value": "/subscriptions/e4718866-4e88-411f-a0b8-10c8051dc165/resourceGroups/vnet/providers/Microsoft.Network/privateDnsZones/privatelink.postgres.database.azure.com"
+    },
+    "acrExistingDnsZoneId": {
+      "value": "/subscriptions/e4718866-4e88-411f-a0b8-10c8051dc165/resourceGroups/rg-talent-devtest/providers/Microsoft.Network/privateDnsZones/privatelink.azurecr.io"
     },
     "clientIpAddress": {
       "value": "${CLIENT_IP_ADDRESS}"
@@ -160,6 +163,9 @@
     },
     "deployContainerAppsEnv": {
       "value": "${deployContainerAppsEnv=true}"
+    },
+    "mcpServerSidecar": {
+      "value": "${mcpServerSidecar=true}"
     },
     "deployMcpServerContainerApp": {
       "value": "${deployMcpServerContainerApp=false}"

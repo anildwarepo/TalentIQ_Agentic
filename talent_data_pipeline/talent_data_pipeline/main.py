@@ -10,6 +10,7 @@ import time
 import psycopg2
 
 from talent_data_pipeline.config import db_config, pipeline_config
+from talent_data_pipeline.pg_entra import pg_connect
 from talent_data_pipeline.connectivity_test import run_connectivity_test
 from talent_data_pipeline.schema.create_relational_tables import run_schema_creation
 from talent_data_pipeline.schema.create_indexes import (
@@ -41,7 +42,7 @@ def _data_already_loaded() -> tuple[bool, dict[str, int]]:
     threshold = int(pipeline_config.employee_count * 0.9)
     graph = pipeline_config.graph_name
     try:
-        conn = psycopg2.connect(**db_config.connection_dict)
+        conn = pg_connect()
         conn.autocommit = True
         with conn.cursor() as cur:
             cur.execute("SET search_path = ag_catalog, '$user', public;")

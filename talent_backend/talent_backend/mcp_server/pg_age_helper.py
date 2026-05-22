@@ -26,6 +26,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from talent_backend.config import pg_conninfo
+from talent_backend.pg_entra import EntraTokenAsyncConnectionPool
 
 logger = logging.getLogger("talent_backend.pg_age")
 
@@ -112,7 +113,7 @@ class PGAgeHelper:
         """Create the helper and open the connection pool."""
         conninfo = conninfo or pg_conninfo()
         logger.info("Opening async connection pool (min=%d, max=%d)", min_size, max_size)
-        pool = AsyncConnectionPool(
+        pool = EntraTokenAsyncConnectionPool(
             conninfo=conninfo,
             min_size=min_size,
             max_size=max_size,
@@ -138,7 +139,7 @@ class PGAgeHelper:
         """
         conninfo = conninfo or pg_conninfo()
         logger.info("Creating deferred connection pool (min=%d, max=%d)", min_size, max_size)
-        pool = AsyncConnectionPool(
+        pool = EntraTokenAsyncConnectionPool(
             conninfo=conninfo,
             min_size=min_size,
             max_size=max_size,

@@ -5,6 +5,7 @@ from __future__ import annotations
 import psycopg2
 
 from talent_data_pipeline.config import db_config, pipeline_config
+from talent_data_pipeline.pg_entra import pg_connect
 
 
 def _exec(cur, stmt: str, label: str) -> None:
@@ -173,7 +174,7 @@ def run_age_label_indexes() -> None:
     print("=" * 60)
     print("AGE Label Indexes (pre-load)")
     print("=" * 60)
-    conn = psycopg2.connect(**db_config.connection_dict)
+    conn = pg_connect()
     conn.autocommit = True
     cur = conn.cursor()
     try:
@@ -189,7 +190,7 @@ def run_index_creation() -> None:
     print("=" * 60)
     print("Index Creation")
     print("=" * 60)
-    conn = psycopg2.connect(**db_config.connection_dict)
+    conn = pg_connect()
     conn.autocommit = True
     cur = conn.cursor()
 

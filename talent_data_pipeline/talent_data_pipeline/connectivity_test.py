@@ -8,11 +8,12 @@ import psycopg2
 from psycopg2 import sql
 
 from talent_data_pipeline.config import db_config, pipeline_config
+from talent_data_pipeline.pg_entra import pg_connect
 
 
 def _connect():
-    """Return a psycopg2 connection."""
-    return psycopg2.connect(**db_config.connection_dict)
+    """Return a psycopg2 connection authenticated via Entra ID."""
+    return pg_connect()
 
 
 def _test_basic_connection(cur) -> bool:

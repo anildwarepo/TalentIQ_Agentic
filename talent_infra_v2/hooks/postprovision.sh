@@ -442,34 +442,76 @@ deploy_container_apps() {
   [ -z "$client_ip" ] && client_ip="0.0.0.0"
 
   echo "  Resource Group:   $resource_group"
-  echo "  Deploy flags:     MCP=true, Backend=true, Webapp=true"
+
+  # Determine MCP topology: sidecar (default) vs. standalone Container App.
+  # When sidecar_mode=true the bicep skips the standalone MCP module (its
+  # condition includes `!mcpServerSidecar`), so we set deployMcpServerContainerApp
+  # to false here to make the intent explicit. Flip via `azd env set
+  # mcpServerSidecar false` to fall back to the legacy two-app topology.
+  local mcp_server_sidecar_raw
+  mcp_server_sidecar_raw=$(get_azd_env "mcpServerSidecar")
+  local sidecar_mode="true"
+  case "$mcp_server_sidecar_raw" in
+    false|False|FALSE) sidecar_mode="false" ;;
+  esac
+  local deploy_mcp_app="true"
+  local mcp_topology="standalone Container App"
+  if [ "$sidecar_mode" = "true" ]; then
+    deploy_mcp_app="false"
+    mcp_topology="sidecar (inside backend Container App)"
+  fi
+  echo "  Deploy flags:     MCP=$deploy_mcp_app, Backend=true, Webapp=true"
+  echo "  MCP topology:     $mcp_topology"
 
   local resolved_params
   resolved_params=$(mktemp)
-  # Resolve azd-substituted Entra admin params. main.parameters.json contains
-  # placeholders like `${POSTGRESQL_ENTRA_ADMIN_OBJECT_ID=}` that only azd
-  # knows how to expand — `az deployment` treats them as literals.
-  local entra_admin_id entra_admin_name entra_admin_type entra_disable_pw
-  entra_admin_id=$(get_azd_env "POSTGRESQL_ENTRA_ADMIN_OBJECT_ID")
-  entra_admin_name=$(get_azd_env "POSTGRESQL_ENTRA_ADMIN_PRINCIPAL_NAME")
-  entra_admin_type=$(get_azd_env "POSTGRESQL_ENTRA_ADMIN_PRINCIPAL_TYPE")
-  [ -z "$entra_admin_type" ] && entra_admin_type="User"
+  # IMPORTANT: We intentionally pass EMPTY values for the Entra admin params
+  # during this postprovision redeploy. The bicep declares the PG admin child
+  # resource as conditional on `!empty(entraAdminObjectId)`, so empty values
+  # cause it to be skipped entirely. Phase 1 (`azd provision`) already created
+  # the Entra admin via the same bicep with real values; re-evaluating it can
+  # race with PG server state transitions and fail with
+  # `AadAuthOperationCannotBePerformedWhenServerIsNotAccessible`.
+  # `initialize_postgres_age_and_data` re-asserts the admin via `az` if needed.
+  local entra_disable_pw
   entra_disable_pw=$(get_azd_env "POSTGRESQL_DISABLE_PASSWORD_AUTH")
   local disable_pw_bool="false"
   [ "$entra_disable_pw" = "true" ] && disable_pw_bool="true"
+  # Resolve azd-style placeholders for the ACA subnet params. azd would
+  # expand `${ACA_SUBNET_NAME=talentiq-aca-${AZURE_ENV_NAME}}` and
+  # `${ACA_SUBNET_ADDRESS_PREFIX=10.0.1.64/27}` before sending to ARM, but
+  # this hook calls `az deployment` directly which leaves them as literals
+  # and ARM then rejects them as invalid subnet names / prefixes.
+  local aca_subnet_name aca_subnet_prefix azure_env_name
+  azure_env_name="${AZURE_ENV_NAME:-$(get_azd_env AZURE_ENV_NAME)}"
+  aca_subnet_name="${ACA_SUBNET_NAME:-$(get_azd_env ACA_SUBNET_NAME)}"
+  if [ -z "$aca_subnet_name" ]; then
+    aca_subnet_name="talentiq-aca-${azure_env_name}"
+  fi
+  aca_subnet_prefix="${ACA_SUBNET_ADDRESS_PREFIX:-$(get_azd_env ACA_SUBNET_ADDRESS_PREFIX)}"
+  if [ -z "$aca_subnet_prefix" ]; then
+    aca_subnet_prefix="10.0.1.64/27"
+  fi
+
   # Use jq to resolve params
   jq --arg pw "$pg_password" --arg ip "$client_ip" \
-     --arg eaid "$entra_admin_id" --arg eaname "$entra_admin_name" \
-     --arg eatype "$entra_admin_type" --argjson disablepw "$disable_pw_bool" \
+     --arg subnet_name "$aca_subnet_name" \
+     --arg subnet_prefix "$aca_subnet_prefix" \
+     --argjson disablepw "$disable_pw_bool" \
+     --argjson deploymcp "$deploy_mcp_app" \
+     --argjson sidecar "$sidecar_mode" \
     '.parameters.postgresqlAdminPassword.value = $pw |
      .parameters.clientIpAddress.value = $ip |
+     (if .parameters.acaSubnetName then .parameters.acaSubnetName.value = $subnet_name else . end) |
+     (if .parameters.acaSubnetAddressPrefix then .parameters.acaSubnetAddressPrefix.value = $subnet_prefix else . end) |
      .parameters.deployContainerAppsEnv.value = true |
-     .parameters.deployMcpServerContainerApp.value = true |
+     .parameters.deployMcpServerContainerApp.value = $deploymcp |
      .parameters.deployBackendContainerApp.value = true |
      .parameters.deployWebappContainerApp.value = true |
-     (if .parameters.postgresqlEntraAdminObjectId then .parameters.postgresqlEntraAdminObjectId.value = $eaid else . end) |
-     (if .parameters.postgresqlEntraAdminPrincipalName then .parameters.postgresqlEntraAdminPrincipalName.value = $eaname else . end) |
-     (if .parameters.postgresqlEntraAdminPrincipalType then .parameters.postgresqlEntraAdminPrincipalType.value = $eatype else . end) |
+     (if .parameters.mcpServerSidecar then .parameters.mcpServerSidecar.value = $sidecar else . end) |
+     (if .parameters.postgresqlEntraAdminObjectId then .parameters.postgresqlEntraAdminObjectId.value = "" else . end) |
+     (if .parameters.postgresqlEntraAdminPrincipalName then .parameters.postgresqlEntraAdminPrincipalName.value = "" else . end) |
+     (if .parameters.postgresqlEntraAdminPrincipalType then .parameters.postgresqlEntraAdminPrincipalType.value = "User" else . end) |
      (if .parameters.postgresqlDisablePasswordAuth then .parameters.postgresqlDisablePasswordAuth.value = $disablepw else . end)' \
     "$params_file" > "$resolved_params"
 
@@ -660,61 +702,157 @@ if [ -n "$postgresqlServerName" ]; then
   echo "PHASE 0.5: Registering container app UAMIs as PG Entra roles"
   echo "=========================================="
 
-  if [ -z "$entraAdminUpn" ]; then
-    echo "  SKIP: Entra admin UPN not resolved — cannot bootstrap UAMI roles." >&2
-    echo "  Set POSTGRESQL_ENTRA_ADMIN_PRINCIPAL_NAME via preprovision and rerun." >&2
+  # Always discover UAMIs first — needed for both SQL and control-plane paths.
+  # In MCP sidecar mode (default), `mcpServerContainerAppName` is empty because the
+  # standalone MCP module is gated off in bicep. The loop below naturally skips empty
+  # app names, so only the backend UAMI is registered — which the MCP sidecar reuses
+  # via the shared pod identity (AZURE_CLIENT_ID is injected into both containers).
+  mcpServerSidecarRaw=$(get_azd_env "mcpServerSidecar")
+  phase05_sidecar_mode="true"
+  case "$mcpServerSidecarRaw" in
+    false|False|FALSE) phase05_sidecar_mode="false" ;;
+  esac
+  if [ "$phase05_sidecar_mode" = "true" ]; then
+    echo "  MCP sidecar mode: only registering backend UAMI (MCP shares it via sidecar pattern)."
+  fi
+  mcpAppName=$(get_azd_env "mcpServerContainerAppName")
+  backendAppName=$(get_azd_env "backendContainerAppName")
+
+  # Collect parallel arrays of names and OIDs (no associative arrays in POSIX sh).
+  principal_names=()
+  principal_oids=()
+  principals_json="["
+  first=true
+  for app in "$mcpAppName" "$backendAppName"; do
+    [ -z "$app" ] && continue
+    uami_name="${app}-identity"
+    echo "  Looking up UAMI '$uami_name'..."
+    oid=$(az identity show --resource-group "$resourceGroup" --name "$uami_name" --query principalId -o tsv 2>/dev/null || true)
+    if [ -z "$oid" ]; then
+      echo "    WARNING: could not resolve principalId for '$uami_name'. Skipping." >&2
+      continue
+    fi
+    echo "    principalId: $oid"
+    principal_names+=("$uami_name")
+    principal_oids+=("$oid")
+    if [ "$first" = "true" ]; then
+      first=false
+    else
+      principals_json="${principals_json},"
+    fi
+    principals_json="${principals_json}{\"name\":\"$uami_name\",\"oid\":\"$oid\",\"type\":\"service\"}"
+  done
+  principals_json="${principals_json}]"
+
+  if [ "${#principal_names[@]}" -eq 0 ]; then
+    echo "  No container app UAMIs found to register."
   else
-    mcpAppName=$(get_azd_env "mcpServerContainerAppName")
-    backendAppName=$(get_azd_env "backendContainerAppName")
+    # Strategy:
+    #   1. Preferred: pgaadauth_create_principal_with_oid via SQL (narrow grants).
+    #      Requires the deployer to have outbound TCP/5432 to PG.
+    #   2. Fallback: az postgres flexible-server microsoft-entra-admin create
+    #      --type ServicePrincipal (Azure control plane, no PG SQL hop).
+    #      Grants ADMIN — broader than SQL, but unblocks containers when
+    #      port 5432 is filtered (Comcast and many residential ISPs do this).
+    #
+    # Set POSTGRESQL_USE_CONTROL_PLANE_UAMI=true to skip the SQL attempt entirely.
+    force_control_plane=$(get_azd_env "POSTGRESQL_USE_CONTROL_PLANE_UAMI")
+    sql_succeeded=false
 
-    principals_json="["
-    first=true
-    for app in "$mcpAppName" "$backendAppName"; do
-      [ -z "$app" ] && continue
-      uami_name="${app}-identity"
-      echo "  Looking up UAMI '$uami_name'..."
-      oid=$(az identity show --resource-group "$resourceGroup" --name "$uami_name" --query principalId -o tsv 2>/dev/null || true)
-      if [ -z "$oid" ]; then
-        echo "    WARNING: could not resolve principalId for '$uami_name'. Skipping." >&2
-        continue
-      fi
-      echo "    principalId: $oid"
-      if [ "$first" = "true" ]; then
-        first=false
+    if [ "$force_control_plane" != "true" ]; then
+      if [ -z "$entraAdminUpn" ]; then
+        echo "  Cannot attempt SQL path: POSTGRESQL_ENTRA_ADMIN_PRINCIPAL_NAME is empty." >&2
+        echo "  Skipping straight to control-plane fallback." >&2
       else
-        principals_json="${principals_json},"
-      fi
-      principals_json="${principals_json}{\"name\":\"$uami_name\",\"oid\":\"$oid\",\"type\":\"service\"}"
-    done
-    principals_json="${principals_json}]"
+        repo_root="$(cd "$script_dir/.." && pwd)"
+        if [ -f "$repo_root/../.venv/bin/python" ]; then
+          python_exe="$repo_root/../.venv/bin/python"
+        else
+          python_exe="python3"
+        fi
+        provision_script="$script_dir/../scripts/provision_pg_entra_roles.py"
 
-    if [ "$principals_json" != "[]" ]; then
-      repo_root="$(cd "$script_dir/.." && pwd)"
-      if [ -f "$repo_root/../.venv/bin/python" ]; then
-        python_exe="$repo_root/../.venv/bin/python"
-      else
-        python_exe="python3"
-      fi
-      provision_script="$script_dir/../scripts/provision_pg_entra_roles.py"
+        connect_host="${connect_fqdn:-$postgresqlServerFqdn}"
 
-      connect_host="${connect_fqdn:-$postgresqlServerFqdn}"
-
-      echo "  Provisioning Entra role(s) on $connect_host..."
-      if "$python_exe" "$provision_script" \
-          --host "$connect_host" \
-          --database "postgres" \
-          --admin-upn "$entraAdminUpn" \
-          --graph-name "$graphName" \
-          --principals "$principals_json"; then
-        echo "  UAMI roles provisioned successfully."
-      else
-        rc=$?
-        echo "  ERROR: UAMI role provisioning failed (exit $rc)." >&2
-        echo "  Container apps will fail to connect to PostgreSQL until you re-run this step." >&2
+        echo "  Attempting SQL path: provisioning Entra role(s) on $connect_host..."
+        if "$python_exe" "$provision_script" \
+            --host "$connect_host" \
+            --database "postgres" \
+            --admin-upn "$entraAdminUpn" \
+            --graph-name "$graphName" \
+            --principals "$principals_json"; then
+          sql_succeeded=true
+          echo "  UAMI roles provisioned successfully via SQL."
+        else
+          rc=$?
+          echo "  SQL path failed (exit $rc). Falling back to control-plane admin registration." >&2
+          echo "  Common cause: deployer network blocks outbound TCP/5432 to PG (Comcast and many ISPs do this)." >&2
+        fi
       fi
     else
-      echo "  No container app UAMIs found to register."
+      echo "  POSTGRESQL_USE_CONTROL_PLANE_UAMI=true — skipping SQL path."
     fi
+
+    if [ "$sql_succeeded" != "true" ]; then
+      echo ""
+      echo "  Control-plane fallback: registering UAMIs as ServicePrincipal admins on $postgresqlServerName..."
+      echo "  NOTE: this grants PG ADMIN privileges (broader than the SQL path's narrow grants)."
+      all_ok=true
+      for i in "${!principal_names[@]}"; do
+        uami_name="${principal_names[$i]}"
+        oid="${principal_oids[$i]}"
+        if az postgres flexible-server microsoft-entra-admin create \
+            --resource-group "$resourceGroup" \
+            --server-name "$postgresqlServerName" \
+            --display-name "$uami_name" \
+            --object-id "$oid" \
+            --type ServicePrincipal \
+            --only-show-errors \
+            --output none 2>&1; then
+          echo "    OK ($uami_name): registered as PG Entra ServicePrincipal admin (control plane)"
+        else
+          rc=$?
+          echo "    FAIL ($uami_name): control-plane admin create failed (exit $rc)" >&2
+          all_ok=false
+        fi
+      done
+      if [ "$all_ok" = "true" ]; then
+        echo "  All UAMIs registered as PG Entra admins via control plane."
+        echo "  Restart container revisions to pick up the new PG roles:"
+        for uami_name in "${principal_names[@]}"; do
+          app_name="${uami_name%-identity}"
+          echo "    az containerapp revision restart -n $app_name -g $resourceGroup --revision <active-revision>"
+        done
+      else
+        echo "  ERROR: one or more UAMI control-plane registrations failed." >&2
+        echo "  Container apps will fail to connect to PostgreSQL until you re-register them." >&2
+      fi
+    fi
+  fi
+fi
+
+# Final defensive check: if any PG server parameter (e.g. shared_preload_libraries=age)
+# is still flagged pending restart, restart now so AGE actually loads. Without this,
+# every cypher() call fails with `unhandled cypher(cstring) function call`.
+if [ -n "$postgresqlServerName" ]; then
+  echo "Checking for PostgreSQL parameters pending restart on '$postgresqlServerName'..."
+  pending_json=$(az postgres flexible-server parameter list \
+      --resource-group "$resourceGroup" \
+      --server-name "$postgresqlServerName" \
+      --query "[?isConfigPendingRestart].name" \
+      --output tsv 2>/dev/null || true)
+  if [ -z "$pending_json" ]; then
+    echo "  No PG parameters pending restart."
+  else
+    echo "  Pending-restart parameters detected:"
+    while IFS= read -r pname; do
+      [ -n "$pname" ] && echo "    - $pname"
+    done <<< "$pending_json"
+    echo "  Restarting PostgreSQL to apply..."
+    az postgres flexible-server restart --resource-group "$resourceGroup" --name "$postgresqlServerName" --output none
+    wait_postgres_ready "$resourceGroup" "$postgresqlServerName"
+    echo "  PG restarted. NOTE: container apps with cached pools may need a revision restart:"
+    echo "    az containerapp revision restart -n <app> -g $resourceGroup --revision <active-revision>"
   fi
 fi
 

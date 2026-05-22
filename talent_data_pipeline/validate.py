@@ -7,6 +7,7 @@ import sys
 import psycopg2
 
 from talent_data_pipeline.config import db_config, pipeline_config
+from talent_data_pipeline.pg_entra import pg_connect
 
 EXPECTED_COUNTS = {
     "Employee": 130000,
@@ -83,7 +84,7 @@ def run_validation() -> bool:
     print("Post-Load Validation")
     print("=" * 60)
 
-    conn = psycopg2.connect(**db_config.connection_dict)
+    conn = pg_connect()
     cur = conn.cursor()
     graph = pipeline_config.graph_name
     all_ok = True

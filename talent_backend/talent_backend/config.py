@@ -28,7 +28,6 @@ PGHOST: str = os.getenv("PGHOST", "localhost")
 PGPORT: int = int(os.getenv("PGPORT", "5432"))
 PGDATABASE: str = os.getenv("PGDATABASE", "postgres")
 PGUSER: str = os.getenv("PGUSER", "")
-PGPASSWORD: str = os.getenv("PGPASSWORD", "")
 PGSSLMODE: str = os.getenv("PGSSLMODE", "require")
 GRAPH_NAME: str = os.getenv("GRAPH_NAME", "talent_graph")
 
@@ -55,8 +54,15 @@ COSMOS_CHAT_CONTAINER: str = os.getenv("COSMOS_CHAT_CONTAINER", "chat_history_db
 
 
 def pg_conninfo() -> str:
-    """Build a libpq connection string from env vars."""
-    base = f"host={PGHOST} port={PGPORT} dbname={PGDATABASE} user={PGUSER} password={PGPASSWORD}"
+    """Build a libpq connection string from env vars (no password).
+
+    PostgreSQL is accessed via Entra ID authentication: the bearer token is
+    injected by ``EntraTokenAsyncConnectionPool`` (see ``pg_entra.py``) as the
+    libpq ``password`` parameter immediately before each new connection.
+    Embedding the token here would make it static for the lifetime of the
+    pool, which would expire within ~60 minutes.
+    """
+    base = f"host={PGHOST} port={PGPORT} dbname={PGDATABASE} user={PGUSER}"
     if PGSSLMODE:
         base += f" sslmode={PGSSLMODE}"
     return base
