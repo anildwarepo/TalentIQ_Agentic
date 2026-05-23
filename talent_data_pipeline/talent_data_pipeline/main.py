@@ -142,9 +142,14 @@ def _resolve_manual_host() -> str:
     exiting non-zero.
     """
     current = os.getenv("PGHOST", "").strip()
-    prompt_suffix = f" [{current}]" if current else ""
+    print("Manual PostgreSQL host selection")
+    if current:
+        print(f"  Current PGHOST from config: {current}")
+        print("  Press Enter to accept it, or type a different host.", flush=True)
+    else:
+        print("  No PGHOST default was loaded. Type a PostgreSQL host.", flush=True)
     for attempt in range(_MAX_HOST_PROMPT_ATTEMPTS):
-        raw = input(f"PG host{prompt_suffix}: ").strip()
+        raw = input("PG host> ").strip()
         if raw:
             return raw
         if current:
