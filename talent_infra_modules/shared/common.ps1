@@ -62,6 +62,107 @@ function Write-Info {
 }
 
 # ------------------------------------------------------------------------------
+# app_config/.env preflight
+# ------------------------------------------------------------------------------
+
+function Get-AppConfigEnvPath {
+    $starts = @((Get-Location).Path, $PSScriptRoot)
+    $seen = @{}
+    foreach ($start in $starts) {
+        if ([string]::IsNullOrWhiteSpace($start)) { continue }
+        $dir = Get-Item -LiteralPath $start -ErrorAction SilentlyContinue
+        if ($null -eq $dir) { continue }
+        if (-not $dir.PSIsContainer) { $dir = $dir.Directory }
+        while ($null -ne $dir) {
+            if (-not $seen.ContainsKey($dir.FullName)) {
+                $seen[$dir.FullName] = $true
+                $candidate = Join-Path $dir.FullName "app_config\.env"
+                if (Test-Path -LiteralPath $candidate) { return $candidate }
+            }
+            $dir = $dir.Parent
+        }
+    }
+    return (Join-Path (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path "app_config\.env")
+}
+
+function Read-DotEnvFile {
+    param([Parameter(Mandatory)][string]$Path)
+    $values = [ordered]@{}
+    if (-not (Test-Path -LiteralPath $Path)) { return $values }
+    foreach ($line in Get-Content -LiteralPath $Path) {
+        $trimmed = $line.Trim()
+        if ([string]::IsNullOrWhiteSpace($trimmed) -or $trimmed.StartsWith('#')) { continue }
+        if ($trimmed.StartsWith('export ')) { $trimmed = $trimmed.Substring(7).Trim() }
+        $idx = $trimmed.IndexOf('=')
+        if ($idx -lt 1) { continue }
+        $name = $trimmed.Substring(0, $idx).Trim()
+        $value = $trimmed.Substring($idx + 1).Trim()
+        if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+            $value = $value.Substring(1, $value.Length - 2)
+        }
+        $values[$name] = $value
+    }
+    return $values
+}
+
+function Format-EnvValueForDisplay {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [AllowNull()][string]$Value
+    )
+    if ($Name -match '(?i)(PASSWORD|SECRET|TOKEN|CONNECTION_STRING|INSTRUMENTATIONKEY|API[_-]?KEY|CLIENT_SECRET)') {
+        if ([string]::IsNullOrEmpty($Value)) { return '(empty)' }
+        return '<redacted>'
+    }
+    if ([string]::IsNullOrEmpty($Value)) { return '(empty)' }
+    return $Value
+}
+
+function Show-AppConfigEnvPreflight {
+    param(
+        [switch]$Import,
+        [switch]$Override,
+        [switch]$Force
+    )
+
+    $envPath = Get-AppConfigEnvPath
+    Write-Step "Reviewing app_config/.env"
+    Write-Info "Path: $envPath"
+    if (-not (Test-Path -LiteralPath $envPath)) {
+        Write-Warn "app_config/.env was not found. Deployment will use explicit arguments, process env vars, and prompts."
+        if (-not (Confirm-Action -Message "Continue without app_config/.env?" -Force:$Force)) {
+            Write-Warn "Aborted by user."
+            exit 1
+        }
+        return
+    }
+
+    $values = Read-DotEnvFile -Path $envPath
+    if ($values.Count -eq 0) {
+        Write-Warn "app_config/.env contains no key/value pairs."
+    } else {
+        foreach ($key in @($values.Keys | Sort-Object)) {
+            $value = [string]$values[$key]
+            if ($Import -and ($Override -or [string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable($key)))) {
+                [Environment]::SetEnvironmentVariable($key, $value, 'Process')
+            }
+            $shown = Format-EnvValueForDisplay -Name $key -Value $value
+            $processValue = [Environment]::GetEnvironmentVariable($key)
+            $suffix = ''
+            if (-not [string]::IsNullOrEmpty($processValue) -and $processValue -ne $value) {
+                $suffix = '  (process env differs; explicit args/process env may still win)'
+            }
+            Write-Host ("    {0}={1}{2}" -f $key, $shown, $suffix) -ForegroundColor Gray
+        }
+    }
+
+    if (-not (Confirm-Action -Message "Continue with these app_config/.env values?" -Force:$Force)) {
+        Write-Warn "Aborted by user."
+        exit 1
+    }
+}
+
+# ------------------------------------------------------------------------------
 # Native command runner  -  keeps $ErrorActionPreference local to the call
 # ------------------------------------------------------------------------------
 

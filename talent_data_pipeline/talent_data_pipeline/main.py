@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import argparse
 import os
+import pickle
+import shutil
 import sys
+import tempfile
 import time
+from pathlib import Path
+from typing import Any, Callable
 
 import psycopg2
 
-from talent_data_pipeline.config import apply_host_override, db_config, pipeline_config
+from talent_data_pipeline.config import _REPO_ROOT, apply_host_override, db_config, pipeline_config
 from talent_data_pipeline.pg_entra import pg_connect
 from talent_data_pipeline.connectivity_test import run_connectivity_test
 from talent_data_pipeline.schema.create_relational_tables import run_schema_creation
@@ -31,6 +36,78 @@ from talent_data_pipeline.validate import run_validation
 
 _VALID_MODES = ("env", "manual")
 _MAX_HOST_PROMPT_ATTEMPTS = 3
+_GENERATION_CHECKPOINT_DIR = _REPO_ROOT / "talent_synthetic_data" / ".generation_checkpoint"
+_GENERATION_CHECKPOINT_VERSION = 1
+
+
+def _generation_metadata() -> dict[str, int]:
+    return {
+        "version": _GENERATION_CHECKPOINT_VERSION,
+        "employee_count": pipeline_config.employee_count,
+        "random_seed": pipeline_config.random_seed,
+    }
+
+
+def _checkpoint_path(name: str) -> Path:
+    return _GENERATION_CHECKPOINT_DIR / f"{name}.pkl"
+
+
+def _load_generation_checkpoint(name: str) -> Any | None:
+    path = _checkpoint_path(name)
+    if not path.exists():
+        return None
+    try:
+        with path.open("rb") as handle:
+            payload = pickle.load(handle)
+    except Exception:
+        try:
+            path.unlink()
+        except OSError:
+            pass
+        return None
+
+    if not isinstance(payload, dict) or payload.get("metadata") != _generation_metadata():
+        return None
+    print(f"  Checkpoint: loaded {name} from {path}")
+    return payload.get("data")
+
+
+def _save_generation_checkpoint(name: str, data: Any) -> None:
+    _GENERATION_CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
+    path = _checkpoint_path(name)
+    payload = {"metadata": _generation_metadata(), "data": data}
+    fd, tmp = tempfile.mkstemp(dir=str(_GENERATION_CHECKPOINT_DIR), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            pickle.dump(payload, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    print(f"  Checkpoint: saved {name} to {path}")
+
+
+def _checkpointed_generation(name: str, factory: Callable[[], Any]) -> Any:
+    cached = _load_generation_checkpoint(name)
+    if cached is not None:
+        return cached
+    data = factory()
+    _save_generation_checkpoint(name, data)
+    return data
+
+
+def _clear_generation_checkpoints() -> None:
+    if _GENERATION_CHECKPOINT_DIR.exists():
+        shutil.rmtree(_GENERATION_CHECKPOINT_DIR)
+        print(f"  Cleared generation checkpoints: {_GENERATION_CHECKPOINT_DIR}")
+    EmbeddingGenerator.clear_checkpoint()
 
 
 def _resolve_mode(cli_mode: str | None) -> str:
@@ -208,7 +285,7 @@ def main(force: bool = False) -> None:
                 f"(employees={counts['employees']:,}, "
                 f"embeddings={counts['embeddings']:,})."
             )
-        _run_generation_and_loading()
+        _run_generation_and_loading(force=force)
 
     # ── Phase 5: Index Creation ───────────────────────────────────
     print("━" * 70)
@@ -230,41 +307,73 @@ def main(force: bool = False) -> None:
     print("=" * 70)
 
 
-def _run_generation_and_loading() -> None:
+def _run_generation_and_loading(force: bool = False) -> None:
     """Run Phase 3 (generate in-memory data) and Phase 4 (load to graph + tables)."""
+    if force:
+        _clear_generation_checkpoints()
 
     # 3a. Reference data
     print("\n[3a] Reference data...")
-    ref_gen = ReferenceDataGenerator()
-    ref_data = ref_gen.generate_all()
-    location_country_edges = ref_gen.generate_location_country_edges()
+    def generate_reference_payload() -> dict[str, Any]:
+        ref_gen = ReferenceDataGenerator()
+        return {
+            "ref_data": ref_gen.generate_all(),
+            "location_country_edges": ref_gen.generate_location_country_edges(),
+        }
+
+    reference_payload = _checkpointed_generation(
+        "reference_data",
+        generate_reference_payload,
+    )
+    ref_data = reference_payload["ref_data"]
+    location_country_edges = reference_payload["location_country_edges"]
 
     # 3b. Employees
     print("\n[3b] Employees...")
-    emp_gen = EmployeeGenerator()
-    employees = emp_gen.generate_all()
+    employees = _checkpointed_generation(
+        "employees",
+        lambda: EmployeeGenerator().generate_all(),
+    )
 
     # 3c. Resume summaries
     print("\n[3c] Resume summaries...")
-    resume_gen = ResumeGenerator()
-    employees = resume_gen.generate_summaries(employees)
+    employees = _checkpointed_generation(
+        "employees_with_resumes",
+        lambda: ResumeGenerator().generate_summaries(employees),
+    )
 
     # 3d. Edges
     print("\n[3d] Edges...")
-    edge_gen = EdgeGenerator(employees)
+    def generate_edges() -> dict[str, list[dict[str, Any]]]:
+        edge_gen = EdgeGenerator(employees)
+        return {
+            "located_in": edge_gen.generate_located_in(),
+            "specializes_in": edge_gen.generate_specializes_in(),
+            "has_skill": edge_gen.generate_has_skill(),
+            "holds_cert": edge_gen.generate_holds_cert(),
+            "speaks": edge_gen.generate_speaks(),
+            "belongs_to_sl": edge_gen.generate_belongs_to_sl(),
+            "works_in_offering": edge_gen.generate_works_in_offering(),
+            "reports_to": edge_gen.generate_reports_to(),
+            "studied_at": edge_gen.generate_studied_at(),
+            "worked_for": edge_gen.generate_worked_for(),
+            "worked_on": edge_gen.generate_worked_on(),
+            "has_role": edge_gen.generate_has_role(),
+        }
 
-    located_in = edge_gen.generate_located_in()
-    specializes_in = edge_gen.generate_specializes_in()
-    has_skill = edge_gen.generate_has_skill()
-    holds_cert = edge_gen.generate_holds_cert()
-    speaks = edge_gen.generate_speaks()
-    belongs_to_sl = edge_gen.generate_belongs_to_sl()
-    works_in_offering = edge_gen.generate_works_in_offering()
-    reports_to = edge_gen.generate_reports_to()
-    studied_at = edge_gen.generate_studied_at()
-    worked_for = edge_gen.generate_worked_for()
-    worked_on = edge_gen.generate_worked_on()
-    has_role = edge_gen.generate_has_role()
+    edges = _checkpointed_generation("employee_edges", generate_edges)
+    located_in = edges["located_in"]
+    specializes_in = edges["specializes_in"]
+    has_skill = edges["has_skill"]
+    holds_cert = edges["holds_cert"]
+    speaks = edges["speaks"]
+    belongs_to_sl = edges["belongs_to_sl"]
+    works_in_offering = edges["works_in_offering"]
+    reports_to = edges["reports_to"]
+    studied_at = edges["studied_at"]
+    worked_for = edges["worked_for"]
+    worked_on = edges["worked_on"]
+    has_role = edges["has_role"]
 
     # 3e. Embeddings
     print("\n[3e] Embeddings...")

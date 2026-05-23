@@ -108,6 +108,8 @@ param(
 $scriptDir = $PSScriptRoot
 . (Join-Path $scriptDir "..\shared\common.ps1")
 
+Show-AppConfigEnvPreflight -Import -Force:$Force
+
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor DarkCyan
 Write-Host " talent_infra_modules / 01-postgresql / deploy.ps1" -ForegroundColor DarkCyan

@@ -76,6 +76,8 @@ $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $here "..\shared\common.ps1")
 
+Show-AppConfigEnvPreflight -Import -Force:$Force
+
 Write-Host ""
 Write-Host "--------------------------------------------------------------"
 Write-Host " 02-backend  -  Backend + MCP sidecar deployment"

@@ -58,6 +58,8 @@ $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir "..\shared\common.ps1")
 
+Show-AppConfigEnvPreflight -Import -Force:$Force
+
 Write-Host ""
 Write-Host "############################################################" -ForegroundColor Cyan
 Write-Host "  TalentIQ 03-frontend - webapp Container App deployment" -ForegroundColor Cyan

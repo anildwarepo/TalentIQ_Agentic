@@ -247,6 +247,9 @@ The pipeline uses **Entra ID auth only** via `azure.identity.DefaultAzureCredent
 ### Azure OpenAI token expired during embedding generation
 The embedding generator has checkpoint support. Re-run — it skips already-generated embeddings.
 
+### Data generation was interrupted
+Phase 3 writes generation checkpoints under `talent_synthetic_data/.generation_checkpoint/` for reference data, employees, resume-enriched employees, and employee edges. Re-run the pipeline and it will load completed generation phases from checkpoint when `EMPLOYEE_COUNT` and `RANDOM_SEED` still match. Use `--force` to clear generation and embedding checkpoints and regenerate from scratch.
+
 ### "Entity search table does not exist"
 Run the entity search setup:
 ```bash
@@ -257,7 +260,7 @@ create_relational_tables()
 ```
 
 ### Full pipeline crashed mid-load
-The graph loader uses MERGE (idempotent) — re-running won't duplicate data. But it will re-process everything from the beginning. Use incremental scripts for just the missing parts.
+The graph loader uses MERGE / truncation-safe direct loads for the relevant phases — re-running won't duplicate data. Completed Phase 3 generation work is reused from checkpoint, and embedding batches are reused from their embedding checkpoint.
 
 ### `FATAL: password authentication failed for user …` / no Entra token
 You're not `az login`'d, or your principal isn't a PG role on the target server. Confirm your identity with `az account show`, then run `talent_data_pipeline/connectivity_test.py` (or the v2 infra `test_pg_entra_connection.py`) to verify Entra → PG end-to-end. If you need to point at a different PG server temporarily without editing `.env`, use `--mode manual` (see [Dataload mode](#dataload-mode---mode-envmanual)).

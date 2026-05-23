@@ -99,6 +99,8 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir '..\shared\common.ps1')
 
+Show-AppConfigEnvPreflight -Import -Force:$Force
+
 Write-Step '00-container-apps-env: prerequisite checks'
 Test-AzLoggedIn
 

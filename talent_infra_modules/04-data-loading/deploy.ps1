@@ -126,6 +126,8 @@ $ScriptRoot = $PSScriptRoot
 
 . (Join-Path $ScriptRoot "..\shared\common.ps1")
 
+Show-AppConfigEnvPreflight -Import -Force:$Force
+
 # Pin script-relative paths (caller's CWD shouldn't matter).
 $PgOutputsPath      = (Join-Path $ScriptRoot "..\01-postgresql\.outputs.json")
 $BackendOutputsPath = (Join-Path $ScriptRoot "..\02-backend\.outputs.json")
