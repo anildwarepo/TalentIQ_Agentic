@@ -393,6 +393,33 @@ function Test-VnetExists {
     return ($LASTEXITCODE -eq 0)
 }
 
+function Resolve-VnetResourceGroupByName {
+    <#
+    .SYNOPSIS
+        Finds the resource group for a VNet name when it is unique in the
+        active subscription. Returns $null when not found or ambiguous.
+    #>
+    param([Parameter(Mandatory)][string]$VnetName)
+
+    $vnetJson = Invoke-Native {
+        az network vnet list --output json 2>$null
+    }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($vnetJson)) {
+        return $null
+    }
+
+    try { $vnets = @($vnetJson | ConvertFrom-Json) } catch { return $null }
+    $matches = @($vnets | Where-Object { $_.name -eq $VnetName })
+    if ($matches.Count -eq 1) {
+        return [string]$matches[0].resourceGroup
+    }
+    if ($matches.Count -gt 1) {
+        Write-Warn "VNet name '$VnetName' exists in multiple resource groups: $((@($matches | ForEach-Object { $_.resourceGroup })) -join ', ')"
+        Write-Info "Set -VnetResourceGroup or AZURE_VNET_RESOURCE_GROUP to choose one."
+    }
+    return $null
+}
+
 function Test-VnetSubnetExists {
     <#
     .SYNOPSIS

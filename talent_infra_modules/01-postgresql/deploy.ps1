@@ -188,6 +188,27 @@ if ([string]::IsNullOrEmpty($UamiPrincipalIds)) {
 # 3. Set subscription
 Test-AzSubscription -SubscriptionId $SubscriptionId
 
+if ($EnablePrivateEndpoint) {
+    $vnetExistsInConfiguredRg = $false
+    if (-not [string]::IsNullOrEmpty($VnetResourceGroup)) {
+        $vnetExistsInConfiguredRg = Test-VnetExists -ResourceGroup $VnetResourceGroup -VnetName $VnetName
+    }
+    if (-not $vnetExistsInConfiguredRg) {
+        Write-Step "Resolving VNet resource group for '$VnetName'"
+        $resolvedVnetResourceGroup = Resolve-VnetResourceGroupByName -VnetName $VnetName
+        if (-not [string]::IsNullOrEmpty($resolvedVnetResourceGroup)) {
+            if ($resolvedVnetResourceGroup -ne $VnetResourceGroup) {
+                Write-Warn "VNet '$VnetName' was not found in '$VnetResourceGroup'; using discovered RG '$resolvedVnetResourceGroup'."
+            } else {
+                Write-Success "VNet '$VnetName' found in '$resolvedVnetResourceGroup'."
+            }
+            $VnetResourceGroup = $resolvedVnetResourceGroup
+        } else {
+            Write-Warn "Could not auto-resolve VNet '$VnetName' in the active subscription. The prerequisite check will report the exact missing resource."
+        }
+    }
+}
+
 # --------------------------------------------------------------------------
 # 4. Auto-detect client IP if not supplied
 # --------------------------------------------------------------------------
