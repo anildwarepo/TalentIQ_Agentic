@@ -34,6 +34,7 @@ param(
 
     [string]$AcrName,
     [string]$AcrResourceGroup,
+    [string]$ContainerAppsEnvironmentId,
     [string]$ContainerAppsEnvName,
     [string]$ContainerAppsEnvResourceGroup,
 
@@ -148,16 +149,29 @@ $AcrName = Get-ParameterValue -Name 'ACR name' -EnvVar 'AZURE_ACR_NAME' -Value $
 
 # Soft fallback: read 00-container-apps-env/.outputs.json when the ACA env
 # name (and its RG) were not supplied via -ContainerAppsEnvName /
-# -ContainerAppsEnvResourceGroup or AZURE_ACA_ENV_NAME / AZURE_ACA_ENV_RESOURCE_GROUP.
+# -ContainerAppsEnvResourceGroup / -ContainerAppsEnvironmentId or
+# AZURE_ACA_ENV_NAME / AZURE_ACA_ENV_RESOURCE_GROUP / AZURE_ACA_ENV_ID.
 # This makes `00 -> 02` a one-shot hand-off without forcing operators to
 # copy values by hand. Never fails if the file is missing.
-if ([string]::IsNullOrEmpty($ContainerAppsEnvName) `
+if ([string]::IsNullOrEmpty($ContainerAppsEnvironmentId) `
+        -and [string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable('AZURE_ACA_ENV_ID')) `
+        -and [string]::IsNullOrEmpty($ContainerAppsEnvName) `
         -and [string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable('AZURE_ACA_ENV_NAME'))) {
     $caeOutputsPath = Join-Path $PSScriptRoot "..\00-container-apps-env\.outputs.json"
     if (Test-Path $caeOutputsPath) {
         try {
             $caeOutputs = Get-Content -LiteralPath $caeOutputsPath -Raw | ConvertFrom-Json
-            if ($caeOutputs -and -not [string]::IsNullOrEmpty($caeOutputs.containerAppsEnvName)) {
+            $caeOutputSubscriptionId = ""
+            if ($caeOutputs -and $caeOutputs.PSObject.Properties.Name -contains 'containerAppsEnvId') {
+                $match = [regex]::Match([string]$caeOutputs.containerAppsEnvId, '/subscriptions/([^/]+)/', 'IgnoreCase')
+                if ($match.Success) { $caeOutputSubscriptionId = $match.Groups[1].Value }
+            }
+            if (-not [string]::IsNullOrEmpty($caeOutputSubscriptionId) -and $caeOutputSubscriptionId -ne $SubscriptionId) {
+                Write-Warn "Ignoring 00-container-apps-env/.outputs.json because it targets subscription $caeOutputSubscriptionId, not $SubscriptionId."
+            } elseif ($caeOutputs -and -not [string]::IsNullOrEmpty($caeOutputs.containerAppsEnvId)) {
+                $ContainerAppsEnvironmentId = [string]$caeOutputs.containerAppsEnvId
+                Write-Info "Container Apps environment ID = (from 00-container-apps-env/.outputs.json)"
+            } elseif ($caeOutputs -and -not [string]::IsNullOrEmpty($caeOutputs.containerAppsEnvName)) {
                 $ContainerAppsEnvName = [string]$caeOutputs.containerAppsEnvName
                 Write-Info "Container Apps environment name = (from 00-container-apps-env/.outputs.json)"
                 if ([string]::IsNullOrEmpty($ContainerAppsEnvResourceGroup) `
@@ -173,13 +187,20 @@ if ([string]::IsNullOrEmpty($ContainerAppsEnvName) `
     }
 }
 
-$ContainerAppsEnvName = Get-ParameterValue -Name 'Container Apps environment name' -EnvVar 'AZURE_ACA_ENV_NAME' -Value $ContainerAppsEnvName
+$envContainerAppsEnvironmentId = [Environment]::GetEnvironmentVariable('AZURE_ACA_ENV_ID')
+if ([string]::IsNullOrEmpty($ContainerAppsEnvironmentId) -and -not [string]::IsNullOrEmpty($envContainerAppsEnvironmentId)) {
+    $ContainerAppsEnvironmentId = $envContainerAppsEnvironmentId
+    Write-Info "Container Apps environment resource ID = (from `$env:AZURE_ACA_ENV_ID)"
+}
+if ([string]::IsNullOrEmpty($ContainerAppsEnvironmentId)) {
+    $ContainerAppsEnvName = Get-ParameterValue -Name 'Container Apps environment name' -EnvVar 'AZURE_ACA_ENV_NAME' -Value $ContainerAppsEnvName
+}
 $FoundryAccountName = Get-ParameterValue -Name 'Foundry account name' -EnvVar 'FOUNDRY_ACCOUNT_NAME' -Value $FoundryAccountName
 $FoundryProjectName = Get-ParameterValue -Name 'Foundry project name' -EnvVar 'FOUNDRY_PROJECT_NAME' -Value $FoundryProjectName -Default 'talentiq'
 
 # Default secondary RGs to the main RG.
 if ([string]::IsNullOrEmpty($AcrResourceGroup)) { $AcrResourceGroup = $ResourceGroup }
-if ([string]::IsNullOrEmpty($ContainerAppsEnvResourceGroup)) { $ContainerAppsEnvResourceGroup = $ResourceGroup }
+if ([string]::IsNullOrEmpty($ContainerAppsEnvResourceGroup) -and [string]::IsNullOrEmpty($ContainerAppsEnvironmentId)) { $ContainerAppsEnvResourceGroup = $ResourceGroup }
 if ([string]::IsNullOrEmpty($FoundryResourceGroup)) { $FoundryResourceGroup = $ResourceGroup }
 if ([string]::IsNullOrEmpty($CosmosResourceGroup)) { $CosmosResourceGroup = $ResourceGroup }
 if ([string]::IsNullOrEmpty($PostgresqlResourceGroup)) { $PostgresqlResourceGroup = $ResourceGroup }
@@ -249,14 +270,42 @@ Test-AzSubscription -SubscriptionId $SubscriptionId
 
 $checks = @(
     @{ Type = 'rg';              Name = $ResourceGroup },
-    @{ Type = 'acr';             Name = $AcrName },
-    @{ Type = 'containerappenv'; Name = $ContainerAppsEnvName }
+    @{ Type = 'acr';             Name = $AcrName }
 )
 if (-not [string]::IsNullOrEmpty($CosmosAccountName)) {
     $checks += @{ Type = 'cosmos'; Name = $CosmosAccountName }
 }
 
 Assert-PrerequisitesExist -ResourceGroup $ResourceGroup -Checks $checks
+
+Write-Step "Resolving Container Apps environment resource ID"
+if ([string]::IsNullOrEmpty($ContainerAppsEnvironmentId)) {
+    $ContainerAppsEnvResourceGroup = Get-ParameterValue -Name 'Container Apps environment resource group' -EnvVar 'AZURE_ACA_ENV_RESOURCE_GROUP' -Value $ContainerAppsEnvResourceGroup -Default $ResourceGroup
+    $ContainerAppsEnvironmentId = (Invoke-Native {
+        az containerapp env show `
+            --resource-group $ContainerAppsEnvResourceGroup `
+            --name $ContainerAppsEnvName `
+            --query id -o tsv 2>$null `
+        | Where-Object { $_ -notmatch '^(WARNING|ERROR)' }
+    }) -join ""
+    $ContainerAppsEnvironmentId = $ContainerAppsEnvironmentId.Trim()
+    if ([string]::IsNullOrEmpty($ContainerAppsEnvironmentId)) {
+        Write-Fail "Container Apps environment '$ContainerAppsEnvName' not found in RG '$ContainerAppsEnvResourceGroup'."
+        Write-Info "Pass -ContainerAppsEnvironmentId <resource-id>, or pass both -ContainerAppsEnvName and -ContainerAppsEnvResourceGroup."
+        exit 1
+    }
+} else {
+    $ContainerAppsEnvironmentId = $ContainerAppsEnvironmentId.Trim()
+    $idMatch = [regex]::Match($ContainerAppsEnvironmentId, '^/subscriptions/[^/]+/resourceGroups/([^/]+)/providers/Microsoft\.App/managedEnvironments/([^/]+)$', 'IgnoreCase')
+    if ($idMatch.Success) {
+        $ContainerAppsEnvResourceGroup = $idMatch.Groups[1].Value
+        $ContainerAppsEnvName = $idMatch.Groups[2].Value
+    } else {
+        Write-Fail "ContainerAppsEnvironmentId is not a valid Microsoft.App/managedEnvironments resource ID."
+        exit 1
+    }
+}
+Write-Success "ACA env ID: $ContainerAppsEnvironmentId"
 
 # Foundry account + project + at least one model deployment.
 $foundry = Test-FoundryProject `
@@ -282,19 +331,6 @@ if ([string]::IsNullOrEmpty($acrLoginServer)) {
     exit 1
 }
 Write-Success "ACR login server: $acrLoginServer"
-
-$acaEnvId = (Invoke-Native {
-    az containerapp env show `
-        --resource-group $ContainerAppsEnvResourceGroup `
-        --name $ContainerAppsEnvName `
-        --query id -o tsv 2>$null `
-    | Where-Object { $_ -notmatch '^(WARNING|ERROR)' }
-}) -join ""
-$acaEnvId = $acaEnvId.Trim()
-if ([string]::IsNullOrEmpty($acaEnvId)) {
-    Write-Fail "Could not resolve Container Apps environment ID for '$ContainerAppsEnvName'."
-    exit 1
-}
 
 # ------------------------------------------------------------------------------
 # 6. Show summary + confirm
@@ -420,7 +456,7 @@ $paramOverrides = @(
     "backendAppName=$BackendAppName",
     "backendImage=$backendImage",
     "mcpImage=$mcpImage",
-    "containerAppsEnvironmentId=$acaEnvId",
+    "containerAppsEnvironmentId=$ContainerAppsEnvironmentId",
     "acrName=$AcrName",
     "pgFqdn=$pgFqdn",
     "graphName=talent_graph",

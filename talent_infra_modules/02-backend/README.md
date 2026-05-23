@@ -69,7 +69,9 @@ Phases:
 | ResourceGroup                 | `AZURE_RESOURCE_GROUP`               | —                               | |
 | Location                     | `AZURE_LOCATION`                     | `eastus`                        | |
 | AcrName                       | `AZURE_ACR_NAME`                     | —                               | Must exist. |
+| ContainerAppsEnvironmentId    | `AZURE_ACA_ENV_ID`                   | empty                           | Preferred when the ACA env is in another RG or when stale `00-container-apps-env/.outputs.json` exists. |
 | AcaEnvironmentName            | `AZURE_ACA_ENV_NAME`                 | —                               | Must exist. |
+| AcaEnvironmentResourceGroup   | `AZURE_ACA_ENV_RESOURCE_GROUP`       | `ResourceGroup`                 | Required when using `AcaEnvironmentName` for a cross-RG ACA env. |
 | BackendContainerAppName       | `BACKEND_CONTAINER_APP_NAME`         | `backend-<uniq>`                | Drives UAMI name `<this>-identity`. |
 | BackendImageTag               | `BACKEND_IMAGE_TAG`                  | git short SHA, fallback `latest`| |
 | McpImageTag                   | `MCP_IMAGE_TAG`                      | git short SHA, fallback `latest`| |
