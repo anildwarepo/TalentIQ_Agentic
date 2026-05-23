@@ -108,7 +108,7 @@ param(
 $scriptDir = $PSScriptRoot
 . (Join-Path $scriptDir "..\shared\common.ps1")
 
-Show-AppConfigEnvPreflight -Import -Force:$Force
+Show-AppConfigEnvPreflight -Import -Override -Force:$Force
 
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor DarkCyan

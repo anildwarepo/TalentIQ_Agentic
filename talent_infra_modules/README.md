@@ -65,10 +65,14 @@ partial-environment scripts do not know.
 
 ## Parameter prompting
 
-Every script accepts parameters in this order (first match wins):
+Every script imports `app_config/.env` before resolving parameters. Values
+from that file are loaded into the current PowerShell process for the deploy
+run, replacing any same-named process env vars. Every script then accepts
+parameters in this order (first match wins):
 
 1. **Explicit script argument** (`./deploy.ps1 -ResourceGroup rg-...`).
-2. **Environment variable** documented per-script.
+2. **Environment variable** documented per-script, normally loaded from
+  `app_config/.env`.
 3. **Azure discovery picker** for the primary subscription/resource group
   (`az account list`, then `az group list` in the selected subscription).
 4. **Interactive prompt** with a sensible default shown in `(default: ...)`.
