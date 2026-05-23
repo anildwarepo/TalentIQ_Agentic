@@ -269,7 +269,7 @@ Assert-PrerequisitesExist `
     -Checks $checks
 
 # --------------------------------------------------------------------------
-# 6b. Auto-discover existing 'privatelink.postgres.database.azure.com' zone
+# 6b. Auto-discover existing PostgreSQL Private DNS zone linked to the VNet
 #
 # Azure rejects "a virtual network cannot be linked to multiple zones
 # with overlapping namespaces". If a zone of that name is already linked
@@ -281,13 +281,12 @@ Assert-PrerequisitesExist `
 # --------------------------------------------------------------------------
 $ExistingDnsZoneLinked = $true   # default matches Bicep  -  skip link creation
 if ($EnablePrivateEndpoint -and [string]::IsNullOrEmpty($ExistingDnsZoneId)) {
-    Write-Step "Discovering existing 'privatelink.postgres.database.azure.com' Private DNS zone"
+    Write-Step "Discovering PostgreSQL Private DNS zone linked to VNet '$VnetName'"
 
     $vnetId = "/subscriptions/$SubscriptionId/resourceGroups/$VnetResourceGroup/providers/Microsoft.Network/virtualNetworks/$VnetName"
 
-    $linkedZoneId = Get-LinkedPrivateDnsZoneId `
+    $linkedZoneId = Get-LinkedPostgresqlPrivateDnsZoneId `
         -SubscriptionId $SubscriptionId `
-        -ZoneName 'privatelink.postgres.database.azure.com' `
         -VnetId $vnetId
 
     if (-not [string]::IsNullOrEmpty($linkedZoneId)) {

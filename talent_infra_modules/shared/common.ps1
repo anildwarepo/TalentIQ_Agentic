@@ -538,6 +538,88 @@ function Get-LinkedPrivateDnsZoneId {
     return $null
 }
 
+function Get-LinkedPostgresqlPrivateDnsZoneId {
+    <#
+    .SYNOPSIS
+        Return a PostgreSQL Private DNS zone already linked to the supplied VNet.
+
+    .DESCRIPTION
+        PostgreSQL environments may use the standard private endpoint zone
+        (privatelink.postgres.database.azure.com), the private-access zone
+        (private.postgres.database.azure.com), or an environment-specific
+        sub-zone ending in .private.postgres.database.azure.com. This resolver
+        prefers a zone that is already linked to the target VNet over any
+        unlinked same-name zone elsewhere in the subscription.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$SubscriptionId,
+        [Parameter(Mandatory)][string]$VnetId
+    )
+
+    $zonesJson = Invoke-Native {
+        az network private-dns zone list `
+            --subscription $SubscriptionId `
+            --output json 2>$null
+    }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($zonesJson)) {
+        return $null
+    }
+    try { $zones = @($zonesJson | ConvertFrom-Json) } catch { return $null }
+
+    $postgresZones = @($zones | Where-Object {
+        $zoneName = [string]$_.name
+        ($zoneName -ieq 'privatelink.postgres.database.azure.com') -or
+        ($zoneName -ieq 'private.postgres.database.azure.com') -or
+        ($zoneName -ilike '*.private.postgres.database.azure.com')
+    })
+
+    $linkedMatches = @()
+    foreach ($zone in $postgresZones) {
+        $zoneId = [string]$zone.id
+        $segments = $zoneId.Split('/')
+        if ($segments.Length -lt 5) { continue }
+        $zoneRg = $segments[4]
+        $zoneNm = [string]$zone.name
+
+        $linksJson = Invoke-Native {
+            az network private-dns link vnet list `
+                --subscription $SubscriptionId `
+                --resource-group $zoneRg `
+                --zone-name $zoneNm `
+                --output json 2>$null
+        }
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($linksJson)) {
+            continue
+        }
+        try { $links = @($linksJson | ConvertFrom-Json) } catch { continue }
+
+        foreach ($link in $links) {
+            $linkVnetId = [string]$link.virtualNetwork.id
+            if ($linkVnetId -ieq $VnetId) {
+                $linkedMatches += [pscustomobject]@{
+                    Id = $zoneId
+                    Name = $zoneNm
+                }
+                break
+            }
+        }
+    }
+
+    if ($linkedMatches.Count -eq 0) { return $null }
+
+    $preferred = @($linkedMatches | Where-Object { $_.Name -ieq 'privatelink.postgres.database.azure.com' } | Select-Object -First 1)
+    if ($preferred.Count -eq 0) {
+        $preferred = @($linkedMatches | Where-Object { $_.Name -ieq 'private.postgres.database.azure.com' } | Select-Object -First 1)
+    }
+    if ($preferred.Count -gt 0) { return [string]$preferred[0].Id }
+
+    if ($linkedMatches.Count -eq 1) { return [string]$linkedMatches[0].Id }
+
+    Write-Warn "Multiple PostgreSQL Private DNS zones are linked to the target VNet: $((@($linkedMatches | ForEach-Object { $_.Id })) -join ', ')"
+    Write-Info "Set POSTGRESQL_DNS_ZONE_ID or -ExistingDnsZoneId to choose one."
+    return $null
+}
+
 function Get-PrivateDnsZoneIdByName {
     <#
     .SYNOPSIS
