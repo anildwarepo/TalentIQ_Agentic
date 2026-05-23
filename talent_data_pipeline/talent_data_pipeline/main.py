@@ -39,6 +39,8 @@ def _print_runtime_config() -> None:
     print(f"  AZURE_OPENAI_ENDPOINT             : {_display_value(pipeline_config.azure_openai_endpoint)}")
     print(f"  AZURE_OPENAI_EMBEDDING_DEPLOYMENT : {_display_value(pipeline_config.azure_openai_embedding_deployment)}")
     print(f"  AZURE_OPENAI_EMBEDDING_DIMENSIONS : {pipeline_config.embedding_dim}")
+    print(f"  AZURE_OPENAI_USE_ENTRA_AUTH       : {pipeline_config.azure_openai_use_entra_auth}")
+    print(f"  Embedding API key configured      : {bool(pipeline_config.azure_openai_api_key)}")
     print()
 
 

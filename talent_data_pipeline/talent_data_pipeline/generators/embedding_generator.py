@@ -97,12 +97,11 @@ class EmbeddingGenerator:
     # ── Client / encoding ─────────────────────────────────────────
 
     def _load_client(self):
-        """Lazy-load the Azure OpenAI client with DefaultAzureCredential."""
+        """Lazy-load the Azure OpenAI client."""
         if self._client is not None:
             return
         try:
             from openai import AzureOpenAI
-            from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
             endpoint = pipeline_config.azure_openai_endpoint.strip().rstrip("/")
             if not endpoint.startswith(("https://", "http://")):
@@ -110,18 +109,36 @@ class EmbeddingGenerator:
                     "AZURE_OPENAI_ENDPOINT must include http:// or https://. "
                     f"Loaded value: {pipeline_config.azure_openai_endpoint!r}"
                 )
-            credential = DefaultAzureCredential()
-            token_provider = get_bearer_token_provider(
-                credential, "https://cognitiveservices.azure.com/.default"
+
+            client_kwargs: dict[str, Any] = {
+                "azure_endpoint": endpoint,
+                "api_version": "2024-06-01",
+                "timeout": 120.0,
+                "max_retries": 5,
+            }
+            if pipeline_config.azure_openai_use_entra_auth:
+                from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+
+                credential = DefaultAzureCredential()
+                client_kwargs["azure_ad_token_provider"] = get_bearer_token_provider(
+                    credential, "https://cognitiveservices.azure.com/.default"
+                )
+                auth_mode = "Entra ID"
+            else:
+                api_key = pipeline_config.azure_openai_api_key
+                if not api_key:
+                    raise ValueError(
+                        "AZURE_OPENAI_USE_ENTRA_AUTH is not true, but no API key was found. "
+                        "Set FOUNDRY_DEPLOYMENT_KEY or AZURE_OPENAI_API_KEY in app_config/.env."
+                    )
+                client_kwargs["api_key"] = api_key
+                auth_mode = "API key"
+
+            self._client = AzureOpenAI(**client_kwargs)
+            print(
+                f"Azure OpenAI client ready ({auth_mode}) — "
+                f"deployment: {self._deployment}, dim: {self.dim}"
             )
-            self._client = AzureOpenAI(
-                azure_endpoint=endpoint,
-                azure_ad_token_provider=token_provider,
-                api_version="2024-06-01",
-                timeout=120.0,
-                max_retries=5,
-            )
-            print(f"Azure OpenAI client ready — deployment: {self._deployment}, dim: {self.dim}")
         except Exception as exc:
             print(f"WARNING: Could not initialize Azure OpenAI client: {exc}")
             print("Falling back to deterministic synthetic embeddings.")

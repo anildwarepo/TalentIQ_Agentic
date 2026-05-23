@@ -8,6 +8,21 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _first_env(*names: str) -> str:
+    for name in names:
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return ""
+
 def _find_repo_env() -> Path:
     """Find repo-level app_config/.env from cwd or package location."""
     starts = [Path.cwd(), Path(__file__).resolve()]
@@ -77,6 +92,8 @@ class PipelineConfig:
     # Azure OpenAI Embeddings
     azure_openai_endpoint: str = field(default_factory=lambda: os.getenv("AZURE_OPENAI_ENDPOINT", ""))
     azure_openai_embedding_deployment: str = field(default_factory=lambda: os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-ada-002"))
+    azure_openai_use_entra_auth: bool = field(default_factory=lambda: _env_bool("AZURE_OPENAI_USE_ENTRA_AUTH"))
+    azure_openai_api_key: str = field(default_factory=lambda: _first_env("FOUNDRY_DEPLOYMENT_KEY", "AZURE_OPENAI_API_KEY", "FOUNDRY_API_KEY"))
     embedding_dim: int = field(default_factory=lambda: int(os.getenv("AZURE_OPENAI_EMBEDDING_DIMENSIONS", "1536")))
 
 

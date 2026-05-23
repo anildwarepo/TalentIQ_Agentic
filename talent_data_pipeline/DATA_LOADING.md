@@ -231,6 +231,10 @@ PGDATABASE=postgres # Database name
 PGUSER=...          # Database user (Entra ID principal — see Authentication below)
 PGSSLMODE=require   # SSL mode
 GRAPH_NAME=talent_graph_dev  # AGE graph name
+AZURE_OPENAI_ENDPOINT=...                  # Azure OpenAI / Foundry account endpoint
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT=...      # Embedding deployment name
+AZURE_OPENAI_USE_ENTRA_AUTH=false          # true = Entra token auth; otherwise use key auth
+FOUNDRY_DEPLOYMENT_KEY=...                 # Used for embeddings when Entra auth is not true
 ```
 
 ### Authentication
@@ -241,6 +245,13 @@ The pipeline uses **Entra ID auth only** via `azure.identity.DefaultAzureCredent
 - **In Azure (Container Apps):** uses the container app's User-Assigned Managed Identity (UAMI) via IMDS automatically — no `az login`, no env vars beyond the standard `AZURE_CLIENT_ID` hint that `DefaultAzureCredential` honors.
 - **Override (rarely needed):** set `AZURE_FORCE_FULL_CREDENTIAL_CHAIN=1` to re-enable the full `DefaultAzureCredential` chain locally (slower; only useful when debugging a non-default credential source such as VS Code or Azure CLI extensions).
 - **Token lifetime:** Entra tokens have ~60 min TTL. The pool refreshes the token per new physical connection — long-lived pooled connections do not need mid-stream refresh because the token is only validated at PG's auth handshake.
+
+### Embedding Authentication
+
+Embedding generation reads `AZURE_OPENAI_USE_ENTRA_AUTH` from `app_config/.env`:
+
+- When set to `true`, `1`, `yes`, or `on`, embeddings use `DefaultAzureCredential` with the Cognitive Services scope.
+- Any other value, including an unset value, uses API-key auth. The loader reads the key from `FOUNDRY_DEPLOYMENT_KEY` first, then `AZURE_OPENAI_API_KEY`, then `FOUNDRY_API_KEY`.
 
 ## Troubleshooting
 
