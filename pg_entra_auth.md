@@ -4,7 +4,7 @@ anildwa@MngEnvMCAP347541.onmicrosoft.com
 
 
 
-$resourceGroup = "RG-Mgmt-AI-Apps-Dev-EUS"
+$resourceGroup = "rg-talent-devtest-v2"
 $foundryName = "tiqfoundry"
 
 $scope = az resource show `
@@ -29,5 +29,5 @@ az role assignment create `
 
 
 az containerapp env list `
-  --query "[].{name.name, resourceGroup:resourceGroup, id:id}" `
+  --query "[].{name:name, resourceGroup:resourceGroup, id:id}" `
   -o table
