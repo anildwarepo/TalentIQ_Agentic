@@ -12,26 +12,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-import psycopg2
-
 from talent_data_pipeline.config import _REPO_ROOT, apply_host_override, db_config, pipeline_config
-from talent_data_pipeline.pg_entra import pg_connect
-from talent_data_pipeline.connectivity_test import run_connectivity_test
-from talent_data_pipeline.schema.create_relational_tables import run_schema_creation
-from talent_data_pipeline.schema.create_indexes import (
-    run_age_label_indexes,
-    run_index_creation,
-)
-from talent_data_pipeline.generators.reference_data import ReferenceDataGenerator
-from talent_data_pipeline.generators.employee_generator import EmployeeGenerator
-from talent_data_pipeline.generators.edge_generator import EdgeGenerator
-from talent_data_pipeline.generators.resume_generator import ResumeGenerator
-from talent_data_pipeline.generators.embedding_generator import EmbeddingGenerator
-from talent_data_pipeline.loaders.graph_loader import GraphLoader
-from talent_data_pipeline.loaders.vector_loader import VectorLoader
-from talent_data_pipeline.loaders.fts_loader import FTSLoader
-from talent_data_pipeline.loaders.entity_search_loader import EntitySearchLoader
-from talent_data_pipeline.validate import run_validation
 
 
 _VALID_MODES = ("env", "manual")
@@ -107,6 +88,8 @@ def _clear_generation_checkpoints() -> None:
     if _GENERATION_CHECKPOINT_DIR.exists():
         shutil.rmtree(_GENERATION_CHECKPOINT_DIR)
         print(f"  Cleared generation checkpoints: {_GENERATION_CHECKPOINT_DIR}")
+    from talent_data_pipeline.generators.embedding_generator import EmbeddingGenerator
+
     EmbeddingGenerator.clear_checkpoint()
 
 
@@ -180,6 +163,8 @@ def _data_already_loaded() -> tuple[bool, dict[str, int]]:
     threshold = int(pipeline_config.employee_count * 0.9)
     graph = pipeline_config.graph_name
     try:
+        from talent_data_pipeline.pg_entra import pg_connect
+
         conn = pg_connect()
         conn.autocommit = True
         with conn.cursor() as cur:
@@ -239,6 +224,8 @@ def main(force: bool = False) -> None:
     print()
 
     # ── Phase 1: Connectivity ─────────────────────────────────────
+    from talent_data_pipeline.connectivity_test import run_connectivity_test
+
     print("━" * 70)
     print("PHASE 1: Connectivity Test")
     print("━" * 70)
@@ -248,6 +235,9 @@ def main(force: bool = False) -> None:
     print()
 
     # ── Phase 2: Schema Creation ──────────────────────────────────
+    from talent_data_pipeline.schema.create_indexes import run_age_label_indexes
+    from talent_data_pipeline.schema.create_relational_tables import run_schema_creation
+
     print("━" * 70)
     print("PHASE 2: Schema & Label Creation")
     print("━" * 70)
@@ -293,6 +283,8 @@ def main(force: bool = False) -> None:
         _run_generation_and_loading(force=force)
 
     # ── Phase 5: Index Creation ───────────────────────────────────
+    from talent_data_pipeline.schema.create_indexes import run_index_creation
+
     print("━" * 70)
     print("PHASE 5: Index Creation")
     print("━" * 70)
@@ -300,6 +292,8 @@ def main(force: bool = False) -> None:
     print()
 
     # ── Phase 6: Validation ───────────────────────────────────────
+    from talent_data_pipeline.validate import run_validation
+
     print("━" * 70)
     print("PHASE 6: Post-Load Validation")
     print("━" * 70)
@@ -314,6 +308,16 @@ def main(force: bool = False) -> None:
 
 def _run_generation_and_loading(force: bool = False) -> None:
     """Run Phase 3 (generate in-memory data) and Phase 4 (load to graph + tables)."""
+    from talent_data_pipeline.generators.edge_generator import EdgeGenerator
+    from talent_data_pipeline.generators.embedding_generator import EmbeddingGenerator
+    from talent_data_pipeline.generators.employee_generator import EmployeeGenerator
+    from talent_data_pipeline.generators.reference_data import ReferenceDataGenerator
+    from talent_data_pipeline.generators.resume_generator import ResumeGenerator
+    from talent_data_pipeline.loaders.entity_search_loader import EntitySearchLoader
+    from talent_data_pipeline.loaders.fts_loader import FTSLoader
+    from talent_data_pipeline.loaders.graph_loader import GraphLoader
+    from talent_data_pipeline.loaders.vector_loader import VectorLoader
+
     if force:
         _clear_generation_checkpoints()
 
