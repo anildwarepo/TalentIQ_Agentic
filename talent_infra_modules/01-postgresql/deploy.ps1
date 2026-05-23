@@ -274,6 +274,13 @@ Assert-PrerequisitesExist `
     -VnetResourceGroup $VnetResourceGroup `
     -Checks $checks
 
+if ($EnablePrivateEndpoint) {
+    Assert-SubnetAllowsPrivateEndpoint `
+        -ResourceGroup $VnetResourceGroup `
+        -VnetName $VnetName `
+        -SubnetName $PeSubnetName
+}
+
 # --------------------------------------------------------------------------
 # 6b. Auto-discover existing PostgreSQL Private DNS zone linked to the VNet
 #

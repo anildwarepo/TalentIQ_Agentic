@@ -443,6 +443,59 @@ function Test-VnetSubnetExists {
     return ($LASTEXITCODE -eq 0)
 }
 
+function Get-VnetSubnet {
+    <#
+    .SYNOPSIS
+        Return the Azure subnet object, or $null if it cannot be read.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$ResourceGroup,
+        [Parameter(Mandatory)][string]$VnetName,
+        [Parameter(Mandatory)][string]$SubnetName
+    )
+    $subnetJson = Invoke-Native {
+        az network vnet subnet show `
+            --resource-group $ResourceGroup `
+            --vnet-name $VnetName `
+            --name $SubnetName `
+            --output json 2>$null
+    }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($subnetJson)) {
+        return $null
+    }
+    try { return ($subnetJson | ConvertFrom-Json) } catch { return $null }
+}
+
+function Assert-SubnetAllowsPrivateEndpoint {
+    <#
+    .SYNOPSIS
+        Abort when a subnet cannot host Azure Private Endpoints.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$ResourceGroup,
+        [Parameter(Mandatory)][string]$VnetName,
+        [Parameter(Mandatory)][string]$SubnetName
+    )
+
+    Write-Step "Verifying subnet '$SubnetName' can host Private Endpoints"
+    $subnet = Get-VnetSubnet -ResourceGroup $ResourceGroup -VnetName $VnetName -SubnetName $SubnetName
+    if ($null -eq $subnet) {
+        Write-Fail "Could not read subnet '$SubnetName' in VNet '$VnetName' (RG '$ResourceGroup')."
+        exit 1
+    }
+
+    $delegations = @($subnet.delegations)
+    if ($delegations.Count -gt 0) {
+        $delegationNames = @($delegations | ForEach-Object {
+            if ($_.serviceName) { [string]$_.serviceName } else { [string]$_.name }
+        })
+        Write-Fail "Subnet '$SubnetName' is delegated ($($delegationNames -join ', ')); Azure Private Endpoints cannot be created in delegated subnets."
+        Write-Info "Use a separate non-delegated subnet for -PeSubnetName / AZURE_PE_SUBNET_NAME. Do not use the Container Apps infrastructure subnet."
+        exit 1
+    }
+    Write-Success "Subnet '$SubnetName' has no delegations."
+}
+
 function Get-LinkedPrivateDnsZoneId {
     <#
     .SYNOPSIS
