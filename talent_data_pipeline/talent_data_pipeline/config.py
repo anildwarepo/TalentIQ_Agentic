@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _ENV_PATH = _REPO_ROOT / "app_config" / ".env"
 if _ENV_PATH.exists():
-    load_dotenv(_ENV_PATH)
+    load_dotenv(_ENV_PATH, override=True)
 
 
 @dataclass(frozen=True)
