@@ -31,3 +31,15 @@ az role assignment create `
 az containerapp env list `
   --query "[].{name:name, resourceGroup:resourceGroup, id:id}" `
   -o table
+
+az cognitiveservices account show `
+  -g "RG-Mgmt-AI-Apps-Dev-EUS" `
+  -n "tiqfoundry" `
+  --query "{name:name, id:id, kind:kind, endpoint:properties.endpoint}" `
+  -o json
+
+az resource list `
+  -g "RG-Mgmt-AI-Apps-Dev-EUS" `
+  --resource-type "Microsoft.CognitiveServices/accounts/projects" `
+  --query "[].{name:name,id:id,type:type}" `
+  -o table
