@@ -104,12 +104,18 @@ class EmbeddingGenerator:
             from openai import AzureOpenAI
             from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
+            endpoint = pipeline_config.azure_openai_endpoint.strip().rstrip("/")
+            if not endpoint.startswith(("https://", "http://")):
+                raise ValueError(
+                    "AZURE_OPENAI_ENDPOINT must include http:// or https://. "
+                    f"Loaded value: {pipeline_config.azure_openai_endpoint!r}"
+                )
             credential = DefaultAzureCredential()
             token_provider = get_bearer_token_provider(
                 credential, "https://cognitiveservices.azure.com/.default"
             )
             self._client = AzureOpenAI(
-                azure_endpoint=pipeline_config.azure_openai_endpoint,
+                azure_endpoint=endpoint,
                 azure_ad_token_provider=token_provider,
                 api_version="2024-06-01",
                 timeout=120.0,

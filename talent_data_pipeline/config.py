@@ -8,9 +8,24 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+def _find_repo_env() -> Path:
+    """Find repo-level app_config/.env from cwd or package location."""
+    starts = [Path.cwd(), Path(__file__).resolve()]
+    seen: set[Path] = set()
+    for start in starts:
+        for parent in (start, *start.parents):
+            if parent in seen:
+                continue
+            seen.add(parent)
+            candidate = parent / "app_config" / ".env"
+            if candidate.exists():
+                return candidate
+    return Path(__file__).resolve().parent.parent / "app_config" / ".env"
+
+
 # Load .env from centralized app_config/.env
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-_ENV_PATH = _REPO_ROOT / "app_config" / ".env"
+_ENV_PATH = _find_repo_env()
+_REPO_ROOT = _ENV_PATH.parent.parent
 if _ENV_PATH.exists():
     load_dotenv(_ENV_PATH, override=True)
 
