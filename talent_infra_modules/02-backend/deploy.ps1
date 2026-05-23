@@ -390,11 +390,14 @@ if (-not $SkipBuild) {
         Write-Fail "BackendSourcePath '$BackendSourcePath' does not exist."
         exit 1
     }
-    if (-not (Test-Path (Join-Path $backendSourceResolved 'Dockerfile'))) {
+    $backendDockerfilePath = Join-Path $backendSourceResolved 'Dockerfile'
+    $mcpDockerfilePath = Join-Path $backendSourceResolved 'Dockerfile.mcp'
+
+    if (-not (Test-Path $backendDockerfilePath)) {
         Write-Fail "No Dockerfile found at $backendSourceResolved"
         exit 1
     }
-    if (-not (Test-Path (Join-Path $backendSourceResolved 'Dockerfile.mcp'))) {
+    if (-not (Test-Path $mcpDockerfilePath)) {
         Write-Fail "No Dockerfile.mcp found at $backendSourceResolved"
         exit 1
     }
@@ -406,7 +409,7 @@ if (-not $SkipBuild) {
             --registry $AcrName `
             --resource-group $AcrResourceGroup `
             --image "backend:$BackendImageTag" `
-            --file 'Dockerfile' `
+            --file $backendDockerfilePath `
             $backendSourceResolved
     }
     if ($LASTEXITCODE -ne 0) {
@@ -422,7 +425,7 @@ if (-not $SkipBuild) {
             --registry $AcrName `
             --resource-group $AcrResourceGroup `
             --image "mcp-server:$McpImageTag" `
-            --file 'Dockerfile.mcp' `
+            --file $mcpDockerfilePath `
             $backendSourceResolved
     }
     if ($LASTEXITCODE -ne 0) {
