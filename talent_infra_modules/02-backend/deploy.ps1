@@ -187,7 +187,7 @@ if ([string]::IsNullOrEmpty($ContainerAppsEnvironmentId) `
     }
 }
 
-$envContainerAppsEnvironmentId = [Environment]::GetEnvironmentVariable('AZURE_ACA_ENV_ID')
+$envContainerAppsEnvironmentId = Get-ProcessEnvValue -Name 'AZURE_ACA_ENV_ID'
 if ([string]::IsNullOrEmpty($ContainerAppsEnvironmentId) -and -not [string]::IsNullOrEmpty($envContainerAppsEnvironmentId)) {
     $ContainerAppsEnvironmentId = $envContainerAppsEnvironmentId
     Write-Info "Container Apps environment resource ID = (from `$env:AZURE_ACA_ENV_ID)"
@@ -197,6 +197,13 @@ if ([string]::IsNullOrEmpty($ContainerAppsEnvironmentId)) {
 }
 $FoundryAccountName = Get-ParameterValue -Name 'Foundry account name' -EnvVar 'FOUNDRY_ACCOUNT_NAME' -Value $FoundryAccountName
 $FoundryProjectName = Get-ParameterValue -Name 'Foundry project name' -EnvVar 'FOUNDRY_PROJECT_NAME' -Value $FoundryProjectName -Default 'talentiq'
+if (-not $PSBoundParameters.ContainsKey('ChatModelDeployment')) {
+    $envChatModelDeployment = Get-ProcessEnvValue -Name 'FOUNDRY_CHAT_DEPLOYMENT_NAME'
+    if (-not [string]::IsNullOrEmpty($envChatModelDeployment)) {
+        $ChatModelDeployment = $envChatModelDeployment
+        Write-Info "Chat model deployment = (from `$env:FOUNDRY_CHAT_DEPLOYMENT_NAME)"
+    }
+}
 
 # Default secondary RGs to the main RG.
 if ([string]::IsNullOrEmpty($AcrResourceGroup)) { $AcrResourceGroup = $ResourceGroup }

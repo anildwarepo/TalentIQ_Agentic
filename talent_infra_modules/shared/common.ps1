@@ -105,6 +105,62 @@ function Read-DotEnvFile {
     return $values
 }
 
+function Test-PlaceholderEnvValue {
+    param([AllowNull()][string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) { return $false }
+    return ($Value -match '<[^>]+>')
+}
+
+function Get-ProcessEnvValue {
+    param([Parameter(Mandatory)][string]$Name)
+    $value = [Environment]::GetEnvironmentVariable($Name)
+    if (Test-PlaceholderEnvValue -Value $value) { return "" }
+    return $value
+}
+
+function Set-AppConfigAlias {
+    param(
+        [Parameter(Mandatory)]$Values,
+        [Parameter(Mandatory)][string]$Target,
+        [Parameter(Mandatory)][string[]]$Sources
+    )
+    if ($Values.Contains($Target) -and -not (Test-PlaceholderEnvValue -Value ([string]$Values[$Target]))) { return }
+    foreach ($source in $Sources) {
+        if ($Values.Contains($source)) {
+            $sourceValue = [string]$Values[$source]
+            if (-not [string]::IsNullOrWhiteSpace($sourceValue) -and -not (Test-PlaceholderEnvValue -Value $sourceValue)) {
+                $Values[$Target] = $sourceValue
+                return
+            }
+        }
+    }
+}
+
+function Add-AppConfigAliases {
+    param([Parameter(Mandatory)]$Values)
+
+    Set-AppConfigAlias -Values $Values -Target 'FOUNDRY_ACCOUNT_NAME' -Sources @('foundry_account_name')
+    Set-AppConfigAlias -Values $Values -Target 'FOUNDRY_PROJECT_NAME' -Sources @('foundry_project_name')
+    Set-AppConfigAlias -Values $Values -Target 'FOUNDRY_CHAT_DEPLOYMENT_NAME' -Sources @('AZURE_OPENAI_CHAT_DEPLOYMENT_NAME', 'FOUNDRY_DEPLOYMENT')
+
+    if ((-not $Values.Contains('FOUNDRY_ACCOUNT_NAME') -or (Test-PlaceholderEnvValue -Value ([string]$Values['FOUNDRY_ACCOUNT_NAME'])) `
+            -or -not $Values.Contains('FOUNDRY_PROJECT_NAME') -or (Test-PlaceholderEnvValue -Value ([string]$Values['FOUNDRY_PROJECT_NAME'])) `
+        ) -and $Values.Contains('FOUNDRY_ENDPOINT')) {
+        $endpoint = [string]$Values['FOUNDRY_ENDPOINT']
+        if (-not (Test-PlaceholderEnvValue -Value $endpoint)) {
+            $match = [regex]::Match($endpoint, '^https://([^./]+)\.services\.ai\.azure\.com/api/projects/([^/]+)/', 'IgnoreCase')
+            if ($match.Success) {
+                if (-not $Values.Contains('FOUNDRY_ACCOUNT_NAME') -or (Test-PlaceholderEnvValue -Value ([string]$Values['FOUNDRY_ACCOUNT_NAME']))) {
+                    $Values['FOUNDRY_ACCOUNT_NAME'] = $match.Groups[1].Value
+                }
+                if (-not $Values.Contains('FOUNDRY_PROJECT_NAME') -or (Test-PlaceholderEnvValue -Value ([string]$Values['FOUNDRY_PROJECT_NAME']))) {
+                    $Values['FOUNDRY_PROJECT_NAME'] = $match.Groups[2].Value
+                }
+            }
+        }
+    }
+}
+
 function Format-EnvValueForDisplay {
     param(
         [Parameter(Mandatory)][string]$Name,
@@ -138,18 +194,24 @@ function Show-AppConfigEnvPreflight {
     }
 
     $values = Read-DotEnvFile -Path $envPath
+    Add-AppConfigAliases -Values $values
     if ($values.Count -eq 0) {
         Write-Warn "app_config/.env contains no key/value pairs."
     } else {
         foreach ($key in @($values.Keys | Sort-Object)) {
             $value = [string]$values[$key]
-            if ($Import -and ($Override -or [string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable($key)))) {
+            $isPlaceholder = Test-PlaceholderEnvValue -Value $value
+            if ($Import -and -not $isPlaceholder -and ($Override -or [string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable($key)))) {
                 [Environment]::SetEnvironmentVariable($key, $value, 'Process')
+            } elseif ($Import -and $Override -and $isPlaceholder -and (Test-PlaceholderEnvValue -Value ([Environment]::GetEnvironmentVariable($key)))) {
+                [Environment]::SetEnvironmentVariable($key, $null, 'Process')
             }
             $shown = Format-EnvValueForDisplay -Name $key -Value $value
-            $processValue = [Environment]::GetEnvironmentVariable($key)
+            $processValue = Get-ProcessEnvValue -Name $key
             $suffix = ''
-            if (-not [string]::IsNullOrEmpty($processValue) -and $processValue -ne $value) {
+            if ($isPlaceholder) {
+                $suffix = '  (placeholder ignored)'
+            } elseif (-not [string]::IsNullOrEmpty($processValue) -and $processValue -ne $value) {
                 $suffix = '  (process env differs; explicit args/process env may still win)'
             }
             Write-Host ("    {0}={1}{2}" -f $key, $shown, $suffix) -ForegroundColor Gray
@@ -249,7 +311,7 @@ function Resolve-AzSubscriptionId {
     if (-not [string]::IsNullOrWhiteSpace($Value)) { return $Value.Trim() }
 
     if (-not [string]::IsNullOrWhiteSpace($EnvVar)) {
-        $envValue = [Environment]::GetEnvironmentVariable($EnvVar)
+        $envValue = Get-ProcessEnvValue -Name $EnvVar
         if (-not [string]::IsNullOrWhiteSpace($envValue)) {
             Write-Info "Subscription ID = (from `$env:$EnvVar)"
             return $envValue.Trim()
@@ -326,7 +388,7 @@ function Resolve-AzResourceGroupName {
     if (-not [string]::IsNullOrWhiteSpace($Value)) { return $Value.Trim() }
 
     if (-not [string]::IsNullOrWhiteSpace($EnvVar)) {
-        $envValue = [Environment]::GetEnvironmentVariable($EnvVar)
+        $envValue = Get-ProcessEnvValue -Name $EnvVar
         if (-not [string]::IsNullOrWhiteSpace($envValue)) {
             Write-Info "$Name = (from `$env:$EnvVar)"
             return $envValue.Trim()
@@ -478,7 +540,7 @@ function Get-ParameterValue {
     # a default suggestion under -AlwaysPrompt.
     $envVal = $null
     if (-not [string]::IsNullOrEmpty($EnvVar)) {
-        $envVal = [Environment]::GetEnvironmentVariable($EnvVar)
+        $envVal = Get-ProcessEnvValue -Name $EnvVar
     }
 
     # Fast path (historical behaviour): script-arg wins, then env var,
