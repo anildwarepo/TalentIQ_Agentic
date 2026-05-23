@@ -91,3 +91,6 @@
 ## Cross-agent note — 2026-05-23T00:30:00Z (Scribe, from Bishop)
 
 - **Testing implication of the 11-file `.ps1` sweep:** any future `.ps1` edit must verify (a) first 3 bytes = `EF BB BF` and (b) `[scriptblock]::Create((Get-Content -Raw))` parses clean in BOTH `powershell.exe` 5.1 **and** `pwsh` 7+. `.editorconfig` + `.vscode/settings.json` prevention guards now handle the BOM half automatically; dual-engine parse is still a release-sweep candidate. **Two BOM-less `.ps1` files with non-ASCII bytes need a future cleanup pass** (NOT in this round's 11-file scope): `.squad/templates/skills/distributed-mesh/sync-mesh.ps1` (squad template) and `talent_infra_v2/scripts/Purge-SoftDeletedFoundryAccounts.ps1` (standalone admin script). Per `decisions.md 2026-05-23T00:30:00Z`.
+
+## Cross-agent note - 2026-05-23T01:30:00Z (Scribe, from Bishop)
+- **New pre-release regression detector (decision `2026-05-23T01:30:00Z`).** Grep `^\s+-\s+\w+` across all `.ps1` files; any real hit (outside comment/string context) is a sweep-methodology bug. Also reject any encoding-remediation PR whose sweep regex matches ASCII text. When sourcing from a git ref, em-dash byte-sequence assertion (`E2 80 94`) is mandatory after blob capture. Known false positive: `talent_infra_modules/shared/common.ps1:482` (legitimate comment-help-block prose dash).

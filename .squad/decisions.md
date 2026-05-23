@@ -5,7 +5,169 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-23T01:30:00Z: PowerShell substitution sweeps MUST be byte-level (codepoint >= 0x80) — regex over ASCII range is FORBIDDEN
+
+**By:** Bishop (Deployment Engineer) — requested by Anil, merged by Scribe
+**Status:** Implemented (12/12 files re-swept clean, dual-engine parse OK in pwsh 7+; 02-backend still flagged `EXPECT_FAIL_PS7_ONLY` for its pre-existing `?.`/`??` syntax — NOT an encoding regression)
+**Supersedes-in-part:** Decision `2026-05-23T00:30:00Z` — the *encoding rule* (UTF-8 + BOM, ASCII content, dual-engine parse) STANDS unchanged. The *substitution method* (the "Required helper shape" / regex pattern Bishop used inside that sweep) is REPLACED by the byte-level codepoint contract below. Any sweep helper inheriting from the 2026-05-23T00:30:00Z entry must be rebuilt from this entry's template.
+
+---
+
+**Regression trigger:** Anil hit a runtime error invoking `talent_infra_modules/01-postgresql/deploy.ps1`:
+
+```
+Get-ParameterValue: A positional parameter cannot be found that accepts argument ''.
+```
+
+Root cause: the 11-file sweep run committed in `53a94e9` ("security: remediate GitGuardian leak") used a **regex** that matched `\s+-\w+` over the full file text and replaced it with ` - $1`. That regex matched **ASCII parameter prefixes** like `    -Value`, `    -EnvVar`, `    -Default` — mangling them into `     - Value`, `     - EnvVar`, etc. PowerShell then parsed `-` as a positional parameter and `Value` as the value of an unnamed parameter, producing the runtime error above on every `Get-ParameterValue` call in `01-postgresql/deploy.ps1` (5 such calls between lines 122 and 131).
+
+Bishop diagnosed via `git diff`, rolled back ALL 12 affected files, and re-swept them using the byte-level codepoint technique below. The encoding-cleanup *intent* was correct (em-dash `—` to ASCII separator). The *implementation* was wrong (regex over the whole file, including ASCII ranges).
+
+---
+
+**Verbatim rule (canonical — quote in cross-agent guardrails):**
+
+> Substitution sweeps over PowerShell source files MUST iterate Unicode codepoints; ASCII bytes (codepoint < 0x80) are PASSTHROUGH and NEVER touched; only codepoints >= 0x80 are substituted via a static `[char]0xNNNN`-keyed table; regex patterns that can match ASCII bytes are FORBIDDEN.
+
+Unknown codepoints `>= 0x80` MUST cause the sweep to throw (preferred) or emit `?` with a warning report — NEVER silently corrupt. This rule applies to ALL substitution sweeps over source files, not just PowerShell — see cross-agent impact for Brett (Python / .env) and Kane (any text-file sweep).
+
+---
+
+**Required helper shape (template — rebuild from this, never resurrect the regex shape):**
+
+```powershell
+$utf8 = New-Object System.Text.UTF8Encoding $true     # BOM emitted on write
+$raw  = [System.IO.File]::ReadAllBytes($path)
+$text = [System.Text.Encoding]::UTF8.GetString($raw)  # decode UTF-8 -> string
+
+$subs = @{
+    0x2014 = ' - '   # em-dash
+    0x2013 = '-'     # en-dash
+    # ... 18 entries total, see table below
+}
+
+$sb = New-Object System.Text.StringBuilder
+foreach ($ch in $text.ToCharArray()) {
+    $cp = [int]$ch
+    if ($cp -lt 0x80) {
+        [void]$sb.Append($ch)            # ASCII passthrough -- NEVER touched
+    } elseif ($subs.ContainsKey($cp)) {
+        [void]$sb.Append($subs[$cp])     # known non-ASCII -> substitute
+    } else {
+        throw "Unknown codepoint U+$($cp.ToString('X4')) in $path"
+    }
+}
+[System.IO.File]::WriteAllText($path, $sb.ToString(), $utf8)
+```
+
+---
+
+**Smoke-test grep (regression detector — Lambert pre-release check):**
+
+Run across all `.ps1` files in the repo:
+
+```
+^\s+-\s+\w+
+```
+
+Any real hit (outside comment/string context) is a regression — the byte-level sweep has been corrupted by a regex pass. One known false positive remains: `talent_infra_modules/shared/common.ps1` line 482 has a comment-help-block prose dash produced by the em-dash → ` - ` substitution; verified by inspection. All other hits MUST be treated as bugs.
+
+---
+
+**Corrected 18-entry substitution map (canonical, codepoint-keyed):**
+
+| Codepoint | Glyph | -> Replacement |
+|---|---|---|
+| U+2014 | em-dash | ` - ` (space-hyphen-space) |
+| U+2013 | en-dash | `-` |
+| U+2018 | left single quote | `'` |
+| U+2019 | right single quote | `'` |
+| U+201C | left double quote | `"` |
+| U+201D | right double quote | `"` |
+| U+00A0 | NBSP | ` ` (space) |
+| U+2026 | ellipsis | `...` |
+| U+2192 | right arrow | `->` |
+| U+2190 | left arrow | `<-` |
+| U+2500 | box-drawing horizontal | `-` |
+| U+2194 | left-right arrow | `<->` |
+| U+2550 | box double horizontal | `=` |
+| U+2588 | full block | `#` |
+| U+26A0 | warning sign | `[WARN]` |
+| U+2705 | check mark (emoji) | `[OK]` |
+| U+2713 | check mark | `[OK]` |
+| U+FEFF | interior BOM | `` (strip; fresh leading BOM added on write) |
+
+---
+
+**Second mandate — capturing git blob bytes for sweep source:**
+
+When re-sweeping a file from a historical commit (e.g., the pristine pre-regression version), `git show <ref>:<path>` piped through PowerShell stdout decodes UTF-8 multi-byte sequences via the **console code page** (CP1252 on en-US Windows hosts), producing double-encoded mojibake before the sweep ever runs. Concrete example this pass: em-dash byte sequence `E2 80 94` was read by PowerShell as 3 CP1252 chars (`U+0393, U+00F6, U+00C7`), causing 7,215 "unknown codepoint" warnings on the first re-sweep attempt of `01-postgresql/deploy.ps1`.
+
+Required capture pattern:
+
+```powershell
+$tmp = [System.IO.Path]::GetTempFileName()
+cmd.exe /c "git show <ref>:<path> > `"$tmp`""    # cmd.exe '>' is byte-level
+$rawBytes = [System.IO.File]::ReadAllBytes($tmp)  # raw UTF-8 blob bytes
+$text     = [System.Text.Encoding]::UTF8.GetString($rawBytes)
+# Sanity-check: assert expected byte sequences are present
+$emCount = 0
+for ($i = 0; $i -le $rawBytes.Length - 3; $i++) {
+    if ($rawBytes[$i] -eq 0xE2 -and $rawBytes[$i+1] -eq 0x80 -and $rawBytes[$i+2] -eq 0x94) { $emCount++ }
+}
+if ($emCount -eq 0) { throw "Captured blob has no em-dashes -- capture likely failed" }
+```
+
+The em-dash byte-sequence assertion is MANDATORY when sourcing from a git ref. Without it, console-code-page corruption is invisible until you tally unknown codepoints post-sweep.
+
+---
+
+**Validation (Bishop, this pass):**
+
+- 12 files re-swept (the 11 from the prior pass PLUS `01-postgresql/deploy.ps1` re-sourced from `HEAD~2` `cbb8b23`).
+- **10,283 codepoint substitutions, 0 ASCII bytes touched, 0 unknown codepoints.**
+- `01-postgresql/deploy.ps1` re-sweep stats: 38,143 ASCII passthrough, 2,405 non-ASCII substituted, 0 unknown, BOM verified, 40,621 output bytes.
+- Smoke-test grep `^\s+-\s+\w+` across all 12 files: 0 real regressions (1 comment-help-block prose hit in `shared/common.ps1:482` is the only known false positive — verified by inspection).
+- Dual-engine parse: all 12 files pass pwsh 7+; 11/12 pass Windows PowerShell 5.1; `02-backend/deploy.ps1` flagged `EXPECT_FAIL_PS7_ONLY` (`?.` + `??` syntax, NOT an encoding regression — consistent with `2026-05-23T00:30:00Z`).
+- Visual confirmation of `01-postgresql/deploy.ps1` lines 118-135: every `Get-ParameterValue` continuation line shows the correct ` -Value $X -EnvVar "Y" -Default "Z"` shape.
+- GitGuardian secret-scrub on `01-postgresql/deploy.ps1` verified intact post-re-sweep.
+
+---
+
+**12 files re-swept this pass:**
+
+- `talent_infra_modules/01-postgresql/deploy.ps1` (re-sourced from `HEAD~2 cbb8b23`)
+- `talent_infra_modules/02-backend/deploy.ps1` (flagged `EXPECT_FAIL_PS7_ONLY` for `?.`/`??`)
+- `talent_infra_modules/03-frontend/deploy.ps1`
+- `talent_infra_modules/04-data-loading/deploy.ps1`
+- `talent_infra_modules/shared/common.ps1`
+- `talent_infra_modules/00-container-apps-env/deploy.ps1`
+- `talent_infra/hooks/postprovision.ps1`
+- `talent_infra/hooks/postup.ps1`
+- `talent_infra/hooks/preprovision.ps1`
+- `talent_infra_v2/hooks/postprovision.ps1`
+- `talent_infra_v2/hooks/postup.ps1`
+- `talent_infra_v2/hooks/preprovision.ps1`
+
+---
+
+**Cross-agent impact:**
+
+- **Ripley (Lead / Architect):** Sweep methodology is now a hard architectural guardrail — codepoint-based passthrough is mandatory; reject any sweep helper at review that contains a regex matching the ASCII range.
+- **Lambert (Tester):** New pre-release regression detector — run smoke-test grep `^\s+-\s+\w+` across all `.ps1` files. Any real hit (outside comment/string context) is a bug. Also reject any encoding-remediation PR whose sweep script regex matches ASCII text; the em-dash byte-sequence assertion is mandatory when sourcing from a git ref.
+- **Kane (Backend Dev):** For awareness — if you ever touch `.ps1` files (you shouldn't, but for completeness), the byte-level codepoint rule applies. ASCII bytes are passthrough; regex over the ASCII range is forbidden.
+- **Brett (Data Generator & Loader):** Same rule applies to any substitution sweep over Python source or `.env` files — codepoint iteration, ASCII passthrough, regex-on-ASCII forbidden, throw on unknown codepoints `>= 0x80`.
+- **Bishop (Deployment Engineer):** Sweep helper preserved in this entry. Rebuild from this template if needed; never resurrect the regex shape from `2026-05-23T00:30:00Z`.
+
+---
+
+**Anil unblocker:** `git pull` + retry `pwsh talent_infra_modules\01-postgresql\deploy.ps1` — all 12 swept files now parse and execute clean; `Get-ParameterValue` calls work as designed.
+
+**Scope:** Re-sweep + rule replacement only. Out of scope: logic refactoring of any swept `.ps1`; the 2 BOM-less files flagged in `2026-05-23T00:30:00Z` (`.squad/templates/skills/distributed-mesh/sync-mesh.ps1`, `talent_infra_v2/scripts/Purge-SoftDeletedFoundryAccounts.ps1`); the git commit for the 12 `.ps1` files (**Anil owns** that commit). Scribe only commits `.squad/` artifacts this pass.
+
 ### 2026-05-23T00:30:00Z: 11-file `.ps1` UTF-8-with-BOM sweep COMPLETE — rule fully enforced + prevention guards landed
+
+> **SUPERSEDED-IN-PART by [2026-05-23T01:30:00Z](#2026-05-23t013000z-powershell-substitution-sweeps-must-be-byte-level-codepoint--0x80--regex-over-ascii-range-is-forbidden).** The encoding rule (UTF-8 + BOM, ASCII content, dual-engine parse) STANDS unchanged. The substitution METHOD (the inline `\s+-\w+` regex pattern used by the sweep helper) is REPLACED by the byte-level codepoint contract — never resurrect the regex shape.
 
 **By:** Bishop (Deployment Engineer) — requested by Anil, merged by Scribe
 **Status:** Implemented (11/11 files swept clean, parse OK in pwsh 7+); `.editorconfig` + `.vscode/settings.json` prevention guards added; Anil owns the code + guards git commit
@@ -517,52 +679,6 @@ Data: {..., '_comment_sku': '...', 'skuName': {'value': '...'}, ...}, {Deploymen
 **Boundary with `talent_infra_v2/`:** v2 = full-stack greenfield production (azd, MSAL on, JWT validated). modules = app tier only on pre-existing infra (PS scripts, MSAL off, dev-user passthrough). Both coexist in same repo; top-level `README.md` documents picking the right one.
 **Files produced (architecture deliverables):** `talent_infra_modules/{README.md, AUTH-DISABLED.md, DEPLOYMENT-ORDER.md, shared/common.ps1, shared/README.md, 01-postgresql/README.md, 02-backend/README.md, 03-frontend/README.md, 04-data-loading/README.md}`. Bishop received the full contract surface.
 **Impact:** Bishop (4 implementation spawns) + Dallas (UI bypass) executed against this contract. Lambert APPROVED the resulting toolkit.
-
-### 2026-05-16: Infra rebuilt to match reference two-phase deployment pattern
-**By:** Bishop (Deployment Engineer)
-**Status:** Implemented
-**What:** Deleted all existing `talent_infra/` files (except `.azure/`) and rebuilt the entire infrastructure following the `talentiq_requirements/reference_code/azd_deploy/` pattern exactly. Created 21 files: `azure.yaml` with hooks/outputs, `infra/main.bicep` with conditional deploy flags for two-phase deployment, 13 Bicep modules (including new Cosmos DB + Key Vault), 4 hook scripts (pre/postprovision for PS1 and bash). Key changes: two-phase deployment (provision infra first, then build+deploy containers via postprovision hook), deploy flags reset by preprovision/set by postprovision, Docker Desktop detection with ACR remote build fallback, content hashing to skip unchanged builds, PostgreSQL AGE init + data loading flag-gated.
-**Why:** Anil requested alignment with the proven `talentiq_requirements/reference_code/azd_deploy/` pattern for production deployment reliability.
-**Impact:** All agents — `talent_infra/` is completely new. Lambert's smoke tests should validate against these Bicep outputs. All Bicep compiles clean (1 warning: unused throughput param in serverless Cosmos).
-
-### 2026-05-16: Infrastructure rebuild complete
-**By:** Bishop (Deployment Engineer)
-**Status:** Implemented
-**What:** Rebuilt all 17 `talent_infra/` files from history blueprint after prior passes were lost to disk. Full Bicep IaC validated with zero errors. Architecture unchanged — VNet, 3 Container Apps (frontend public, backend+MCP internal), Cosmos DB + PostgreSQL + Foundry + KV + ACR all with private endpoints/delegated subnets, RBAC-only auth, Entra ID-only on PostgreSQL. Ready for `azd up`.
-**Why:** Files from Passes 1-3 did not survive to disk. History.md served as complete blueprint for faithful recreation.
-**Impact:** All team members can now reference `talent_infra/` for infrastructure. Lambert's smoke tests should pass against the Bicep outputs unchanged.
-
-### 2026-05-16: Role added as canonical entity to data model
-**By:** Brett (Data Generator & Loader)
-**Status:** Implemented
-**What:** Added `Role` as a first-class graph node (17 roles with name/code/aliases) and `HAS_ROLE` as a 1:1 edge from Employee → Role. Previously, job roles were free-text strings hardcoded in multiple generators.
-**Key decisions:**
-1. **17 canonical roles** — Unified from three separate hardcoded lists.
-2. **`role_name` field on Employee** — Added alongside existing `job_title`.
-3. **`HAS_ROLE` edge is 1:1** — Each employee has exactly one role.
-4. **ROLES in ENTITY_SOURCES** — Roles get FTS + vector embeddings via entity_search.
-5. **AGE property indexes** — `idx_role_name` and `idx_role_code` added.
-**Impact:** Kane/MCP agents can now query `MATCH (e:Employee)-[:HAS_ROLE]->(r:Role) WHERE r.code = 'PM'`. Ontology now has 15 node labels (was 14) and 13 edge types (was 12). Backward compatible — `job_title` property unchanged.
-
-### 2026-05-16: Resolve-first query architecture — MCP tool descriptions cleaned
-**By:** Kane (Backend Dev)
-**Status:** Implemented
-**What:** Updated all MCP tool descriptions to enforce the resolve-first query pattern. `resolve_entities` docstring says "CALL THIS FIRST". `query_using_sql_cypher` mandates `v.code = 'RESOLVED_CODE'` matching. `search_graph` narrowed to employee name lookup only. `vector_search` narrowed to resume/skills semantic matching only. Tool implementations unchanged — only descriptions/docstrings updated.
-**Why:** The agent was calling wrong tools for entity lookups (search_graph, vector_search instead of resolve_entities), degrading result quality.
-**Impact:** All agents using MCP tools — follow pattern: `resolve_entities → Cypher with .code = 'X'`, only vector_search for semantic resume/skills matching.
-
-### 2026-05-16: Batch embeddings in resolve_entities — performance optimization
-**By:** Kane (Backend Dev)
-**Status:** Implemented
-**What:** Restructured `resolve_entities` into a two-pass architecture: Pass 1 (fast, no HTTP) runs exact-code, exact-name, and FTS checks for ALL queries in a single DB cursor pass. Pass 2 (one HTTP call) batches all unresolved terms into a single Azure OpenAI embeddings API call. Previously ~28 seconds for 47 entities (sequential HTTP per term), now estimated ~3-5 seconds.
-**Why:** Sequential embedding calls (~30 × 300ms) dominated resolution latency.
-**Impact:** All MCP tool consumers — resolve_entities is significantly faster. Resolution priority, thresholds, and confidence scoring unchanged.
-
-### 2026-05-16: Agent instructions rewritten — resolve-first, no hardcoded rules
-**By:** Parker (Data Engineer)
-**Status:** Implemented
-**What:** Rewrote `TALENT_GRAPH_QUERY_GENERATION_AGENT_v1.md` to enforce clean resolve-first architecture. All hardcoded entity values removed. Instructions teach patterns, not specific values. Workflow: parse → resolve_entities → build Cypher with codes → execute → format. The `resolve_entities` tool is the sole source of truth for entity→code mapping. All 19 AGE Query Rules, RFP Multi-Role Matching Workflow, Response Format, and Graph Ontology sections preserved.
-**Why:** Hardcoded entity names and regex patterns in instructions were brittle and caused mismatches.
 
 ### 2026-05-22: talent_data_pipeline outer folders are stale refactor artifacts
 **By:** Brett (Data Generator & Loader), requested by Anil

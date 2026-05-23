@@ -134,3 +134,6 @@ FYI for backend devs touching deploy hooks: per decisions.md `2026-05-22T23:59:5
 ## Cross-agent note — 2026-05-23T00:30:00Z (Scribe, from Bishop)
 
 - **Backend devs touching `talent_infra*/hooks/*.ps1`:** the UTF-8-with-BOM encoding rule from `2026-05-22T23:59:59Z` is now enforced via `.editorconfig` (root-level `[*.ps1]` charset=utf-8-bom) **and** `.vscode/settings.json` (`"[powershell]": { "files.encoding": "utf8bom" }`). Keep VS Code's PowerShell extension on (default for this workspace) and the guards will handle BOM on save — no more manual `[System.IO.File]::WriteAllText(..., UTF8Encoding(true))` discipline required as long as you don't bypass the editor. Per `decisions.md 2026-05-23T00:30:00Z`.
+
+## Cross-agent note - 2026-05-23T01:30:00Z (Scribe, from Bishop)
+- **Byte-level sweep rule applies to .ps1 work (decision `2026-05-23T01:30:00Z`).** If you ever touch `.ps1` files: codepoint iteration only, ASCII passthrough, no regex over ASCII range, throw on unknown codepoints >= 0x80. You normally don't, but this is the canonical rule going forward.

@@ -48,3 +48,6 @@ Unified 17 roles (previously hardcoded strings in 3 generators) into canonical `
 ## Team update — 2026-05-22T23:59:30Z (via Scribe, originated by Bishop)
 
 Team-wide rule from GitGuardian remediation on `talent_infra_modules/01-postgresql/deploy.ps1`: **no literal secrets in `.EXAMPLE` / docstring / sample-code blocks** — use `Read-Host -AsSecureString` or an angle-bracket `<placeholder>`. Scanners regex on shape, not intent; a plausible-looking literal in a help comment is functionally a leak. Applies to any sample code you emit (Python docstrings, JS examples, README snippets, agent prompts), not just PowerShell.
+
+## Cross-agent note - 2026-05-23T01:30:00Z (Scribe, from Bishop)
+- **Byte-level sweep rule extends to Python and .env (decision `2026-05-23T01:30:00Z`).** Any substitution sweep over Python source or `.env` files MUST iterate Unicode codepoints; ASCII passthrough; regex over the ASCII range FORBIDDEN; throw on unknown codepoints >= 0x80. The rule is source-file-agnostic — applies to whichever languages you may sweep next.

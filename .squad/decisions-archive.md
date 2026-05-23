@@ -4,6 +4,54 @@
 
 ---
 
+> **Batch 4 archived 2026-05-22 by Scribe** (Tier 2: decisions.md at 78,790 bytes exceeded 51,200-byte threshold; all six 2026-05-16 entries moved here. Entries 2026-05-21 and newer remain in decisions.md.)
+
+### 2026-05-16: Infra rebuilt to match reference two-phase deployment pattern
+**By:** Bishop (Deployment Engineer)
+**Status:** Implemented
+**What:** Deleted all existing `talent_infra/` files (except `.azure/`) and rebuilt the entire infrastructure following the `talentiq_requirements/reference_code/azd_deploy/` pattern exactly. Created 21 files: `azure.yaml` with hooks/outputs, `infra/main.bicep` with conditional deploy flags for two-phase deployment, 13 Bicep modules (including new Cosmos DB + Key Vault), 4 hook scripts (pre/postprovision for PS1 and bash). Key changes: two-phase deployment (provision infra first, then build+deploy containers via postprovision hook), deploy flags reset by preprovision/set by postprovision, Docker Desktop detection with ACR remote build fallback, content hashing to skip unchanged builds, PostgreSQL AGE init + data loading flag-gated.
+**Why:** Anil requested alignment with the proven `talentiq_requirements/reference_code/azd_deploy/` pattern for production deployment reliability.
+**Impact:** All agents — `talent_infra/` is completely new. Lambert's smoke tests should validate against these Bicep outputs. All Bicep compiles clean (1 warning: unused throughput param in serverless Cosmos).
+
+### 2026-05-16: Infrastructure rebuild complete
+**By:** Bishop (Deployment Engineer)
+**Status:** Implemented
+**What:** Rebuilt all 17 `talent_infra/` files from history blueprint after prior passes were lost to disk. Full Bicep IaC validated with zero errors. Architecture unchanged — VNet, 3 Container Apps (frontend public, backend+MCP internal), Cosmos DB + PostgreSQL + Foundry + KV + ACR all with private endpoints/delegated subnets, RBAC-only auth, Entra ID-only on PostgreSQL. Ready for `azd up`.
+**Why:** Files from Passes 1-3 did not survive to disk. History.md served as complete blueprint for faithful recreation.
+**Impact:** All team members can now reference `talent_infra/` for infrastructure. Lambert's smoke tests should pass against the Bicep outputs unchanged.
+
+### 2026-05-16: Role added as canonical entity to data model
+**By:** Brett (Data Generator & Loader)
+**Status:** Implemented
+**What:** Added `Role` as a first-class graph node (17 roles with name/code/aliases) and `HAS_ROLE` as a 1:1 edge from Employee → Role. Previously, job roles were free-text strings hardcoded in multiple generators.
+**Key decisions:**
+1. **17 canonical roles** — Unified from three separate hardcoded lists.
+2. **`role_name` field on Employee** — Added alongside existing `job_title`.
+3. **`HAS_ROLE` edge is 1:1** — Each employee has exactly one role.
+4. **ROLES in ENTITY_SOURCES** — Roles get FTS + vector embeddings via entity_search.
+5. **AGE property indexes** — `idx_role_name` and `idx_role_code` added.
+**Impact:** Kane/MCP agents can now query `MATCH (e:Employee)-[:HAS_ROLE]->(r:Role) WHERE r.code = 'PM'`. Ontology now has 15 node labels (was 14) and 13 edge types (was 12). Backward compatible — `job_title` property unchanged.
+
+### 2026-05-16: Resolve-first query architecture — MCP tool descriptions cleaned
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+**What:** Updated all MCP tool descriptions to enforce the resolve-first query pattern. `resolve_entities` docstring says "CALL THIS FIRST". `query_using_sql_cypher` mandates `v.code = 'RESOLVED_CODE'` matching. `search_graph` narrowed to employee name lookup only. `vector_search` narrowed to resume/skills semantic matching only. Tool implementations unchanged — only descriptions/docstrings updated.
+**Why:** The agent was calling wrong tools for entity lookups (search_graph, vector_search instead of resolve_entities), degrading result quality.
+**Impact:** All agents using MCP tools — follow pattern: `resolve_entities → Cypher with .code = 'X'`, only vector_search for semantic resume/skills matching.
+
+### 2026-05-16: Batch embeddings in resolve_entities — performance optimization
+**By:** Kane (Backend Dev)
+**Status:** Implemented
+**What:** Restructured `resolve_entities` into a two-pass architecture: Pass 1 (fast, no HTTP) runs exact-code, exact-name, and FTS checks for ALL queries in a single DB cursor pass. Pass 2 (one HTTP call) batches all unresolved terms into a single Azure OpenAI embeddings API call. Previously ~28 seconds for 47 entities (sequential HTTP per term), now estimated ~3-5 seconds.
+**Why:** Sequential embedding calls (~30 × 300ms) dominated resolution latency.
+**Impact:** All MCP tool consumers — resolve_entities is significantly faster. Resolution priority, thresholds, and confidence scoring unchanged.
+
+### 2026-05-16: Agent instructions rewritten — resolve-first, no hardcoded rules
+**By:** Parker (Data Engineer)
+**Status:** Implemented
+**What:** Rewrote `TALENT_GRAPH_QUERY_GENERATION_AGENT_v1.md` to enforce clean resolve-first architecture. All hardcoded entity values removed. Instructions teach patterns, not specific values. Workflow: parse → resolve_entities → build Cypher with codes → execute → format. The `resolve_entities` tool is the sole source of truth for entity→code mapping. All 19 AGE Query Rules, RFP Multi-Role Matching Workflow, Response Format, and Graph Ontology sections preserved.
+**Why:** Hardcoded entity names and regex patterns in instructions were brittle and caused mismatches.
+
 > **Batch 3 archived 2026-05-22 by Scribe** (Tier 2: file exceeded 51,200-byte threshold at 51,383 bytes after the 2026-05-22 Bishop vnet-prereq fix entry; all 2026-05-12 entries — 10 total — moved here. Entries 2026-05-15 and newer remain in decisions.md.)
 ### 2026-05-12T21:40:00Z: HARD RULE — Reference code patterns are authoritative
 **By:** Anil Dwarakanath (via Copilot Coordinator)

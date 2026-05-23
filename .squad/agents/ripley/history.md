@@ -75,3 +75,6 @@ Architectural guardrail (decisions.md `2026-05-22T23:59:59Z`): **all `.ps1` file
 ## Cross-agent note — 2026-05-23T00:30:00Z (Scribe, from Bishop)
 
 - **11-file `.ps1` UTF-8-with-BOM sweep COMPLETE** — the architectural guardrail from `2026-05-22T23:59:59Z` is now fully enforced across `talent_infra_modules/`, `talent_infra/hooks/`, and `talent_infra_v2/hooks/`. Bishop also landed `.editorconfig` (root=true; `[*.ps1]` charset=utf-8-bom, end_of_line=crlf, insert_final_newline=true) plus `.vscode/settings.json` (`"[powershell]": { "files.encoding": "utf8bom" }`) prevention guards at the repo root, so new `.ps1` files will save with BOM automatically. Two BOM-less files still flagged for a future cleanup pass: `.squad/templates/skills/distributed-mesh/sync-mesh.ps1` and `talent_infra_v2/scripts/Purge-SoftDeletedFoundryAccounts.ps1`. Per `decisions.md 2026-05-23T00:30:00Z`.
+
+## Cross-agent note - 2026-05-23T01:30:00Z (Scribe, from Bishop)
+- **Sweep methodology hardened (decision `2026-05-23T01:30:00Z`).** Substitution sweeps over source files MUST iterate Unicode codepoints; ASCII bytes (cp < 0x80) are PASSTHROUGH; regex over the ASCII range is FORBIDDEN. Reject any sweep helper at review that contains a regex matching the ASCII range. Supersedes-in-part the implementation contract of `2026-05-23T00:30:00Z` (encoding rule still stands).
