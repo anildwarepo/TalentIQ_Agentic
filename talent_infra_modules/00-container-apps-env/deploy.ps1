@@ -126,7 +126,10 @@ if ([string]::IsNullOrWhiteSpace($Location)) {
 }
 $VnetResourceGroup = Get-ParameterValue -Name 'VNet resource group' -EnvVar 'AZURE_VNET_RESOURCE_GROUP' -Value $VnetResourceGroup -Default $ResourceGroup
 $VnetName          = Get-ParameterValue -Name 'VNet name' -EnvVar 'AZURE_VNET_NAME' -Value $VnetName
-$AcaSubnetName     = Get-ParameterValue -Name 'ACA subnet name' -EnvVar 'AZURE_ACA_SUBNET_NAME' -Value $AcaSubnetName -Default 'talentiq-aca'
+# -AlwaysPrompt: subnet names are environment-specific. Even though no
+# param-block default exists today, force confirmation so a future
+# maintainer adding a default does not re-introduce the silent-bind bug.
+$AcaSubnetName     = Get-ParameterValue -Name 'ACA subnet name' -EnvVar 'AZURE_ACA_SUBNET_NAME' -Value $AcaSubnetName -Default 'talentiq-aca' -AlwaysPrompt
 if ([string]::IsNullOrWhiteSpace($AcaSubnetAddressPrefix) -and $env:AZURE_ACA_SUBNET_PREFIX) {
     $AcaSubnetAddressPrefix = $env:AZURE_ACA_SUBNET_PREFIX
 }

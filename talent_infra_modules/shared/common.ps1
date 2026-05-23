@@ -146,6 +146,13 @@ function Get-ParameterValue {
           3. An interactive Read-Host prompt, defaulting to -Default.
           4. The -Default value if running non-interactively with no input.
 
+        When -AlwaysPrompt is set, steps 1 and 2 are downgraded to default
+        suggestions for the prompt; the operator is always asked to
+        confirm (Enter accepts the suggestion) or type an override. Use
+        this for env-specific Azure resource names (subnets, NSGs,
+        peering, route tables, etc.) where a silent default is unsafe
+        across environments. See .PARAMETER AlwaysPrompt.
+
     .PARAMETER Name
         Display name for log/prompt text.
 
@@ -170,6 +177,16 @@ function Get-ParameterValue {
         When set, the prompt uses Read-Host -AsSecureString and returns
         a SecureString. The env var is converted to SecureString if set.
 
+    .PARAMETER AlwaysPrompt
+        When set, the function ALWAYS displays the interactive prompt
+        even if -Value or the env var resolved to a non-empty string.
+        The resolved value (Value > env var > Default) is shown as the
+        suggested default in the usual "(default: X)" format, and
+        pressing Enter accepts it. Reserved for env-specific Azure
+        resource names (subnets, NSGs, peering, route tables) where a
+        silent default is unsafe across environments  -  never apply to
+        platform invariants like PG version, SKU tier, or admin login.
+
     .OUTPUTS
         [string] or [SecureString] depending on -Secure.
 
@@ -178,6 +195,14 @@ function Get-ParameterValue {
 
     .EXAMPLE
         $pw = Get-ParameterValue -Name "Postgres admin password" -EnvVar "POSTGRESQL_ADMIN_PASSWORD" -Secure
+
+    .EXAMPLE
+        # Subnet names differ per environment  -  always confirm with the
+        # operator, even when a param-block default is wired through as
+        # -Value. Pressing Enter accepts "pe-subnet"; anything else wins.
+        $subnet = Get-ParameterValue -Name "PE subnet name" `
+            -Value $PeSubnetName -EnvVar "AZURE_PE_SUBNET_NAME" `
+            -Default "pe-subnet" -AlwaysPrompt
     #>
     [CmdletBinding()]
     param(
@@ -186,20 +211,28 @@ function Get-ParameterValue {
         [string]$Value = "",
         [string]$Default = "",
         [string]$EnvVar = "",
-        [switch]$Secure
+        [switch]$Secure,
+        [switch]$AlwaysPrompt
     )
 
-    # 1. Explicit script-arg pass-through wins.
-    if (-not [string]::IsNullOrEmpty($Value)) {
-        if ($Secure) {
-            return (ConvertTo-SecureString $Value -AsPlainText -Force)
-        }
-        return $Value
-    }
-
-    # 2. Env var.
+    # Resolve env-var value once  -  used both as a fast-path source and as
+    # a default suggestion under -AlwaysPrompt.
+    $envVal = $null
     if (-not [string]::IsNullOrEmpty($EnvVar)) {
         $envVal = [Environment]::GetEnvironmentVariable($EnvVar)
+    }
+
+    # Fast path (historical behaviour): script-arg wins, then env var,
+    # then prompt. Skipped entirely when -AlwaysPrompt is set so the
+    # operator is always asked to confirm env-specific resource names
+    # (subnets, NSGs, peering, route tables, etc.).
+    if (-not $AlwaysPrompt) {
+        if (-not [string]::IsNullOrEmpty($Value)) {
+            if ($Secure) {
+                return (ConvertTo-SecureString $Value -AsPlainText -Force)
+            }
+            return $Value
+        }
         if (-not [string]::IsNullOrEmpty($envVal)) {
             Write-Info "$Name = (from `$env:$EnvVar)"
             if ($Secure) {
@@ -209,10 +242,19 @@ function Get-ParameterValue {
         }
     }
 
-    # 3. Interactive prompt.
+    # Interactive prompt. Reached when:
+    #   (a) Neither -Value nor env var supplied a value, OR
+    #   (b) -AlwaysPrompt was set.
+    # Suggested-default priority: -Value > env var > -Default. Operator
+    # hits Enter to accept the suggestion, otherwise types an override.
+    $suggested = ""
+    if     (-not [string]::IsNullOrEmpty($Value))   { $suggested = $Value }
+    elseif (-not [string]::IsNullOrEmpty($envVal))  { $suggested = $envVal }
+    elseif (-not [string]::IsNullOrEmpty($Default)) { $suggested = $Default }
+
     $promptText = if ([string]::IsNullOrEmpty($Prompt)) { $Name } else { $Prompt }
-    if (-not [string]::IsNullOrEmpty($Default)) {
-        $promptText = "$promptText (default: $Default)"
+    if (-not [string]::IsNullOrEmpty($suggested)) {
+        $promptText = "$promptText (default: $suggested)"
     }
 
     if ($Secure) {
@@ -221,8 +263,8 @@ function Get-ParameterValue {
         # parameter and trip a SwitchParameter<->SecureString type-coercion error.
         $secureValue = Read-Host -Prompt $promptText -AsSecureString
         if ($null -eq $secureValue -or $secureValue.Length -eq 0) {
-            if (-not [string]::IsNullOrEmpty($Default)) {
-                return (ConvertTo-SecureString $Default -AsPlainText -Force)
+            if (-not [string]::IsNullOrEmpty($suggested)) {
+                return (ConvertTo-SecureString $suggested -AsPlainText -Force)
             }
             Write-Fail "No value supplied for required secure parameter '$Name'."
             exit 1
@@ -232,8 +274,8 @@ function Get-ParameterValue {
 
     $entered = Read-Host -Prompt $promptText
     if ([string]::IsNullOrWhiteSpace($entered)) {
-        if (-not [string]::IsNullOrEmpty($Default)) {
-            return $Default
+        if (-not [string]::IsNullOrEmpty($suggested)) {
+            return $suggested
         }
         Write-Fail "No value supplied for required parameter '$Name'."
         exit 1

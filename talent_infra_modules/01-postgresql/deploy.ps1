@@ -163,8 +163,11 @@ if ($EnablePrivateEndpoint) {
         $VnetName = Get-ParameterValue -Name "VNet name" `
             -Value $VnetName -EnvVar "AZURE_VNET_NAME"
     }
+    # -AlwaysPrompt: subnet names are environment-specific (RG/VNet may not
+    # contain "pe-subnet"). The param-block default would otherwise short-
+    # circuit the prompt and bind us to a subnet that does not exist.
     $PeSubnetName = Get-ParameterValue -Name "PE subnet name" `
-        -Value $PeSubnetName -EnvVar "AZURE_PE_SUBNET_NAME" -Default "pe-subnet"
+        -Value $PeSubnetName -EnvVar "AZURE_PE_SUBNET_NAME" -Default "pe-subnet" -AlwaysPrompt
 } else {
     $VnetResourceGroup = ""
     $VnetName = ""
