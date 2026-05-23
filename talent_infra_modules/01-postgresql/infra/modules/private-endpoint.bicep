@@ -103,13 +103,14 @@ module existingPrivateDnsZoneVnetLink 'private-dns-zone-vnet-link.bicep' = if (u
 
 // Private DNS Zone Group
 var resolvedDnsZoneId = useExistingDnsZone ? existingPrivateDnsZoneId : privateDnsZone.id
+var resolvedDnsZoneName = useExistingDnsZone ? existingZoneName : privateDnsZoneName
 resource privateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01' = {
   parent: privateEndpoint
   name: 'default'
   properties: {
     privateDnsZoneConfigs: [
       {
-        name: replace(privateDnsZoneName, '.', '-')
+        name: replace(resolvedDnsZoneName, '.', '-')
         properties: {
           privateDnsZoneId: resolvedDnsZoneId
         }

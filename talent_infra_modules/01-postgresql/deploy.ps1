@@ -287,7 +287,8 @@ if ($EnablePrivateEndpoint -and [string]::IsNullOrEmpty($ExistingDnsZoneId)) {
 
     $linkedZoneId = Get-LinkedPostgresqlPrivateDnsZoneId `
         -SubscriptionId $SubscriptionId `
-        -VnetId $vnetId
+        -VnetId $vnetId `
+        -VnetName $VnetName
 
     if (-not [string]::IsNullOrEmpty($linkedZoneId)) {
         $ExistingDnsZoneId = $linkedZoneId

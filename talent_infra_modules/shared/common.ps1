@@ -553,7 +553,8 @@ function Get-LinkedPostgresqlPrivateDnsZoneId {
     #>
     param(
         [Parameter(Mandatory)][string]$SubscriptionId,
-        [Parameter(Mandatory)][string]$VnetId
+        [Parameter(Mandatory)][string]$VnetId,
+        [string]$VnetName = ''
     )
 
     $zonesJson = Invoke-Native {
@@ -595,7 +596,8 @@ function Get-LinkedPostgresqlPrivateDnsZoneId {
 
         foreach ($link in $links) {
             $linkVnetId = [string]$link.virtualNetwork.id
-            if ($linkVnetId -ieq $VnetId) {
+            $linkVnetName = if ([string]::IsNullOrEmpty($linkVnetId)) { '' } else { $linkVnetId.Split('/')[-1] }
+            if (($linkVnetId -ieq $VnetId) -or ((-not [string]::IsNullOrEmpty($VnetName)) -and ($linkVnetName -ieq $VnetName))) {
                 $linkedMatches += [pscustomobject]@{
                     Id = $zoneId
                     Name = $zoneNm
@@ -607,9 +609,12 @@ function Get-LinkedPostgresqlPrivateDnsZoneId {
 
     if ($linkedMatches.Count -eq 0) { return $null }
 
-    $preferred = @($linkedMatches | Where-Object { $_.Name -ieq 'privatelink.postgres.database.azure.com' } | Select-Object -First 1)
+    $preferred = @($linkedMatches | Where-Object { ($_.Name -ilike '*.private.postgres.database.azure.com') -and ($_.Name -ine 'private.postgres.database.azure.com') } | Select-Object -First 1)
     if ($preferred.Count -eq 0) {
         $preferred = @($linkedMatches | Where-Object { $_.Name -ieq 'private.postgres.database.azure.com' } | Select-Object -First 1)
+    }
+    if ($preferred.Count -eq 0) {
+        $preferred = @($linkedMatches | Where-Object { $_.Name -ieq 'privatelink.postgres.database.azure.com' } | Select-Object -First 1)
     }
     if ($preferred.Count -gt 0) { return [string]$preferred[0].Id }
 
