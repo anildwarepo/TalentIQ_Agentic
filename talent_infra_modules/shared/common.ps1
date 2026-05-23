@@ -1104,8 +1104,29 @@ function Test-FoundryProject {
             --output json 2>$null
     }
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($projJson)) {
-        Write-Fail "Foundry project '$ProjectName' not found under account '$AccountName'."
-        return $null
+        $projectsJson = Invoke-Native {
+            az resource list `
+                --resource-group $ResourceGroup `
+                --resource-type "Microsoft.CognitiveServices/accounts/projects" `
+                --output json 2>$null
+        }
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($projectsJson)) {
+            Write-Fail "Foundry project '$ProjectName' not found under account '$AccountName'."
+            return $null
+        }
+        try {
+            $projectNameFull = "$AccountName/$ProjectName"
+            $project = @($projectsJson | ConvertFrom-Json) | Where-Object {
+                $_.name -eq $projectNameFull -or $_.name -eq $ProjectName
+            } | Select-Object -First 1
+        } catch {
+            Write-Fail "Could not parse Foundry project list for account '$AccountName'."
+            return $null
+        }
+        if ($null -eq $project) {
+            Write-Fail "Foundry project '$ProjectName' not found under account '$AccountName'."
+            return $null
+        }
     }
 
     # 3. Model deployments.
