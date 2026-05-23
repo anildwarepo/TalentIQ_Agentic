@@ -26,3 +26,8 @@ az role assignment create `
   --assignee "user@domain.com" `
   --role "Azure AI User" `
   --scope $scope
+
+
+az containerapp env list `
+  --query "[].{name:name, resourceGroup:resourceGroup, id:id}" `
+  -o table
