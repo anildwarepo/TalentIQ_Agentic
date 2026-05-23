@@ -133,7 +133,7 @@ module postgresql './modules/postgresql-flexible-server.bicep' = {
 // Private Endpoint into the supplied VNet (optional).
 module postgresqlPrivateEndpoint './modules/private-endpoint.bicep' = if (enablePrivateEndpoint) {
   params: {
-    location: location
+    location: vnet!.location
     privateEndpointName: '${serverName}-pe'
     subnetId: peSubnet!.id
     privateLinkServiceId: postgresql.outputs.id
