@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
     Deploys an Azure Container Apps Environment (ACA Env) into an existing VNet.
@@ -32,7 +32,7 @@
     Defaults to AZURE_RESOURCE_GROUP env var. Required.
 
 .PARAMETER Location
-    Azure region. Defaults to AZURE_LOCATION env var or 'westus'. (Canonical region for this project — VNet 'vnet-westus' lives in westus.)
+    Azure region. Defaults to AZURE_LOCATION env var or 'westus'. (Canonical region for this project  -  VNet 'vnet-westus' lives in westus.)
 
 .PARAMETER EnvName
     Container Apps Environment name (2-32 chars). Defaults to
@@ -220,7 +220,7 @@ function Test-CidrInsideAny {
     return $false
 }
 
-# Query subnet (suppress error if missing — we check $LASTEXITCODE)
+# Query subnet (suppress error if missing  -  we check $LASTEXITCODE)
 $subnetJson = az network vnet subnet show `
     --subscription $SubscriptionId `
     -g $VnetResourceGroup `
@@ -236,7 +236,7 @@ if ($subnetExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($subnetJson)) {
     $existingSubnet = $subnetJson | ConvertFrom-Json
     Write-Info "Subnet '$AcaSubnetName' already exists (CIDR: $($existingSubnet.addressPrefix))"
 
-    # Delegation check — must be Microsoft.App/environments
+    # Delegation check  -  must be Microsoft.App/environments
     $hasAcaDelegation = $false
     if ($existingSubnet.delegations) {
         foreach ($d in $existingSubnet.delegations) {
@@ -257,7 +257,7 @@ or manually add the delegation:
     }
     Write-Success 'Subnet delegation OK (Microsoft.App/environments).'
 
-    # Soft-lock / 1:1 check — is another ACA env already pinned to this subnet?
+    # Soft-lock / 1:1 check  -  is another ACA env already pinned to this subnet?
     Write-Info 'Checking whether another Container Apps Environment already owns this subnet...'
     $envsJson = az containerapp env list --subscription $SubscriptionId -o json 2>$null
     if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($envsJson)) {
@@ -281,12 +281,12 @@ either:
     then re-run this script.
 "@
             }
-            Write-Success "Existing Container Apps Environment '$EnvName' already uses this subnet — idempotent reuse."
+            Write-Success "Existing Container Apps Environment '$EnvName' already uses this subnet  -  idempotent reuse."
         }
     }
     $createSubnet = $false
 } else {
-    Write-Info "Subnet '$AcaSubnetName' does not exist yet — will be created."
+    Write-Info "Subnet '$AcaSubnetName' does not exist yet  -  will be created."
     if ([string]::IsNullOrWhiteSpace($AcaSubnetAddressPrefix)) {
         Write-Fail "Subnet '$AcaSubnetName' does not exist and -AcaSubnetAddressPrefix was not supplied (also tried `$env:AZURE_ACA_SUBNET_PREFIX). Provide a CIDR (recommended /23 or larger) that fits inside the VNet's address space."
     }
@@ -404,7 +404,7 @@ $deploymentJson = Invoke-Native {
 # ----------------------------------------------------------------------------
 # 8a. Validate the deployment ACTUALLY succeeded before claiming so.
 #     Invoke-Native deliberately runs with $ErrorActionPreference='Continue'
-#     so az non-zero exits do not blow up the surrounding script — the caller
+#     so az non-zero exits do not blow up the surrounding script  -  the caller
 #     (this code) is responsible for inspecting $LASTEXITCODE. Skipping these
 #     checks is how a failed `az deployment group create` (e.g. region
 #     mismatch between the ACA env and its VNet subnet) silently fell through
@@ -471,9 +471,9 @@ Write-Success "Wrote $outputsPath"
 # 10. What-next footer
 # -----------------------------------------------------------------------------
 Write-Host ''
-Write-Host '════════════════════════════════════════════════════════════════════'
+Write-Host '===================================================================='
 Write-Host '  00-container-apps-env: deployment complete'
-Write-Host '════════════════════════════════════════════════════════════════════'
+Write-Host '===================================================================='
 Write-Host ''
 Write-Host "  Container Apps Environment : $($payload.containerAppsEnvName)"
 Write-Host "  Default domain             : $($payload.containerAppsEnvDefaultDomain)"

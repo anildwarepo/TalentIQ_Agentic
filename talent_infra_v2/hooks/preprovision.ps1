@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Pre-provision hook for TalentIQ: get client IP, generate PG password,
     reset container app deploy flags for two-phase deployment.
@@ -26,7 +26,7 @@ try {
 function Read-AzdEnvValue($Name) {
     $raw = & cmd /c "azd env get-value $Name 2>&1"
     if ($null -eq $raw) { return "" }
-    # Force array semantics — PowerShell unwraps single-element collections to scalars.
+    # Force array semantics  -  PowerShell unwraps single-element collections to scalars.
     $lines = @(@($raw) | Where-Object { $_ -ne $null -and $_ -ne "" } | Where-Object {
         $line = $_.ToString().Trim()
         $line -ne "" -and
@@ -83,7 +83,7 @@ cmd /c "azd env set deployMcpServerContainerApp false 2>&1"
 cmd /c "azd env set deployBackendContainerApp false 2>&1"
 cmd /c "azd env set deployWebappContainerApp false 2>&1"
 
-# Capture deploying user's Entra identity → registered as the initial PostgreSQL
+# Capture deploying user's Entra identity -> registered as the initial PostgreSQL
 # Entra ID administrator by the Bicep `administrators` child resource. The
 # postprovision hook then connects with this identity (via OSSRDBMS token) to
 # provision additional Entra principals (container app UAMIs, app users).
@@ -99,7 +99,7 @@ try {
             Write-Host "  PG Entra admin: $($signedInUser.upn) ($($signedInUser.id))"
         }
     } else {
-        Write-Host "  WARNING: az CLI not signed in or returned no user — run 'az login' first." -ForegroundColor Yellow
+        Write-Host "  WARNING: az CLI not signed in or returned no user  -  run 'az login' first." -ForegroundColor Yellow
         Write-Host "  Bicep will skip the initial Entra admin assignment; postprovision will retry." -ForegroundColor Yellow
     }
 } catch {

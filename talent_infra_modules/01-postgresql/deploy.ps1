@@ -14,18 +14,18 @@
     can consume the server FQDN, tenant, and deployer UPN.
 
     Hard rules baked in:
-      * AGE preload + restart - polls isConfigPendingRestart and issues
+      * AGE preload + restart  -  polls isConfigPendingRestart and issues
         `az postgres flexible-server restart` when any param is pending.
         Without this, every cypher() call fails with
         `unhandled cypher(cstring) function call`.
       * Entra admin registration is CONTROL-PLANE ONLY (`az postgres
-        flexible-server microsoft-entra-admin create`) - never via SQL.
+        flexible-server microsoft-entra-admin create`)  -  never via SQL.
         Avoids the ISP-blocks-5432 footgun on residential networks.
       * The deployer is always registered as Type=User; UAMIs are
         registered as Type=ServicePrincipal with display-name == UAMI
         name (that's the PG username the container presents).
       * Bicep is invoked with entraAdminObjectId='' to skip the
-        administrators child resource - re-applying it during an idempotent
+        administrators child resource  -  re-applying it during an idempotent
         redeploy triggers AadAuthOperationCannotBePerformedWhenServer-
         IsNotAccessible.
 
@@ -36,24 +36,24 @@
     match the UAMI's resource name exactly.
 
 .EXAMPLE
-    # Preferred: prompt securely - nothing lands in shell history, scripts, or
+    # Preferred: prompt securely  -  nothing lands in shell history, scripts, or
     # the GitGuardian feed. Get-ParameterValue in shared/common.ps1 also falls
     # back to Read-Host when -AdminPassword is omitted, so you can drop the
     # parameter entirely and just answer the prompt.
     pwsh ./deploy.ps1 `
- - SubscriptionId e4718866-... `
- - ResourceGroup rg-talent-modular `
- - Location westus `
- - AdminPassword (Read-Host -AsSecureString -Prompt 'Postgres admin password') `
- - VnetName vnet-talent-shared `
- - VnetResourceGroup rg-network `
- - Force
+        -SubscriptionId e4718866-... `
+        -ResourceGroup rg-talent-modular `
+        -Location westus `
+        -AdminPassword (Read-Host -AsSecureString -Prompt 'Postgres admin password') `
+        -VnetName vnet-talent-shared `
+        -VnetResourceGroup rg-network `
+        -Force
 
     # CI / automated runs: source the password from a secret manager (Key Vault,
     # GitHub Actions secret, AZ DevOps variable group) and convert to SecureString
     # just before invocation. NEVER hardcode a literal password in this file or
-    # any committed script - use the placeholder pattern below only as a template:
-    # - AdminPassword (ConvertTo-SecureString '<your-strong-password>' -AsPlainText -Force)
+    # any committed script  -  use the placeholder pattern below only as a template:
+    #   -AdminPassword (ConvertTo-SecureString '<your-strong-password>' -AsPlainText -Force)
 
 .NOTES
     Requires Azure CLI 2.53+, Bicep CLI, Contributor on -ResourceGroup,
@@ -69,7 +69,7 @@ param(
     [string]$AdminLogin = "pgadmin",
     [SecureString]$AdminPassword,
     [string]$PostgresqlVersion = "16",
-    # SKU defaults mirror talent_infra_v2/infra/main.parameters.json - D-series
+    # SKU defaults mirror talent_infra_v2/infra/main.parameters.json  -  D-series
     # is the only D/E size that is actually GeneralPurpose; Standard_B* sizes
     # are Burstable tier and produce ServerEditionIncompatibleWithSkuSize when
     # paired with -SkuTier GeneralPurpose. See decision
@@ -99,7 +99,7 @@ param(
     [switch]$Force
 )
 
-# Do NOT set $ErrorActionPreference='Stop' globally - Invoke-Native in
+# Do NOT set $ErrorActionPreference='Stop' globally  -  Invoke-Native in
 # common.ps1 manages it per-call so `az` non-zero exits don't blow up the
 # script before we can inspect $LASTEXITCODE.
 
@@ -117,25 +117,25 @@ Write-Host "================================================================" -F
 $account = Test-AzLoggedIn
 
 # --------------------------------------------------------------------------
-# 2. Parameter resolution - script arg -> env var -> prompt -> default
+# 2. Parameter resolution  -  script arg -> env var -> prompt -> default
 # --------------------------------------------------------------------------
 $SubscriptionId = Get-ParameterValue -Name "Subscription ID" `
- - Value $SubscriptionId -EnvVar "AZURE_SUBSCRIPTION_ID" -Default $account.id
+    -Value $SubscriptionId -EnvVar "AZURE_SUBSCRIPTION_ID" -Default $account.id
 $ResourceGroup = Get-ParameterValue -Name "Resource group" `
- - Value $ResourceGroup -EnvVar "AZURE_RESOURCE_GROUP"
+    -Value $ResourceGroup -EnvVar "AZURE_RESOURCE_GROUP"
 $Location = Get-ParameterValue -Name "Location" `
- - Value $Location -EnvVar "AZURE_LOCATION" -Default "westus"
+    -Value $Location -EnvVar "AZURE_LOCATION" -Default "westus"
 $AdminLogin = Get-ParameterValue -Name "PG admin login" `
- - Value $AdminLogin -EnvVar "POSTGRESQL_ADMIN_LOGIN" -Default "pgadmin"
+    -Value $AdminLogin -EnvVar "POSTGRESQL_ADMIN_LOGIN" -Default "pgadmin"
 $PostgresqlVersion = Get-ParameterValue -Name "PostgreSQL version" `
- - Value $PostgresqlVersion -EnvVar "POSTGRESQL_VERSION" -Default "16"
+    -Value $PostgresqlVersion -EnvVar "POSTGRESQL_VERSION" -Default "16"
 # SKU defaults mirror talent_infra_v2/infra/main.parameters.json. Standard_D4ds_v5
 # is GeneralPurpose; Standard_B* sizes are Burstable and would require
 # -SkuTier Burstable. Env-var overrides still win.
 $SkuName = Get-ParameterValue -Name "SKU name" `
- - Value $SkuName -EnvVar "POSTGRESQL_SKU_NAME" -Default "Standard_D4ds_v5"
+    -Value $SkuName -EnvVar "POSTGRESQL_SKU_NAME" -Default "Standard_D4ds_v5"
 $SkuTier = Get-ParameterValue -Name "SKU tier" `
- - Value $SkuTier -EnvVar "POSTGRESQL_SKU_TIER" -Default "GeneralPurpose"
+    -Value $SkuTier -EnvVar "POSTGRESQL_SKU_TIER" -Default "GeneralPurpose"
 
 # Numeric param: env var carries a string, force conversion.
 $storageEnv = [Environment]::GetEnvironmentVariable("POSTGRESQL_STORAGE_GB")
@@ -147,24 +147,24 @@ if (-not [string]::IsNullOrEmpty($peEnv)) {
     $EnablePrivateEndpoint = ($peEnv -match '^(true|1|yes)$')
 }
 
-# Secure password - never logged, never default.
+# Secure password  -  never logged, never default.
 if ($null -eq $AdminPassword -or $AdminPassword.Length -eq 0) {
     $AdminPassword = Get-ParameterValue -Name "PG admin password" `
- - EnvVar "POSTGRESQL_ADMIN_PASSWORD" -Secure
+        -EnvVar "POSTGRESQL_ADMIN_PASSWORD" -Secure
 }
 
-# VNet wiring - only required when PE is enabled.
+# VNet wiring  -  only required when PE is enabled.
 if ($EnablePrivateEndpoint) {
     if ([string]::IsNullOrEmpty($VnetResourceGroup)) {
         $VnetResourceGroup = Get-ParameterValue -Name "VNet resource group" `
- - EnvVar "AZURE_VNET_RESOURCE_GROUP" -Default $ResourceGroup
+            -EnvVar "AZURE_VNET_RESOURCE_GROUP" -Default $ResourceGroup
     }
     if ([string]::IsNullOrEmpty($VnetName)) {
         $VnetName = Get-ParameterValue -Name "VNet name" `
- - Value $VnetName -EnvVar "AZURE_VNET_NAME"
+            -Value $VnetName -EnvVar "AZURE_VNET_NAME"
     }
     $PeSubnetName = Get-ParameterValue -Name "PE subnet name" `
- - Value $PeSubnetName -EnvVar "AZURE_PE_SUBNET_NAME" -Default "pe-subnet"
+        -Value $PeSubnetName -EnvVar "AZURE_PE_SUBNET_NAME" -Default "pe-subnet"
 } else {
     $VnetResourceGroup = ""
     $VnetName = ""
@@ -176,7 +176,7 @@ if ([string]::IsNullOrEmpty($ExistingDnsZoneId)) {
     if ($null -eq $ExistingDnsZoneId) { $ExistingDnsZoneId = "" }
 }
 
-# UAMI list (JSON) - env var override.
+# UAMI list (JSON)  -  env var override.
 if ([string]::IsNullOrEmpty($UamiPrincipalIds)) {
     $UamiPrincipalIds = [Environment]::GetEnvironmentVariable("POSTGRESQL_UAMI_PRINCIPALS")
     if ($null -eq $UamiPrincipalIds) { $UamiPrincipalIds = "" }
@@ -195,16 +195,16 @@ if ([string]::IsNullOrEmpty($ClientIpAddress)) {
     Write-Step "Auto-detecting public IP from api.ipify.org"
     try {
         $detected = (Invoke-WebRequest -Uri 'https://api.ipify.org' `
- - UseBasicParsing -TimeoutSec 5 -ErrorAction Stop).Content.Trim()
+            -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop).Content.Trim()
         if ($detected -match '^\d{1,3}(\.\d{1,3}){3}$') {
             $ClientIpAddress = $detected
             Write-Success "Detected client IP: $ClientIpAddress"
         } else {
-            Write-Warn "api.ipify.org returned unexpected value: '$detected' - skipping client firewall rule"
+            Write-Warn "api.ipify.org returned unexpected value: '$detected'  -  skipping client firewall rule"
             $ClientIpAddress = ""
         }
     } catch {
-        Write-Warn "Could not auto-detect public IP ($($_.Exception.Message)) - skipping client firewall rule"
+        Write-Warn "Could not auto-detect public IP ($($_.Exception.Message))  -  skipping client firewall rule"
         $ClientIpAddress = ""
     }
 }
@@ -240,9 +240,9 @@ if ($EnablePrivateEndpoint) {
     $checks += @{ Type='subnet'; Vnet=$VnetName; Name=$PeSubnetName }
 }
 Assert-PrerequisitesExist `
- - ResourceGroup $ResourceGroup `
- - VnetResourceGroup $VnetResourceGroup `
- - Checks $checks
+    -ResourceGroup $ResourceGroup `
+    -VnetResourceGroup $VnetResourceGroup `
+    -Checks $checks
 
 # --------------------------------------------------------------------------
 # 6b. Auto-discover existing 'privatelink.postgres.database.azure.com' zone
@@ -252,19 +252,19 @@ Assert-PrerequisitesExist `
 # to the target VNet (typical in shared-tenant subs where a network team
 # owns the zone), we must REUSE it instead of creating a duplicate. We
 # only discover when (a) PE is enabled, (b) the operator did NOT pass an
-# explicit -ExistingDnsZoneId or POSTGRESQL_DNS_ZONE_ID override - those
+# explicit -ExistingDnsZoneId or POSTGRESQL_DNS_ZONE_ID override  -  those
 # are trusted as-is.
 # --------------------------------------------------------------------------
-$ExistingDnsZoneLinked = $true   # default matches Bicep - skip link creation
+$ExistingDnsZoneLinked = $true   # default matches Bicep  -  skip link creation
 if ($EnablePrivateEndpoint -and [string]::IsNullOrEmpty($ExistingDnsZoneId)) {
     Write-Step "Discovering existing 'privatelink.postgres.database.azure.com' Private DNS zone"
 
     $vnetId = "/subscriptions/$SubscriptionId/resourceGroups/$VnetResourceGroup/providers/Microsoft.Network/virtualNetworks/$VnetName"
 
     $linkedZoneId = Get-LinkedPrivateDnsZoneId `
- - SubscriptionId $SubscriptionId `
- - ZoneName 'privatelink.postgres.database.azure.com' `
- - VnetId $vnetId
+        -SubscriptionId $SubscriptionId `
+        -ZoneName 'privatelink.postgres.database.azure.com' `
+        -VnetId $vnetId
 
     if (-not [string]::IsNullOrEmpty($linkedZoneId)) {
         $ExistingDnsZoneId = $linkedZoneId
@@ -272,15 +272,15 @@ if ($EnablePrivateEndpoint -and [string]::IsNullOrEmpty($ExistingDnsZoneId)) {
         Write-Success "Reusing existing linked Private DNS zone: $linkedZoneId"
     } else {
         $unlinkedZoneId = Get-PrivateDnsZoneIdByName `
- - SubscriptionId $SubscriptionId `
- - ZoneName 'privatelink.postgres.database.azure.com'
+            -SubscriptionId $SubscriptionId `
+            -ZoneName 'privatelink.postgres.database.azure.com'
         if (-not [string]::IsNullOrEmpty($unlinkedZoneId)) {
             $ExistingDnsZoneId = $unlinkedZoneId
             $ExistingDnsZoneLinked = $false
             Write-Success "Reusing existing Private DNS zone (no current VNet link): $unlinkedZoneId"
             Write-Info "Bicep will create the VNet link in the zone's resource group."
         } else {
-            Write-Info "No existing zone found - Bicep will create one and link it."
+            Write-Info "No existing zone found  -  Bicep will create one and link it."
         }
     }
 }
@@ -313,7 +313,7 @@ if ($EnablePrivateEndpoint -and -not [string]::IsNullOrEmpty($ExistingDnsZoneId)
     if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($peJson)) {
         $zgJson = Invoke-Native {
             az network private-endpoint dns-zone-group list `
- - g $ResourceGroup --endpoint-name $peName -o json 2>$null
+                -g $ResourceGroup --endpoint-name $peName -o json 2>$null
         }
         $zgList = @()
         if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($zgJson)) {
@@ -327,7 +327,7 @@ if ($EnablePrivateEndpoint -and -not [string]::IsNullOrEmpty($ExistingDnsZoneId)
                     $StaleZoneGroupOldZoneId = $currentZoneId
                     Write-Warn "Stale zone group '$($zg.name)' points at: $currentZoneId"
                     Write-Warn "Resolved canonical zone is        : $ExistingDnsZoneId"
-                    Write-Warn "Azure forbids in-place repointing - zone group must be deleted and recreated."
+                    Write-Warn "Azure forbids in-place repointing  -  zone group must be deleted and recreated."
                     break
                 }
             }
@@ -337,7 +337,7 @@ if ($EnablePrivateEndpoint -and -not [string]::IsNullOrEmpty($ExistingDnsZoneId)
             Write-Success "No stale zone group detected on PE '$peName'."
         }
     } else {
-        Write-Info "PE '$peName' not present yet (first run) - nothing to repair."
+        Write-Info "PE '$peName' not present yet (first run)  -  nothing to repair."
     }
 }
 
@@ -346,7 +346,7 @@ if ($EnablePrivateEndpoint -and -not [string]::IsNullOrEmpty($ExistingDnsZoneId)
 # --------------------------------------------------------------------------
 Write-Host ""
 Write-Host "  Deployment plan" -ForegroundColor Cyan
-Write-Host " - --------------" -ForegroundColor Cyan
+Write-Host "  ---------------" -ForegroundColor Cyan
 Write-Host ("    Subscription          : {0}" -f $SubscriptionId)
 Write-Host ("    Resource group        : {0}" -f $ResourceGroup)
 Write-Host ("    Location              : {0}" -f $Location)
@@ -365,7 +365,7 @@ if ($EnablePrivateEndpoint) {
         Write-Host ("    DNS zone link status  : {0}" -f $(if ($ExistingDnsZoneLinked) { 'already linked (no link will be created)' } else { 'unlinked (Bicep will create the VNet link)' }))
     }
     if ($null -ne $StaleZoneGroup) {
-        $gate = if ($FixStaleDnsZoneGroup -or $Force) { 'auto-approved (-FixStaleDnsZoneGroup or -Force)' } else { 'BLOCKED - rerun with -FixStaleDnsZoneGroup' }
+        $gate = if ($FixStaleDnsZoneGroup -or $Force) { 'auto-approved (-FixStaleDnsZoneGroup or -Force)' } else { 'BLOCKED  -  rerun with -FixStaleDnsZoneGroup' }
         Write-Host ("    Stale PE zone group   : '{0}' WILL BE DELETED [{1}]" -f $StaleZoneGroup, $gate) -ForegroundColor Yellow
         Write-Host ("      currently points at : {0}" -f $StaleZoneGroupOldZoneId) -ForegroundColor DarkYellow
     }
@@ -407,10 +407,10 @@ if ($null -ne $StaleZoneGroup) {
     Write-Step "Deleting stale Private DNS zone group '$StaleZoneGroup' on PE '$peName'"
     $delOut = Invoke-Native {
         az network private-endpoint dns-zone-group delete `
- - g $ResourceGroup `
- - -endpoint-name $peName `
- - n $StaleZoneGroup `
- - -output none 2>&1
+            -g $ResourceGroup `
+            --endpoint-name $peName `
+            -n $StaleZoneGroup `
+            --output none 2>&1
     }
     if ($LASTEXITCODE -ne 0) {
         Write-Fail "Could not delete stale zone group (exit $LASTEXITCODE):"
@@ -432,7 +432,7 @@ if ($null -ne $StaleZoneGroup) {
 #   * It has at most one record set left (just the SOA after the
 #     zone-group delete in 7b reclaimed the A record).
 # Anything else -> log a manual-cleanup hint and move on. Failure here
-# is non-fatal - Section 8's Bicep does not depend on this.
+# is non-fatal  -  Section 8's Bicep does not depend on this.
 # --------------------------------------------------------------------------
 if ($null -ne $StaleZoneGroup -and ($FixStaleDnsZoneGroup -or $Force) -and -not [string]::IsNullOrEmpty($StaleZoneGroupOldZoneId)) {
     $segments = $StaleZoneGroupOldZoneId.Split('/')
@@ -445,7 +445,7 @@ if ($null -ne $StaleZoneGroup -and ($FixStaleDnsZoneGroup -or $Force) -and -not 
                 az network private-dns zone show -g $orphanRg -n $orphanName -o json 2>$null
             }
             if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($zoneJson)) {
-                # Authoritative record-set check via `record-set list` -  
+                # Authoritative record-set check via `record-set list`  - 
                 # the `numberOfRecordSets` / `numberOfVirtualNetworkLinks`
                 # counters on `zone show` (and the listing returned by
                 # `link vnet list`) can lag the Azure RP's actual state
@@ -457,30 +457,30 @@ if ($null -ne $StaleZoneGroup -and ($FixStaleDnsZoneGroup -or $Force) -and -not 
                 #   1. Guard on real record-set contents (only SOA is OK).
                 #   2. Loop any visible VNet links and delete each by
                 #      name (delete is idempotent and authoritative).
-                #   3. Attempt the zone delete unconditionally - if Azure
+                #   3. Attempt the zone delete unconditionally  -  if Azure
                 #      still holds nested links we log a manual-cleanup
                 #      hint and move on (non-fatal; Bicep does not depend
                 #      on this cleanup).
                 $rsListJson = Invoke-Native {
                     az network private-dns record-set list `
- - g $orphanRg --zone-name $orphanName `
- - -query "[?type!='Microsoft.Network/privateDnsZones/SOA'].{n:name,t:type}" `
- - o json 2>$null
+                        -g $orphanRg --zone-name $orphanName `
+                        --query "[?type!='Microsoft.Network/privateDnsZones/SOA'].{n:name,t:type}" `
+                        -o json 2>$null
                 }
                 $nonSoaRecords = @()
                 if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($rsListJson)) {
                     try { $nonSoaRecords = @($rsListJson | ConvertFrom-Json) } catch { $nonSoaRecords = @() }
                 }
                 if ($nonSoaRecords.Count -gt 0) {
-                    Write-Warn "Orphan zone has $($nonSoaRecords.Count) non-SOA record set(s) - leaving in place to avoid accidental data loss."
+                    Write-Warn "Orphan zone has $($nonSoaRecords.Count) non-SOA record set(s)  -  leaving in place to avoid accidental data loss."
                     Write-Info  "Inspect: az network private-dns record-set list -g $orphanRg --zone-name $orphanName -o table"
                     Write-Info  "Delete manually only if safe: az network private-dns zone delete -g $orphanRg -n $orphanName --yes"
                 } else {
-                    Write-Step "Orphan zone has only SOA - clearing any visible VNet links"
+                    Write-Step "Orphan zone has only SOA  -  clearing any visible VNet links"
                     $linkListJson = Invoke-Native {
                         az network private-dns link vnet list `
- - g $orphanRg --zone-name $orphanName `
- - -query "[].name" -o json 2>$null
+                            -g $orphanRg --zone-name $orphanName `
+                            --query "[].name" -o json 2>$null
                     }
                     $linkNames = @()
                     if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($linkListJson)) {
@@ -491,29 +491,29 @@ if ($null -ne $StaleZoneGroup -and ($FixStaleDnsZoneGroup -or $Force) -and -not 
                         Write-Info "  Deleting link '$lname' (idempotent)"
                         Invoke-Native {
                             az network private-dns link vnet delete `
- - g $orphanRg --zone-name $orphanName `
- - n $lname --yes --output none 2>$null
+                                -g $orphanRg --zone-name $orphanName `
+                                -n $lname --yes --output none 2>$null
                         } | Out-Null
                     }
                     Write-Step "Attempting orphan zone delete"
                     $delZoneOut = Invoke-Native {
                         az network private-dns zone delete `
- - g $orphanRg -n $orphanName `
- - -yes --output none 2>&1
+                            -g $orphanRg -n $orphanName `
+                            --yes --output none 2>&1
                     }
                     if ($LASTEXITCODE -eq 0) {
                         Write-Success "Orphan zone '$orphanName' deleted from '$orphanRg'."
                     } else {
-                        Write-Warn "Orphan zone delete failed (exit $LASTEXITCODE). Non-fatal - Bicep will still succeed."
+                        Write-Warn "Orphan zone delete failed (exit $LASTEXITCODE). Non-fatal  -  Bicep will still succeed."
                         $delZoneOut | ForEach-Object { Write-Host "      $_" -ForegroundColor DarkYellow }
-                        Write-Info "Manual cleanup (Azure RP cache can lag - retry after a few minutes):"
+                        Write-Info "Manual cleanup (Azure RP cache can lag  -  retry after a few minutes):"
                         Write-Info "  az network private-dns link vnet list -g $orphanRg --zone-name $orphanName -o table"
                         Write-Info "  # for each link: az network private-dns link vnet delete -g $orphanRg --zone-name $orphanName -n <name> --yes"
                         Write-Info "  az network private-dns zone delete -g $orphanRg -n $orphanName --yes"
                     }
                 }
             } else {
-                Write-Info "Orphan zone not found (already deleted?) - nothing to clean up."
+                Write-Info "Orphan zone not found (already deleted?)  -  nothing to clean up."
             }
         }
     }
@@ -570,12 +570,12 @@ $stderrLog = Join-Path $logDir "$logStamp-bicep-stderr.txt"
 
 $deployOut = Invoke-Native {
     az deployment group create `
- - -resource-group $ResourceGroup `
- - -name $deploymentName `
- - -template-file $bicepFile `
- - -parameters "@$paramsFile" `
- - -parameters $overrides `
- - -output json 2>$stderrLog
+        --resource-group $ResourceGroup `
+        --name $deploymentName `
+        --template-file $bicepFile `
+        --parameters "@$paramsFile" `
+        --parameters $overrides `
+        --output json 2>$stderrLog
 }
 # Scrub the password from anything we might log on failure.
 $plainPw = $null
@@ -595,11 +595,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Success "Bicep deployment succeeded ($deploymentName)"
 
-# Validate non-empty BEFORE parsing - an empty stdout on a success exit
+# Validate non-empty BEFORE parsing  -  an empty stdout on a success exit
 # is itself a bug worth surfacing rather than silently NPE'ing below.
 $deployRaw = ($deployOut -join "`n").Trim()
 if ([string]::IsNullOrWhiteSpace($deployRaw)) {
-    Write-Fail "Bicep deploy succeeded (exit 0) but produced empty stdout - cannot read outputs."
+    Write-Fail "Bicep deploy succeeded (exit 0) but produced empty stdout  -  cannot read outputs."
     if (Test-Path $stderrLog) {
         Write-Info "stderr captured to: $stderrLog"
     }
@@ -632,15 +632,15 @@ Write-Info "Server ID    : $serverId"
 Write-Info "Tenant ID    : $tenantId"
 
 # --------------------------------------------------------------------------
-# 9. Restart if any params still pending - AGE is unusable until then
+# 9. Restart if any params still pending  -  AGE is unusable until then
 # --------------------------------------------------------------------------
 Write-Step "Checking for PostgreSQL parameters pending restart"
 $pendingJson = Invoke-Native {
     az postgres flexible-server parameter list `
- - -resource-group $ResourceGroup `
- - -server-name $ServerName `
- - -query "[?isConfigPendingRestart].{name:name,value:value}" `
- - -output json 2>$null
+        --resource-group $ResourceGroup `
+        --server-name $ServerName `
+        --query "[?isConfigPendingRestart].{name:name,value:value}" `
+        --output json 2>$null
 }
 $pending = @()
 if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($pendingJson)) {
@@ -651,8 +651,8 @@ if ($pending.Count -gt 0) {
     Write-Info "Restarting PG (offline ~30-60s) so AGE preload takes effect..."
     Invoke-Native {
         az postgres flexible-server restart `
- - -resource-group $ResourceGroup `
- - -name $ServerName --output none 2>&1 | Out-Null
+            --resource-group $ResourceGroup `
+            --name $ServerName --output none 2>&1 | Out-Null
     }
     if ($LASTEXITCODE -ne 0) {
         Write-Fail "PG restart failed. AGE will be unusable until the server is restarted manually."
@@ -680,9 +680,9 @@ Write-Info "Deployer: $deployerUpn ($deployerOid)"
 
 $existingAdminsJson = Invoke-Native {
     az postgres flexible-server microsoft-entra-admin list `
- - -resource-group $ResourceGroup `
- - -server-name $ServerName `
- - -output json 2>$null
+        --resource-group $ResourceGroup `
+        --server-name $ServerName `
+        --output json 2>$null
 }
 $existingAdmins = @()
 if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($existingAdminsJson)) {
@@ -694,13 +694,13 @@ if ($existingAdmins | Where-Object { $_.objectId -eq $deployerOid }) {
 } else {
     $adminOut = Invoke-Native {
         az postgres flexible-server microsoft-entra-admin create `
- - -resource-group $ResourceGroup `
- - -server-name $ServerName `
- - -display-name $deployerUpn `
- - -object-id $deployerOid `
- - -type User `
- - -only-show-errors `
- - -output none 2>&1
+            --resource-group $ResourceGroup `
+            --server-name $ServerName `
+            --display-name $deployerUpn `
+            --object-id $deployerOid `
+            --type User `
+            --only-show-errors `
+            --output none 2>&1
     }
     if ($LASTEXITCODE -eq 0) {
         Write-Success "Registered $deployerUpn as PG Entra User admin."
@@ -719,12 +719,12 @@ if ($existingAdmins | Where-Object { $_.objectId -eq $deployerOid }) {
 if ($uamiList.Count -gt 0) {
     Write-Step "Registering UAMIs as PG Entra ServicePrincipal admins"
 
-    # Refresh admin list once after the deployer add - used to skip already-present UAMIs.
+    # Refresh admin list once after the deployer add  -  used to skip already-present UAMIs.
     $refreshJson = Invoke-Native {
         az postgres flexible-server microsoft-entra-admin list `
- - -resource-group $ResourceGroup `
- - -server-name $ServerName `
- - -output json 2>$null
+            --resource-group $ResourceGroup `
+            --server-name $ServerName `
+            --output json 2>$null
     }
     $existingAdmins = @()
     if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($refreshJson)) {
@@ -748,13 +748,13 @@ if ($uamiList.Count -gt 0) {
 
         $regOut = Invoke-Native {
             az postgres flexible-server microsoft-entra-admin create `
- - -resource-group $ResourceGroup `
- - -server-name $ServerName `
- - -display-name $uamiName `
- - -object-id $uamiOid `
- - -type ServicePrincipal `
- - -only-show-errors `
- - -output none 2>&1
+                --resource-group $ResourceGroup `
+                --server-name $ServerName `
+                --display-name $uamiName `
+                --object-id $uamiOid `
+                --type ServicePrincipal `
+                --only-show-errors `
+                --output none 2>&1
         }
         if ($LASTEXITCODE -eq 0) {
             Write-Success "  Registered $uamiName as PG Entra ServicePrincipal admin."
@@ -777,26 +777,26 @@ if ($EnablePrivateEndpoint) {
     $peName = "${ServerName}-pe"
     $nicId = Invoke-Native {
         az network private-endpoint show `
- - -name $peName --resource-group $ResourceGroup `
- - -query "networkInterfaces[0].id" -o tsv 2>$null `
+            --name $peName --resource-group $ResourceGroup `
+            --query "networkInterfaces[0].id" -o tsv 2>$null `
         | Where-Object { $_ -notmatch '^(WARNING|ERROR)' }
     }
     $nicId = ($nicId -join "").Trim()
     if (-not [string]::IsNullOrEmpty($nicId)) {
         $ipRaw = Invoke-Native {
             az network nic show --ids $nicId `
- - -query "ipConfigurations[0].privateIPAddress" -o tsv 2>$null `
+                --query "ipConfigurations[0].privateIPAddress" -o tsv 2>$null `
             | Where-Object { $_ -notmatch '^(WARNING|ERROR)' }
         }
         $privateIp = ($ipRaw -join "").Trim()
         if (-not [string]::IsNullOrEmpty($privateIp)) {
             Write-Success "PE private IP: $privateIp"
         } else {
-            Write-Warn "Could not read private IP from NIC $nicId - leaving null."
+            Write-Warn "Could not read private IP from NIC $nicId  -  leaving null."
             $privateIp = $null
         }
     } else {
-        Write-Warn "Private endpoint $peName has no NIC reference - leaving private IP null."
+        Write-Warn "Private endpoint $peName has no NIC reference  -  leaving private IP null."
     }
 }
 
@@ -822,10 +822,10 @@ Write-Host " 01-postgresql DEPLOYMENT COMPLETE" -ForegroundColor Green
 Write-Host "================================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Next step: deploy the backend + MCP sidecar Container App." -ForegroundColor Cyan
-Write-Host "    cd $($scriptDir | Split-Path -Parent)\02-backend" - ForegroundColor Gray
-Write-Host "    pwsh ./deploy.ps1" - ForegroundColor Gray
+Write-Host "    cd $($scriptDir | Split-Path -Parent)\02-backend"            -ForegroundColor Gray
+Write-Host "    pwsh ./deploy.ps1"                                            -ForegroundColor Gray
 Write-Host ""
-Write-Host "  02-backend/deploy.ps1 will read 01-postgresql/.outputs.json" - ForegroundColor Gray
-Write-Host "  for postgresqlServerFqdn and tenantId." - ForegroundColor Gray
+Write-Host "  02-backend/deploy.ps1 will read 01-postgresql/.outputs.json"     -ForegroundColor Gray
+Write-Host "  for postgresqlServerFqdn and tenantId."                          -ForegroundColor Gray
 Write-Host ""
 exit 0

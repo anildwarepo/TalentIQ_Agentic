@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Post-provision hook for TalentIQ: PostgreSQL AGE init + data loading,
     Docker builds for 3 images, container app deployment via ARM.
@@ -28,7 +28,7 @@ function Get-AzdEnvValue {
     # not stderr, so `2>nul` does not suppress them. Capture all output and filter.
     $raw = & cmd /c "azd env get-value $Name 2>&1"
     if ($null -eq $raw) { return "" }
-    # Force array semantics — PowerShell unwraps single-element collections to scalars,
+    # Force array semantics  -  PowerShell unwraps single-element collections to scalars,
     # which would cause $lines[0] to return a character rather than a line.
     $lines = @(@($raw) | Where-Object { $_ -ne $null -and $_ -ne "" } | Where-Object {
         $line = $_.ToString().Trim()
@@ -313,11 +313,11 @@ function Register-PgUamiAsEntraAdmin {
         Registers a user-assigned managed identity as a PostgreSQL Entra
         ServicePrincipal administrator via the Azure control plane. This is the
         fallback path for Phase 0.5 when `pgaadauth_create_principal_with_oid`
-        (the SQL approach) is unreachable from the deployer — e.g. ISP-level
+        (the SQL approach) is unreachable from the deployer  -  e.g. ISP-level
         port 5432 blocks (Comcast and many residential ISPs do this), or a
         private endpoint that isn't exposed locally.
 
-        Idempotent — re-running for the same display-name+object-id is a no-op.
+        Idempotent  -  re-running for the same display-name+object-id is a no-op.
         The UAMI receives **PG admin** privileges, which is broader than the
         SQL path (which grants narrow per-schema privileges). This is
         acceptable for unblocking container apps; deployers with full network
@@ -327,7 +327,7 @@ function Register-PgUamiAsEntraAdmin {
     .PARAMETER ServerName
         PG flexible server name (without FQDN suffix).
     .PARAMETER UamiName
-        Display name to register. MUST equal the UAMI's name — that's the PG
+        Display name to register. MUST equal the UAMI's name  -  that's the PG
         username the container will present when authenticating.
     .PARAMETER ObjectId
         principalId of the UAMI.
@@ -370,7 +370,7 @@ function Ensure-PostgresqlConfigApplied {
     .SYNOPSIS
         Restarts the PG flexible server if ANY server parameter is still
         flagged ``isConfigPendingRestart=true``. AGE in particular requires
-        ``shared_preload_libraries=age`` to be applied via a restart — the
+        ``shared_preload_libraries=age`` to be applied via a restart  -  the
         Bicep template sets it, but if a later step (re-deploy, parameter
         update, manual ``az postgres ... parameter set``) re-touches it the
         change is stuck in pending state and every ``cypher()`` call fails
@@ -392,7 +392,7 @@ function Ensure-PostgresqlConfigApplied {
         --query "[?isConfigPendingRestart].{name:name,value:value}" `
         --output json 2>$null
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrEmpty($pendingJson)) {
-        Write-Host "  (could not query pending-restart params — skipping)" -ForegroundColor DarkYellow
+        Write-Host "  (could not query pending-restart params  -  skipping)" -ForegroundColor DarkYellow
         return
     }
     try { $pending = $pendingJson | ConvertFrom-Json } catch { $pending = @() }
@@ -480,7 +480,7 @@ function Wait-ForPrivateEndpointReachable {
 
     Write-Host ""
     Write-Host "============================================================" -ForegroundColor Cyan
-    Write-Host "  PostgreSQL private endpoint — hosts file entry required" -ForegroundColor Cyan
+    Write-Host "  PostgreSQL private endpoint  -  hosts file entry required" -ForegroundColor Cyan
     Write-Host "============================================================" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "  PostgreSQL is reachable only via private endpoint."
@@ -490,7 +490,7 @@ function Wait-ForPrivateEndpointReachable {
     Write-Host "  Hosts file location:" -ForegroundColor Yellow
     Write-Host "    $hostsPath" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "  Option A (recommended — matches TLS cert CN):" -ForegroundColor Yellow
+    Write-Host "  Option A (recommended  -  matches TLS cert CN):" -ForegroundColor Yellow
     Write-Host "    $($PeInfo.PrivateIp)  $($PeInfo.PublicFqdn)" -ForegroundColor Green
     Write-Host ""
     Write-Host "  Option B (privatelink FQDN):" -ForegroundColor Yellow
@@ -553,7 +553,7 @@ function Wait-ForPrivateEndpointReachable {
             } else {
                 "resolves correctly but port 5432 not reachable"
             }
-            $statuses += "$fqdn → $status"
+            $statuses += "$fqdn -> $status"
         }
         Write-Host "  [poll $attempt] $($statuses -join '; '). Retrying in ${PollSeconds}s..." -ForegroundColor DarkGray
         Start-Sleep -Seconds $PollSeconds
@@ -602,7 +602,7 @@ function Initialize-PostgresqlAgeAndData {
     Invoke-NativeCommand { az postgres flexible-server restart --resource-group $ResourceGroup --name $ServerName 2>&1 | Out-Null }
     Wait-PostgresqlReady -ResourceGroup $ResourceGroup -ServerName $ServerName
 
-    # ── Entra ID authentication (idempotent) ─────────────────────────────
+    # -- Entra ID authentication (idempotent) -----------------------------
     # Ensure Entra auth is enabled on the server (Bicep already sets this,
     # but the hook is safe to re-run against an existing server that may
     # have been provisioned before the Entra changes landed).
@@ -632,11 +632,11 @@ function Initialize-PostgresqlAgeAndData {
                 --output none 2>&1 | Out-Null
         }
     } else {
-        Write-Host "  WARNING: POSTGRESQL_ENTRA_ADMIN_OBJECT_ID / _PRINCIPAL_NAME not set — data load may fail." -ForegroundColor Yellow
+        Write-Host "  WARNING: POSTGRESQL_ENTRA_ADMIN_OBJECT_ID / _PRINCIPAL_NAME not set  -  data load may fail." -ForegroundColor Yellow
         Write-Host "  Run 'az login' and re-run 'azd up', or invoke Enable-PostgresEntraAuth.ps1 manually." -ForegroundColor Yellow
     }
 
-    # ── Data pipeline (uses Entra token at connect time) ─────────────────
+    # -- Data pipeline (uses Entra token at connect time) -----------------
     $scriptDir = $PSScriptRoot
     $repoRoot = Resolve-Path (Join-Path $scriptDir "../..")
     $dataPipelineScript = Join-Path $repoRoot "talent_data_pipeline/main.py"
@@ -652,7 +652,7 @@ function Initialize-PostgresqlAgeAndData {
     # PGUSER must be the Entra principal name (UPN for users). The data
     # pipeline acquires an OSSRDBMS bearer token via DefaultAzureCredential
     # (which uses the az CLI session locally, or the container UAMI in cloud)
-    # and attaches it as the libpq password — see talent_data_pipeline/pg_entra.py.
+    # and attaches it as the libpq password  -  see talent_data_pipeline/pg_entra.py.
     $env:PGUSER = $EntraAdminUpn
     Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
     $env:PGSSLMODE = "require"
@@ -702,7 +702,7 @@ function Register-WebappRedirectUri {
     <#
     .SYNOPSIS
         Adds the deployed webapp FQDN as a SPA redirect URI on the Entra app registration
-        if it isn't already present. Idempotent. Failures are non-fatal — they are logged
+        if it isn't already present. Idempotent. Failures are non-fatal  -  they are logged
         but do not abort the post-provision flow (the deployment can still complete and
         the URI can be added manually).
     #>
@@ -712,13 +712,13 @@ function Register-WebappRedirectUri {
     )
 
     if ([string]::IsNullOrEmpty($AppClientId)) {
-        Write-Host "  ⚠ Skipping redirect URI registration — no SPA client ID resolved." -ForegroundColor Yellow
+        Write-Host "  [WARN] Skipping redirect URI registration  -  no SPA client ID resolved." -ForegroundColor Yellow
         Write-Host "    To enable automatic registration on future runs:"
         Write-Host "      azd env set entraSpaClientId <your-spa-app-client-id>"
         return
     }
     if ([string]::IsNullOrEmpty($WebappFqdn)) {
-        Write-Host "  ⚠ Skipping redirect URI registration — no webapp FQDN available." -ForegroundColor Yellow
+        Write-Host "  [WARN] Skipping redirect URI registration  -  no webapp FQDN available." -ForegroundColor Yellow
         return
     }
 
@@ -731,7 +731,7 @@ function Register-WebappRedirectUri {
         # Get the app's object ID (Graph requires it, not the appId)
         $objectId = & az ad app show --id $AppClientId --query id -o tsv 2>$null
         if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrEmpty($objectId)) {
-            Write-Host "  ⚠ App registration $AppClientId not found, or insufficient permissions to read it." -ForegroundColor Yellow
+            Write-Host "  [WARN] App registration $AppClientId not found, or insufficient permissions to read it." -ForegroundColor Yellow
             Write-Host "    Add the URI manually in the Entra portal (Single-page application platform)."
             return
         }
@@ -745,7 +745,7 @@ function Register-WebappRedirectUri {
         }
 
         if ($existing -contains $newUri) {
-            Write-Host "  ✓ Redirect URI already registered. No action needed." -ForegroundColor Green
+            Write-Host "  [OK] Redirect URI already registered. No action needed." -ForegroundColor Green
             return
         }
 
@@ -765,15 +765,15 @@ function Register-WebappRedirectUri {
         Remove-Item $bodyFile -Force -ErrorAction SilentlyContinue
 
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "  ⚠ Failed to update app registration (az rest exit $LASTEXITCODE)." -ForegroundColor Yellow
+            Write-Host "  [WARN] Failed to update app registration (az rest exit $LASTEXITCODE)." -ForegroundColor Yellow
             Write-Host "    You likely need Application Administrator or owner rights on the app."
             Write-Host "    Add the URI manually: $newUri (Single-page application platform)"
             return
         }
 
-        Write-Host "  ✓ Added $newUri to SPA redirect URIs." -ForegroundColor Green
+        Write-Host "  [OK] Added $newUri to SPA redirect URIs." -ForegroundColor Green
     } catch {
-        Write-Host "  ⚠ Exception while updating app registration: $_" -ForegroundColor Yellow
+        Write-Host "  [WARN] Exception while updating app registration: $_" -ForegroundColor Yellow
         Write-Host "    Add the URI manually: $newUri (Single-page application platform)"
     }
 }
@@ -817,7 +817,7 @@ function Invoke-ContainerAppsDeploy {
 
     # Generic resolver for azd-style placeholders (${VAR} and ${VAR=default}).
     # azd expands these before handing params to ARM, but this hook calls
-    # `az deployment` directly which does NOT expand them — so any param
+    # `az deployment` directly which does NOT expand them  -  so any param
     # left as a literal `${...}` string would be sent verbatim and rejected
     # (e.g. `InvalidResourceName: ${ACA_SUBNET_NAME=...}` for the ACA subnet).
     # The lookup pulls from process env (which azd populates from .env and
@@ -873,12 +873,12 @@ function Invoke-ContainerAppsDeploy {
 
     # Resolve azd-substituted Entra admin params. The on-disk parameter file
     # has placeholders like `${POSTGRESQL_ENTRA_ADMIN_OBJECT_ID=}` that only
-    # azd knows how to expand — `az deployment` would treat them as literals.
+    # azd knows how to expand  -  `az deployment` would treat them as literals.
     #
     # IMPORTANT: We intentionally pass EMPTY values for the Entra admin params
     # during this postprovision redeploy. The bicep declares the PG admin child
     # resource as conditional on `!empty(entraAdminObjectId)`, so empty values
-    # cause it to be skipped entirely — which is what we want, because:
+    # cause it to be skipped entirely  -  which is what we want, because:
     #   1. Phase 1 (`azd provision`) already created the Entra admin via the
     #      same bicep with real values.
     #   2. Re-evaluating the admin in a second deployment can race with the
@@ -960,7 +960,7 @@ function Invoke-ContainerAppsDeploy {
     # (Phase 0.5 UAMI role provisioning, webapp URL display, etc.) can read
     # the container app names and FQDNs. The initial `azd provision` runs
     # main.bicep with `deploy*ContainerApp=false`, so its outputs for those
-    # names are empty — only this postprovision deployment knows them.
+    # names are empty  -  only this postprovision deployment knows them.
     Write-Host "  Capturing container app outputs from deployment..."
     $outputsJson = & az deployment group show `
         --resource-group $ResourceGroup `
@@ -1019,12 +1019,12 @@ $entraAdminUpn = Get-AzdEnvValue "POSTGRESQL_ENTRA_ADMIN_PRINCIPAL_NAME"
 $entraAdminType = Get-AzdEnvValue "POSTGRESQL_ENTRA_ADMIN_PRINCIPAL_TYPE"
 if ([string]::IsNullOrEmpty($entraAdminType)) { $entraAdminType = "User" }
 if ([string]::IsNullOrEmpty($entraAdminUpn)) {
-    Write-Host "WARNING: POSTGRESQL_ENTRA_ADMIN_PRINCIPAL_NAME is empty — Entra PG bootstrap may fail." -ForegroundColor Yellow
+    Write-Host "WARNING: POSTGRESQL_ENTRA_ADMIN_PRINCIPAL_NAME is empty  -  Entra PG bootstrap may fail." -ForegroundColor Yellow
     Write-Host "  Run preprovision.ps1 (or 'az login' then 'azd up') to capture the signed-in user." -ForegroundColor Yellow
 }
 # PostgreSQL admin password is still required because the Azure ARM API insists
 # on an `administratorLoginPassword` value even when password auth is disabled
-# at the server level. The password is generated/preserved by preprovision —
+# at the server level. The password is generated/preserved by preprovision  - 
 # it is NEVER injected into running apps or used by the data pipeline.
 Write-Host "Resolving PostgreSQL admin password (Bicep API requirement only)..."
 $postgresqlAdminPassword = Get-PostgresqlAdminPassword
@@ -1064,7 +1064,7 @@ if (-not [string]::IsNullOrEmpty($postgresqlServerName) -and $initializePostgres
         # Wait-ForPrivateEndpointReachable returns whichever FQDN (public or privatelink) the user mapped in hosts.
         $connectFqdn = Show-HostsFileInstructions -PeInfo $peInfo
     } else {
-        # No PE — fall back to public access + broad firewall
+        # No PE  -  fall back to public access + broad firewall
         Ensure-PostgresqlAllowAllIps -ResourceGroup $resourceGroup -ServerName $postgresqlServerName
     }
 
@@ -1095,7 +1095,7 @@ if (Test-DockerAvailable) {
     $useDockerDesktop = $true
     Write-Host "Build strategy: Docker Desktop (local build + push to ACR)"
 } else {
-    # Always fall back to ACR remote build — no interactive prompt
+    # Always fall back to ACR remote build  -  no interactive prompt
     # (azd hook stdin is unreliable; user opted into this default).
     Write-Host "Docker Desktop is not available. Build strategy: ACR remote build"
 }
@@ -1175,10 +1175,10 @@ if (-not [string]::IsNullOrEmpty($postgresqlServerName)) {
     Write-Host "PHASE 0.5: Registering container app UAMIs as PG Entra roles"
     Write-Host "=========================================="
 
-    # Always discover UAMIs first — they're needed for both SQL and control-plane paths.
+    # Always discover UAMIs first  -  they're needed for both SQL and control-plane paths.
     # In MCP sidecar mode (default), `mcpServerContainerAppName` is empty because the
     # standalone MCP module is gated off in bicep. The loop below naturally skips empty
-    # app names, so only the backend UAMI is registered — which the MCP sidecar reuses
+    # app names, so only the backend UAMI is registered  -  which the MCP sidecar reuses
     # via the shared pod identity (AZURE_CLIENT_ID is injected into both containers).
     $mcpServerSidecarRaw = Get-AzdEnvValue "mcpServerSidecar"
     $sidecarMode = -not ($mcpServerSidecarRaw -eq "false" -or $mcpServerSidecarRaw -eq "False" -or $mcpServerSidecarRaw -eq "FALSE")
@@ -1210,7 +1210,7 @@ if (-not [string]::IsNullOrEmpty($postgresqlServerName)) {
         #      Requires the deployer to have outbound TCP/5432 to PG.
         #   2. Fallback: az postgres flexible-server microsoft-entra-admin create
         #      --type ServicePrincipal (Azure control plane, no PG SQL hop).
-        #      Grants ADMIN — broader than SQL, but unblocks containers when
+        #      Grants ADMIN  -  broader than SQL, but unblocks containers when
         #      port 5432 is filtered (Comcast and many residential ISPs do this).
         #
         # Set POSTGRESQL_USE_CONTROL_PLANE_UAMI=true to skip the SQL attempt
@@ -1253,7 +1253,7 @@ if (-not [string]::IsNullOrEmpty($postgresqlServerName)) {
                 }
             }
         } else {
-            Write-Host "  POSTGRESQL_USE_CONTROL_PLANE_UAMI=true — skipping SQL path." -ForegroundColor Cyan
+            Write-Host "  POSTGRESQL_USE_CONTROL_PLANE_UAMI=true  -  skipping SQL path." -ForegroundColor Cyan
         }
 
         if (-not $sqlSucceeded) {

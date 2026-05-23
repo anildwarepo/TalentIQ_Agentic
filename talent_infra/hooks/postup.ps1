@@ -1,13 +1,13 @@
-<#
+﻿<#
 .SYNOPSIS
-    Post-up hook for TalentIQ — runs after every `azd up`, regardless of whether
+    Post-up hook for TalentIQ  -  runs after every `azd up`, regardless of whether
     provision was skipped due to state cache. Ensures the deployed webapp's URL
     is registered as a SPA redirect URI on the Entra app registration so MSAL
     sign-in works.
 
 .NOTES
     Idempotent. Safe to re-run. Failures are logged as warnings but do NOT abort
-    the `azd up` flow — manual registration via the Entra portal remains an option.
+    the `azd up` flow  -  manual registration via the Entra portal remains an option.
 
     The postprovision hook also performs this registration on full provisions;
     this hook is the safety net for cached `azd up` runs where postprovision is
@@ -75,13 +75,13 @@ function Register-WebappRedirectUri {
     )
 
     if ([string]::IsNullOrEmpty($AppClientId)) {
-        Write-Host "  ⚠ Skipping — no SPA client ID resolved." -ForegroundColor Yellow
+        Write-Host "  [WARN] Skipping  -  no SPA client ID resolved." -ForegroundColor Yellow
         Write-Host "    To enable automatic registration:"
         Write-Host "      azd env set entraSpaClientId <your-spa-app-client-id>"
         return
     }
     if ([string]::IsNullOrEmpty($WebappFqdn)) {
-        Write-Host "  ⚠ Skipping — no webapp FQDN in azd env." -ForegroundColor Yellow
+        Write-Host "  [WARN] Skipping  -  no webapp FQDN in azd env." -ForegroundColor Yellow
         return
     }
 
@@ -92,7 +92,7 @@ function Register-WebappRedirectUri {
     try {
         $objectId = & az ad app show --id $AppClientId --query id -o tsv 2>$null
         if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrEmpty($objectId)) {
-            Write-Host "  ⚠ App $AppClientId not found or unreadable." -ForegroundColor Yellow
+            Write-Host "  [WARN] App $AppClientId not found or unreadable." -ForegroundColor Yellow
             Write-Host "    Add the URI manually in the Entra portal (Single-page application)."
             return
         }
@@ -105,7 +105,7 @@ function Register-WebappRedirectUri {
         }
 
         if ($existing -contains $newUri) {
-            Write-Host "  ✓ Redirect URI already registered. No action needed." -ForegroundColor Green
+            Write-Host "  [OK] Redirect URI already registered. No action needed." -ForegroundColor Green
             return
         }
 
@@ -124,7 +124,7 @@ function Register-WebappRedirectUri {
         Remove-Item $bodyFile -Force -ErrorAction SilentlyContinue
 
         if ($patchExit -ne 0) {
-            Write-Host "  ⚠ Failed to update app registration (az rest exit $patchExit)." -ForegroundColor Yellow
+            Write-Host "  [WARN] Failed to update app registration (az rest exit $patchExit)." -ForegroundColor Yellow
             if ($patchOutput) { Write-Host "    $patchOutput" }
             Write-Host "    Likely cause: signed-in user lacks Application.ReadWrite.OwnedBy"
             Write-Host "                  or is not an owner of the app registration."
@@ -132,9 +132,9 @@ function Register-WebappRedirectUri {
             return
         }
 
-        Write-Host "  ✓ Added $newUri to SPA redirect URIs." -ForegroundColor Green
+        Write-Host "  [OK] Added $newUri to SPA redirect URIs." -ForegroundColor Green
     } catch {
-        Write-Host "  ⚠ Exception: $_" -ForegroundColor Yellow
+        Write-Host "  [WARN] Exception: $_" -ForegroundColor Yellow
         Write-Host "    Manual add: $newUri (Single-page application platform)"
     }
 }
@@ -147,7 +147,7 @@ function Get-WebappFqdnFromAzure {
         Lists all container apps in the resource group and picks the one whose
         name starts with "webapp-".
 
-        Note: avoid passing JMESPath via --query — PowerShell → az.cmd → cmd.exe
+        Note: avoid passing JMESPath via --query  -  PowerShell -> az.cmd -> cmd.exe
         strips outer quotes and cmd then chokes on [] {} metacharacters. Get
         all apps as JSON and filter in PowerShell instead.
     #>
@@ -169,30 +169,30 @@ function Get-WebappFqdnFromAzure {
             Remove-Item $tmpErr -Force -ErrorAction SilentlyContinue
         }
         if ($azExit -ne 0) {
-            Write-Host "  ⚠ az containerapp list failed (exit $azExit):" -ForegroundColor Yellow
+            Write-Host "  [WARN] az containerapp list failed (exit $azExit):" -ForegroundColor Yellow
             if (-not [string]::IsNullOrWhiteSpace($stderr)) { Write-Host "    $stderr" -ForegroundColor DarkGray }
             if (-not [string]::IsNullOrWhiteSpace($json))   { Write-Host "    $json" -ForegroundColor DarkGray }
             return ""
         }
         $apps = $json | ConvertFrom-Json -ErrorAction SilentlyContinue
         if (-not $apps -or @($apps).Count -eq 0) {
-            Write-Host "  ⚠ No container apps found in resource group $ResourceGroup" -ForegroundColor Yellow
+            Write-Host "  [WARN] No container apps found in resource group $ResourceGroup" -ForegroundColor Yellow
             return ""
         }
         # Filter in PowerShell (avoids JMESPath quoting issues).
         $candidates = @($apps) | Where-Object { $_.name -like "webapp-*" }
         if (@($candidates).Count -eq 0) {
             $allNames = (@($apps) | ForEach-Object { $_.name }) -join ", "
-            Write-Host "  ⚠ No container apps matched 'webapp-*'. Found: $allNames" -ForegroundColor Yellow
+            Write-Host "  [WARN] No container apps matched 'webapp-*'. Found: $allNames" -ForegroundColor Yellow
             return ""
         }
         # Prefer apps with external ingress FQDN.
         $candidate = $candidates | Where-Object { $_.properties.configuration.ingress.fqdn } | Select-Object -First 1
         if ($candidate) { return $candidate.properties.configuration.ingress.fqdn }
-        Write-Host "  ⚠ Found webapp container app(s) but none have an external FQDN." -ForegroundColor Yellow
+        Write-Host "  [WARN] Found webapp container app(s) but none have an external FQDN." -ForegroundColor Yellow
         return ""
     } catch {
-        Write-Host "  ⚠ Exception calling az: $_" -ForegroundColor Yellow
+        Write-Host "  [WARN] Exception calling az: $_" -ForegroundColor Yellow
         return ""
     }
 }
@@ -218,7 +218,7 @@ if ([string]::IsNullOrEmpty($webappFqdn)) {
 
 $webappSourcePath = Resolve-Path (Join-Path $scriptDir $WebappPath) -ErrorAction SilentlyContinue
 if (-not $webappSourcePath) {
-    Write-Host "⚠ Could not resolve webapp source path '$WebappPath' — skipping." -ForegroundColor Yellow
+    Write-Host "[WARN] Could not resolve webapp source path '$WebappPath'  -  skipping." -ForegroundColor Yellow
     exit 0
 }
 

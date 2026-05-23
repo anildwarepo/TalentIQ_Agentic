@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Run the TalentIQ data pipeline against a pre-provisioned PostgreSQL
     Flexible Server (and optionally narrow the backend UAMI's PG grants).
@@ -7,15 +7,15 @@
     Step 4 of the talent_infra_modules per-component deploy chain.
 
     Reads:
-      * ..\01-postgresql\.outputs.json  (required)  — PG FQDN, deployer UPN
-      * ..\02-backend\.outputs.json     (optional)  — backend UAMI for grant narrowing
+      * ..\01-postgresql\.outputs.json  (required)   -  PG FQDN, deployer UPN
+      * ..\02-backend\.outputs.json     (optional)   -  backend UAMI for grant narrowing
 
     Does:
       1. Verifies az sign-in and target subscription.
       2. Verifies psql and Python (talent_data_pipeline) are installed.
       3. Acquires an OSSRDBMS bearer token for the deployer.
       4. Installs PG extensions (age, vector, pg_trgm, pg_diskann) and runs
-         create_graph(<graphName>) — idempotent. Skip with -SkipExtensions.
+         create_graph(<graphName>)  -  idempotent. Skip with -SkipExtensions.
       5. Optional idempotency check (skip with -Force): aborts if the graph
          already has Employee nodes.
       6. Invokes `python -m talent_data_pipeline.main` (with --force when
@@ -45,7 +45,7 @@
 .PARAMETER PgPrivateIp
     Optional private endpoint IPv4. When supplied, the script sets PGHOSTADDR
     so psql / role provisioning bypass DNS while keeping the FQDN for TLS.
-    NOTE: the data pipeline itself does NOT read PGHOSTADDR — if PG is
+    NOTE: the data pipeline itself does NOT read PGHOSTADDR  -  if PG is
     private-link-only, you must have a hosts-file override mapping PG FQDN
     to this IP for the pipeline to connect.
 
@@ -75,7 +75,7 @@
     from PG admin (broad) to schema-scoped grants (narrow). Requires
     ..\02-backend\.outputs.json. Defaulting to OFF preserves the working
     fallback path on networks that block direct PG (port 5432) access from
-    the deployer — see history.md.
+    the deployer  -  see history.md.
 
 .PARAMETER RestartBackend
     When set with -NarrowBackendGrants, restart the active backend Container
@@ -118,9 +118,9 @@ param(
     [switch]$Force
 )
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Setup
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 $ErrorActionPreference = "Stop"
 $ScriptRoot = $PSScriptRoot
 
@@ -136,14 +136,14 @@ if (-not $PipelineFullPath) {
 }
 $ProvisionRolesScript = (Join-Path $ScriptRoot "..\..\talent_infra_v2\scripts\provision_pg_entra_roles.py")
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Phase 1 — Az sign-in
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Phase 1  -  Az sign-in
+# ------------------------------------------------------------------------------
 $acct = Test-AzLoggedIn
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Phase 2 — Read upstream outputs
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Phase 2  -  Read upstream outputs
+# ------------------------------------------------------------------------------
 Write-Step "Reading upstream module outputs"
 
 if (-not (Test-Path -LiteralPath $PgOutputsPath)) {
@@ -166,10 +166,10 @@ if (Test-Path -LiteralPath $BackendOutputsPath) {
         $backendOutputs = Get-Content -Raw -LiteralPath $BackendOutputsPath | ConvertFrom-Json
         Write-Success "02-backend outputs loaded (optional)"
     } catch {
-        Write-Warn "Could not parse $BackendOutputsPath as JSON: $_ — backend-dependent steps will be skipped"
+        Write-Warn "Could not parse $BackendOutputsPath as JSON: $_  -  backend-dependent steps will be skipped"
     }
 } else {
-    Write-Info "02-backend\.outputs.json not present — backend grant-narrowing + restart will be skipped"
+    Write-Info "02-backend\.outputs.json not present  -  backend grant-narrowing + restart will be skipped"
 }
 
 if ($NarrowBackendGrants -and -not $backendOutputs) {
@@ -184,9 +184,9 @@ if ($RestartBackend -and -not $backendOutputs) {
     exit 1
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Phase 3 — Resolve parameters
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Phase 3  -  Resolve parameters
+# ------------------------------------------------------------------------------
 Write-Step "Resolving parameters"
 
 $SubscriptionId = Get-ParameterValue `
@@ -205,7 +205,7 @@ if ($NarrowBackendGrants -or $RestartBackend) {
         -EnvVar  "AZURE_RESOURCE_GROUP"
 }
 
-# PG FQDN — prefer override → outputs.postgresqlServerFqdn → outputs.postgresqlPrivateFqdn
+# PG FQDN  -  prefer override -> outputs.postgresqlServerFqdn -> outputs.postgresqlPrivateFqdn
 if (-not $PgServerFqdn) {
     if ($pgOutputs.postgresqlServerFqdn) {
         $PgServerFqdn = [string]$pgOutputs.postgresqlServerFqdn
@@ -214,16 +214,16 @@ if (-not $PgServerFqdn) {
     }
 }
 if (-not $PgServerFqdn) {
-    Write-Fail "Could not determine PG FQDN — pass -PgServerFqdn or add postgresqlServerFqdn to 01 outputs."
+    Write-Fail "Could not determine PG FQDN  -  pass -PgServerFqdn or add postgresqlServerFqdn to 01 outputs."
     exit 1
 }
 
-# PG private IP — optional override → outputs.postgresqlPrivateIp
+# PG private IP  -  optional override -> outputs.postgresqlPrivateIp
 if (-not $PgPrivateIp -and $pgOutputs.postgresqlPrivateIp) {
     $PgPrivateIp = [string]$pgOutputs.postgresqlPrivateIp
 }
 
-# Graph name — explicit → outputs.graphName → default
+# Graph name  -  explicit -> outputs.graphName -> default
 if (-not $GraphName) {
     if ($pgOutputs.graphName) {
         $GraphName = [string]$pgOutputs.graphName
@@ -232,7 +232,7 @@ if (-not $GraphName) {
     }
 }
 
-# Deployer UPN — explicit → outputs.deployerEntraUpn → signed-in user
+# Deployer UPN  -  explicit -> outputs.deployerEntraUpn -> signed-in user
 if (-not $DeployerUpn) {
     if ($pgOutputs.deployerEntraUpn) {
         $DeployerUpn = [string]$pgOutputs.deployerEntraUpn
@@ -252,9 +252,9 @@ Write-Info "Data pipeline:     $PipelineFullPath"
 
 Test-AzSubscription -SubscriptionId $SubscriptionId
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Phase 4 — Prerequisite checks (psql, python, pipeline package)
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Phase 4  -  Prerequisite checks (psql, python, pipeline package)
+# ------------------------------------------------------------------------------
 Write-Step "Checking psql is on PATH"
 $psqlCmd = Get-Command psql -ErrorAction SilentlyContinue
 if (-not $psqlCmd) {
@@ -301,9 +301,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Success "talent_data_pipeline.main is importable"
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Phase 5 — Acquire PG access token (OSSRDBMS scope)
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Phase 5  -  Acquire PG access token (OSSRDBMS scope)
+# ------------------------------------------------------------------------------
 Write-Step "Acquiring PostgreSQL Entra access token (oss-rdbms scope)"
 $pgToken = (Invoke-Native {
     az account get-access-token --resource-type oss-rdbms --query accessToken -o tsv 2>$null `
@@ -317,9 +317,9 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrEmpty($pgToken)) {
 }
 Write-Success "Token acquired ($($pgToken.Length) chars)"
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Phase 6 — Env var setup with deterministic restoration
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Phase 6  -  Env var setup with deterministic restoration
+# ------------------------------------------------------------------------------
 # We snapshot every PG* var we touch up-front, then restore in a finally so the
 # caller's shell is unchanged after the script returns (success OR failure).
 $envVarsToManage = @(
@@ -354,9 +354,9 @@ try {
     $env:PGPASSWORD = $pgToken
     $env:PGSSLMODE  = "require"
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # Phase 7 — Install extensions + create graph (skippable)
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
+    # Phase 7  -  Install extensions + create graph (skippable)
+    # --------------------------------------------------------------------------
     if ($SkipExtensions) {
         Write-Step "Skipping extension install (-SkipExtensions)"
     } else {
@@ -399,9 +399,9 @@ END
         Write-Success "Extensions installed and graph ready"
     }
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # Phase 8 — Idempotency check
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
+    # Phase 8  -  Idempotency check
+    # --------------------------------------------------------------------------
     if ($Force) {
         Write-Step "Skipping idempotency check (-Force)"
     } else {
@@ -429,7 +429,7 @@ AS (cnt agtype);
             }
         } else {
             # Label likely does not exist yet (empty graph). Treat as zero and continue.
-            Write-Info "Employee label not queryable yet — assuming empty graph"
+            Write-Info "Employee label not queryable yet  -  assuming empty graph"
         }
 
         if ($employeeCount -gt 0) {
@@ -439,13 +439,13 @@ AS (cnt agtype);
                 exit 0
             }
         } else {
-            Write-Success "Graph is empty — proceeding with full load"
+            Write-Success "Graph is empty  -  proceeding with full load"
         }
     }
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # Phase 9 — Run the data pipeline
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
+    # Phase 9  -  Run the data pipeline
+    # --------------------------------------------------------------------------
     Write-Step "Running talent_data_pipeline.main"
 
     # Pipeline env. The pipeline's pg_entra.pg_connect() fetches its OWN token
@@ -455,7 +455,7 @@ AS (cnt agtype);
     # IMPORTANT: talent_data_pipeline.config reads PGHOST (not PGHOSTADDR). If
     # PG is private-link-only and DNS resolves PGHOST to a public IP the
     # deployer cannot reach, the pipeline will fail Phase 1 (connectivity).
-    # The documented workaround is a hosts-file entry mapping PGHOST → private
+    # The documented workaround is a hosts-file entry mapping PGHOST -> private
     # IP. See talent_data_pipeline/DATA_LOADING.md and 04-data-loading/README.md.
     if ($PgPrivateIp) {
         Write-Warn "PG private IP supplied, but talent_data_pipeline does NOT honor PGHOSTADDR."
@@ -466,7 +466,7 @@ AS (cnt agtype);
     $env:GRAPH_NAME = $GraphName
 
     # Carry the embedding endpoint forward if it was set in the caller's env
-    # (pipeline reads it from AZURE_OPENAI_ENDPOINT). We do NOT prompt — the
+    # (pipeline reads it from AZURE_OPENAI_ENDPOINT). We do NOT prompt  -  the
     # pipeline's connectivity test will fail clearly if it is missing.
     if ($Force) { $env:FORCE_REGENERATE = "true" }
 
@@ -486,9 +486,9 @@ AS (cnt agtype);
     }
     Write-Success "talent_data_pipeline completed"
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # Phase 10 — Optional grant narrowing
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
+    # Phase 10  -  Optional grant narrowing
+    # --------------------------------------------------------------------------
     $grantsNarrowed = $false
     if ($NarrowBackendGrants) {
         Write-Step "Narrowing backend UAMI's PG grants (provision_pg_entra_roles.py)"
@@ -541,9 +541,9 @@ AS (cnt agtype);
         }
     }
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # Phase 11 — Optional backend restart
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
+    # Phase 11  -  Optional backend restart
+    # --------------------------------------------------------------------------
     $backendRestarted = $false
     if ($RestartBackend -and $backendOutputs) {
         Write-Step "Restarting backend Container App's active revision"
@@ -583,9 +583,9 @@ AS (cnt agtype);
         $backendRestarted = $true
     }
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # Phase 12 — Summary (vertex counts per AGE label)
-    # ──────────────────────────────────────────────────────────────────────────
+    # --------------------------------------------------------------------------
+    # Phase 12  -  Summary (vertex counts per AGE label)
+    # --------------------------------------------------------------------------
     Write-Step "Final vertex counts per AGE label"
 
     $labels = @(
@@ -613,7 +613,7 @@ AS (cnt agtype);
             $line = ($out | Where-Object { $_ -match '^\s*\d+\s*$' } | Select-Object -First 1)
             $summary[$lbl] = if ($line) { [int64]$line.Trim() } else { 0 }
         } else {
-            # Label may not exist on a freshly created graph — record as null.
+            # Label may not exist on a freshly created graph  -  record as null.
             $summary[$lbl] = $null
         }
     }

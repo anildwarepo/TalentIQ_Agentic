@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Build, push, and deploy the TalentIQ frontend (React/Vite + nginx) as
     a standalone Azure Container App with external HTTPS ingress.
@@ -51,27 +51,27 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Bootstrap
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir "..\shared\common.ps1")
 
 Write-Host ""
-Write-Host "████████████████████████████████████████████████████████████" -ForegroundColor Cyan
+Write-Host "############################################################" -ForegroundColor Cyan
 Write-Host "  TalentIQ 03-frontend - webapp Container App deployment" -ForegroundColor Cyan
-Write-Host "████████████████████████████████████████████████████████████" -ForegroundColor Cyan
+Write-Host "############################################################" -ForegroundColor Cyan
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Phase 1 - Azure sign-in
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 $account = Test-AzLoggedIn
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Phase 2 - Read backend FQDN from 02-backend/.outputs.json
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 if ([string]::IsNullOrEmpty($BackendFqdn)) {
     Write-Step "Reading backend FQDN from ../02-backend/.outputs.json"
@@ -102,9 +102,9 @@ if ([string]::IsNullOrEmpty($BackendFqdn)) {
 # Strip any accidental scheme / trailing slash - Bicep expects bare FQDN.
 $BackendFqdn = $BackendFqdn -replace '^https?://', '' -replace '/+$', ''
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Phase 3 - Parameter resolution
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 $SubscriptionId       = Get-ParameterValue -Name "Subscription ID"               -Value $SubscriptionId       -EnvVar "AZURE_SUBSCRIPTION_ID"
 $ResourceGroup        = Get-ParameterValue -Name "Resource group"                -Value $ResourceGroup        -EnvVar "AZURE_RESOURCE_GROUP"
@@ -115,7 +115,7 @@ $AcrResourceGroup     = Get-ParameterValue -Name "ACR resource group"           
 # Soft fallback: read 00-container-apps-env/.outputs.json when the ACA env
 # name (and its RG) were not supplied via -ContainerAppsEnvName /
 # -ContainerAppsEnvResourceGroup or AZURE_ACA_ENV_NAME / AZURE_ACA_ENV_RESOURCE_GROUP.
-# This makes `00 → 03` a one-shot hand-off without forcing operators to
+# This makes `00 -> 03` a one-shot hand-off without forcing operators to
 # copy values by hand. Never fails if the file is missing.
 if ([string]::IsNullOrEmpty($ContainerAppsEnvName) `
         -and [string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable('AZURE_ACA_ENV_NAME'))) {
@@ -190,9 +190,9 @@ if ($AcrResourceGroup -ne $ResourceGroup) {
     exit 1
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Phase 4 - Set subscription and verify prerequisites exist
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 Test-AzSubscription -SubscriptionId $SubscriptionId
 
@@ -228,9 +228,9 @@ Write-Success "ACR loginServer: $acrLoginServer"
 
 $webappImageRef = "${acrLoginServer}/webapp:${WebappImageTag}"
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Phase 5 - Inspect talent_ui/Dockerfile for the required ARG declarations
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 #
 # The Vite build inlines `import.meta.env.VITE_*` at `npm run build` time
 # ONLY for variables that are declared as `ARG <name>` (with optional
@@ -296,9 +296,9 @@ if ($missingArgs.Count -gt 0) {
     Write-Success "All required ARG declarations are present in the Dockerfile."
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Phase 6 - Summary + confirm
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 Write-Step "Deployment summary"
 Write-Host "  Subscription:        $SubscriptionId" -ForegroundColor Gray
@@ -319,9 +319,9 @@ if (-not (Confirm-Action -Message "Proceed with deployment?" -Force:$Force)) {
     exit 0
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Phase 7 - az acr build  (skipped when -SkipBuild)
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 if (-not $SkipBuild) {
     Write-Step "Building webapp image via az acr build  (this may take several minutes)"
@@ -368,9 +368,9 @@ if (-not $SkipBuild) {
     Write-Info "Assuming $webappImageRef already exists in ACR."
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Phase 8 - az deployment group create
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 Write-Step "Deploying Container App via Bicep"
 
@@ -420,9 +420,9 @@ Write-Success "Container App deployed: $webappContainerAppName"
 Write-Success "FQDN:                   https://$webappContainerAppFqdn"
 Write-Success "UAMI principalId:       $webappUamiPrincipalId"
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Phase 9 - Emit .outputs.json
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 Write-Step "Writing .outputs.json"
 $outputsPath = Join-Path $scriptDir ".outputs.json"
@@ -438,14 +438,14 @@ $outputs = [ordered]@{
 $outputs | ConvertTo-Json -Depth 5 | Set-Content -Path $outputsPath -Encoding UTF8
 Write-Success ".outputs.json written to $outputsPath"
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # What next
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 Write-Host ""
-Write-Host "════════════════════════════════════════════════════════════" -ForegroundColor Green
-Write-Host "  ✓ 03-frontend deployment complete" -ForegroundColor Green
-Write-Host "════════════════════════════════════════════════════════════" -ForegroundColor Green
+Write-Host "============================================================" -ForegroundColor Green
+Write-Host "  [OK] 03-frontend deployment complete" -ForegroundColor Green
+Write-Host "============================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Visit the frontend:" -ForegroundColor Cyan
 Write-Host "    https://$webappContainerAppFqdn" -ForegroundColor White

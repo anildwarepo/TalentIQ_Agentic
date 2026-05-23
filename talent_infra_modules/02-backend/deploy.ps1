@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    talent_infra_modules / 02-backend — build, push, and deploy the
+    talent_infra_modules / 02-backend  -  build, push, and deploy the
     TalentIQ backend Container App with the MCP server as a sidecar.
 
 .DESCRIPTION
@@ -11,7 +11,7 @@
       2. Verifies pre-existing infra (RG, ACR, ACA env, Foundry).
       3. Builds + pushes two ACR images: backend, mcp-server.
       4. Resolves the Foundry endpoint via az.
-      5. Deploys infra/main.bicep — one Container App with two
+      5. Deploys infra/main.bicep  -  one Container App with two
          containers (backend + mcp-server sidecar) sharing one UAMI.
       6. Registers the new UAMI as a PG Entra ServicePrincipal admin
          via control-plane API (display-name MUST equal UAMI name).
@@ -23,7 +23,7 @@
 
 .NOTES
     Auth-disable contract: AZURE_TENANT_ID is NEVER set on either
-    container — talent_backend/auth.py short-circuits to dev mode
+    container  -  talent_backend/auth.py short-circuits to dev mode
     without it. See ../AUTH-DISABLED.md.
 #>
 [CmdletBinding()]
@@ -67,9 +67,9 @@ param(
     [switch]$RestartActive
 )
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Bootstrapping
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 $ErrorActionPreference = 'Stop'
 
@@ -77,20 +77,20 @@ $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $here "..\shared\common.ps1")
 
 Write-Host ""
-Write-Host "──────────────────────────────────────────────────────────────"
-Write-Host " 02-backend — Backend + MCP sidecar deployment"
-Write-Host "──────────────────────────────────────────────────────────────"
+Write-Host "--------------------------------------------------------------"
+Write-Host " 02-backend  -  Backend + MCP sidecar deployment"
+Write-Host "--------------------------------------------------------------"
 Write-Host ""
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # 1. Az sign-in
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 $null = Test-AzLoggedIn
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # 2. Read 01-postgresql/.outputs.json
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 Write-Step "Reading 01-postgresql outputs"
 
@@ -135,9 +135,9 @@ if (-not [string]::IsNullOrEmpty($pgPrivateIp)) {
     Write-Info "Private IP (PE detected): $pgPrivateIp"
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # 3. Resolve required parameters
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 $SubscriptionId = Get-ParameterValue -Name 'Subscription ID' -EnvVar 'AZURE_SUBSCRIPTION_ID' -Value $SubscriptionId
 $ResourceGroup = Get-ParameterValue -Name 'Resource group' -EnvVar 'AZURE_RESOURCE_GROUP' -Value $ResourceGroup
@@ -147,7 +147,7 @@ $AcrName = Get-ParameterValue -Name 'ACR name' -EnvVar 'AZURE_ACR_NAME' -Value $
 # Soft fallback: read 00-container-apps-env/.outputs.json when the ACA env
 # name (and its RG) were not supplied via -ContainerAppsEnvName /
 # -ContainerAppsEnvResourceGroup or AZURE_ACA_ENV_NAME / AZURE_ACA_ENV_RESOURCE_GROUP.
-# This makes `00 → 02` a one-shot hand-off without forcing operators to
+# This makes `00 -> 02` a one-shot hand-off without forcing operators to
 # copy values by hand. Never fails if the file is missing.
 if ([string]::IsNullOrEmpty($ContainerAppsEnvName) `
         -and [string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable('AZURE_ACA_ENV_NAME'))) {
@@ -184,7 +184,7 @@ if ([string]::IsNullOrEmpty($PostgresqlResourceGroup)) { $PostgresqlResourceGrou
 
 # Bicep main.bicep requires ACR + Foundry + Cosmos to be in the deployment RG
 # (inline existing refs + role assignments). Cross-RG deploys would need
-# sub-modules per scope — out of scope for this MVP.
+# sub-modules per scope  -  out of scope for this MVP.
 $crossRgFatal = $false
 if ($AcrResourceGroup -ne $ResourceGroup) {
     Write-Fail "AcrResourceGroup ($AcrResourceGroup) differs from ResourceGroup ($ResourceGroup)."
@@ -235,15 +235,15 @@ if ($BackendAppName -notmatch '^[a-z][a-z0-9-]*[a-z0-9]$') {
     exit 1
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # 4. Set subscription
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 Test-AzSubscription -SubscriptionId $SubscriptionId
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # 5. Prerequisite checks
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 $checks = @(
     @{ Type = 'rg';              Name = $ResourceGroup },
@@ -294,9 +294,9 @@ if ([string]::IsNullOrEmpty($acaEnvId)) {
     exit 1
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # 6. Show summary + confirm
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 $backendImage = "$acrLoginServer/backend:$BackendImageTag"
 $mcpImage = "$acrLoginServer/mcp-server:$McpImageTag"
@@ -316,7 +316,7 @@ Write-Info "Foundry account        : $FoundryAccountName ($FoundryResourceGroup)
 Write-Info "Foundry endpoint       : $($foundry.Endpoint)"
 Write-Info "Chat model deployment  : $ChatModelDeployment"
 if ([string]::IsNullOrEmpty($CosmosAccountName)) {
-    Write-Info "Cosmos                 : (disabled — no account supplied)"
+    Write-Info "Cosmos                 : (disabled  -  no account supplied)"
 } else {
     Write-Info "Cosmos account         : $CosmosAccountName ($CosmosResourceGroup)"
 }
@@ -333,9 +333,9 @@ if (-not (Confirm-Action -Message "Proceed with deployment?" -Force:$Force)) {
     exit 0
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # 7. Build + push images via az acr build
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 if (-not $SkipBuild) {
     Write-Step "Building + pushing backend image"
@@ -390,9 +390,9 @@ if (-not $SkipBuild) {
     Write-Info "Assuming $backendImage and $mcpImage already exist in $AcrName."
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # 8. Deploy main.bicep
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 Write-Step "Deploying Container App + sidecar via Bicep"
 
@@ -502,9 +502,9 @@ Write-Info "UAMI name     : $backendUamiName"
 Write-Info "UAMI clientId : $backendUamiClientId"
 Write-Info "UAMI principal: $backendUamiPrincipalId"
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # 9. Post-deploy PG Entra admin registration (control plane)
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 Write-Step "Registering UAMI as PG Entra ServicePrincipal admin"
 
@@ -529,7 +529,7 @@ if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($existingAdminsJs
             }
         }
     } catch {
-        Write-Warn "Could not parse existing PG admin list — will attempt registration anyway."
+        Write-Warn "Could not parse existing PG admin list  -  will attempt registration anyway."
     }
 }
 
@@ -554,9 +554,9 @@ if ($alreadyRegistered) {
     Write-Success "Registered $backendUamiName as PG Entra admin."
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # 10. Optional revision restart
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 if ($RestartActive) {
     Write-Step "Restarting active revision"
@@ -593,9 +593,9 @@ if ($RestartActive) {
     }
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # 11. Emit .outputs.json
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 Write-Step "Writing .outputs.json"
 
@@ -613,14 +613,14 @@ $outputsFile = Join-Path $here '.outputs.json'
 $outputsPayload | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $outputsFile -Encoding UTF8
 Write-Success "Wrote $outputsFile"
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # 12. What next
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 Write-Host ""
-Write-Host "──────────────────────────────────────────────────────────────"
-Write-Host " ✅ 02-backend deployment complete"
-Write-Host "──────────────────────────────────────────────────────────────"
+Write-Host "--------------------------------------------------------------"
+Write-Host " [OK] 02-backend deployment complete"
+Write-Host "--------------------------------------------------------------"
 Write-Host ""
 Write-Host "Backend URL : https://$backendContainerAppFqdn"
 Write-Host ""

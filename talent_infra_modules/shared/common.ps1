@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Shared helpers for talent_infra_modules per-component deployment scripts.
 
@@ -21,7 +21,7 @@
       * Native az errors (WARNING/ERROR lines on stdout) are filtered out
         of -o tsv reads so callers see only the value.
       * Get-ParameterValue is the SINGLE entry point for any required
-        parameter — env var first, then prompt, then default. Secure
+        parameter  -  env var first, then prompt, then default. Secure
         values are read via Read-Host -AsSecureString and returned as a
         SecureString.
 
@@ -31,9 +31,9 @@
       * No global state. Helpers take what they need as parameters.
 #>
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Coloured output helpers
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 function Write-Step {
     param([Parameter(Mandatory)][string]$Message)
@@ -61,9 +61,9 @@ function Write-Info {
     Write-Host "    $Message" -ForegroundColor Gray
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Native command runner — keeps $ErrorActionPreference local to the call
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Native command runner  -  keeps $ErrorActionPreference local to the call
+# ------------------------------------------------------------------------------
 
 function Invoke-Native {
     <#
@@ -79,9 +79,9 @@ function Invoke-Native {
     finally { $ErrorActionPreference = $saved }
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Az CLI sign-in & subscription
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 function Test-AzLoggedIn {
     <#
@@ -133,9 +133,9 @@ function Test-AzSubscription {
     Write-Success "Switched to $SubscriptionId"
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Parameter resolution (env var → prompt → default)
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
+# Parameter resolution (env var -> prompt -> default)
+# ------------------------------------------------------------------------------
 
 function Get-ParameterValue {
     <#
@@ -216,9 +216,9 @@ function Get-ParameterValue {
     }
 
     if ($Secure) {
-        # NOTE: local must NOT be named $secure — PowerShell is case-insensitive
+        # NOTE: local must NOT be named $secure  -  PowerShell is case-insensitive
         # for variables, so $secure would shadow/overwrite the [switch]$Secure
-        # parameter and trip a SwitchParameter↔SecureString type-coercion error.
+        # parameter and trip a SwitchParameter<->SecureString type-coercion error.
         $secureValue = Read-Host -Prompt $promptText -AsSecureString
         if ($null -eq $secureValue -or $secureValue.Length -eq 0) {
             if (-not [string]::IsNullOrEmpty($Default)) {
@@ -257,9 +257,9 @@ function ConvertFrom-SecureStringPlain {
     }
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Resource existence checks
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 function Test-ResourceGroup {
     <#
@@ -356,7 +356,7 @@ function Test-VnetSubnetExists {
     .SYNOPSIS
         True if -SubnetName exists inside -VnetName in -ResourceGroup.
 
-        Use this instead of Test-ResourceExists for subnets — subnets are
+        Use this instead of Test-ResourceExists for subnets  -  subnets are
         child resources, so `az resource show` requires a different shape.
     #>
     param(
@@ -383,7 +383,7 @@ function Get-LinkedPrivateDnsZoneId {
 
     .DESCRIPTION
         Azure enforces "at most one Private DNS zone per namespace per
-        VNet" — attempting to link a second zone with the same name to
+        VNet"  -  attempting to link a second zone with the same name to
         the same VNet fails with:
 
             "A virtual network cannot be linked to multiple zones with
@@ -392,10 +392,10 @@ function Get-LinkedPrivateDnsZoneId {
         Before a per-component deploy creates a brand-new
         privatelink.<service>.<region>.azure.com zone + VNet link, it
         should ask: "Is there already a zone of that name linked to my
-        target VNet?" — and reuse it if so.
+        target VNet?"  -  and reuse it if so.
 
         This is the resource-provider-specific call (`az network
-        private-dns ...`) — same RBAC posture as Test-VnetExists /
+        private-dns ...`)  -  same RBAC posture as Test-VnetExists /
         Test-VnetSubnetExists, so it works in shared-tenant subs where
         the existing zone lives in a network team's RG and the deployer
         only has Microsoft.Network/privateDnsZones/read scoped there.
@@ -479,14 +479,14 @@ function Get-PrivateDnsZoneIdByName {
 
     .DESCRIPTION
         Use this as the second-tier check after Get-LinkedPrivateDnsZoneId
-        — when no zone of that name is linked to the target VNet, an
+         -  when no zone of that name is linked to the target VNet, an
         UNLINKED zone may still exist somewhere in the subscription
         (typical for fresh shared infra where the network team has
         created the zone but not yet linked it). Reuse that zone and
         let Bicep create the VNet link.
 
         When multiple zones with the same name exist in different
-        resource groups (rare — happens in subs that mix per-app and
+        resource groups (rare  -  happens in subs that mix per-app and
         shared private DNS), returns the FIRST one returned by Azure.
         Operators who need deterministic selection should set the
         env-var override (e.g. POSTGRESQL_DNS_ZONE_ID) instead of
@@ -597,9 +597,9 @@ function Test-FoundryProject {
     }
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # ACR helpers
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 function Get-AcrLoginServer {
     <#
@@ -625,9 +625,9 @@ function Get-AcrLoginServer {
     return $login
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Interactive confirmation
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 function Confirm-Action {
     <#
@@ -636,7 +636,7 @@ function Confirm-Action {
 
         Auto-confirms (returns $true) when EITHER:
           * The -Force switch is supplied.
-          * The CI env var is set (any value) — common CI convention.
+          * The CI env var is set (any value)  -  common CI convention.
 
         Auto-denies (returns $false) when running non-interactively with
         no -Force and no CI env var, to avoid hanging in pipelines.
@@ -654,7 +654,7 @@ function Confirm-Action {
         return $true
     }
     if (-not [Environment]::UserInteractive) {
-        Write-Warn "Non-interactive session and no -Force / `$env:CI — denying: $Message"
+        Write-Warn "Non-interactive session and no -Force / `$env:CI  -  denying: $Message"
         return $false
     }
 
@@ -662,9 +662,9 @@ function Confirm-Action {
     return ($ans -match '^(y|yes)$')
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 # Convenience: bulk-verify pre-existing infrastructure
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 function Assert-PrerequisitesExist {
     <#
@@ -677,7 +677,7 @@ function Assert-PrerequisitesExist {
         always use -VnetResourceGroup if supplied, otherwise this RG).
 
     .PARAMETER VnetResourceGroup
-        Optional — RG holding the VNet (if different from -ResourceGroup).
+        Optional  -  RG holding the VNet (if different from -ResourceGroup).
         Subnet checks query against this RG.
 
     .PARAMETER Checks
