@@ -251,6 +251,99 @@ Repo-wide post-sweep scan (informational, NOT in decision scope): 12 `.ps1` file
 
 **Scope:** Encoding sweep + prevention guards only. Out of scope: the two flagged BOM-less files above (future pass), line-ending normalization on other file types, logic refactoring of any swept `.ps1`. **Anil owns** the git commit for the 11 `.ps1` files + `.editorconfig` + `.vscode/settings.json`. Scribe only commits `.squad/` artifacts this pass.
 
+### 2026-05-22T23:59:59.9Z: Env-specific Azure resource names MUST use `-AlwaysPrompt`; platform invariants stay silent
+
+**By:** Bishop (Deployment Engineer) — requested by Anil, merged by Scribe
+**Status:** Implemented (3 files modified, dual-engine parse clean, awaiting Anil commit)
+**Trigger:** Anil ran `pwsh .\deploy.ps1` from `talent_infra_modules\01-postgresql\` and the script silently bound `$PeSubnetName` to the param-block default `"pe-subnet"` without prompting. That subnet does not exist in his target RG/VNet.
+
+---
+
+**Verbatim rule (canonical — quote in cross-agent guardrails):**
+
+> Any call to `Get-ParameterValue` that resolves an **environment-specific Azure resource name** — subnet, NSG, peering link, route table, private endpoint, IP range — MUST pass `-AlwaysPrompt` so the operator confirms or overrides the suggestion at every run. Calls that resolve **platform invariants** — PG version, SKU tier, admin login, Container Apps Environment name (when wired via env var), resource group when used as a fallback target — MUST NOT pass `-AlwaysPrompt`; their fast-path behaviour (Value > envVar > Read-Host with default) is the intended UX.
+
+If you cannot tell which bucket a parameter belongs to, ask: *"would the same value be safe across all environments (dev, test, prod, Anil's box, Lambert's box)?"* If yes → silent default. If no → `-AlwaysPrompt`.
+
+---
+
+**Root cause (one paragraph):**
+
+`Get-ParameterValue` in `shared/common.ps1` short-circuits on a non-empty `-Value` parameter — by design, so callers can pass `-Value $MyParam` and inherit the operator's CLI flags. But when the script's own `param()` block declares `[string]$PeSubnetName = "pe-subnet"`, the variable is *always* non-empty at the call site; the script-arg pass-through silently binds the param-block default. Env var lookup AND prompt are both skipped. Result: silent bind to a resource that may not exist in the target environment, with no operator visibility. Same bug class lurks at every call site whose param-block has a default; subnet / NSG / peering / route-table / PE names are the ones where this is unsafe.
+
+---
+
+**API change to `Get-ParameterValue` (`shared/common.ps1`):**
+
+New parameter: `[switch]$AlwaysPrompt`
+
+Semantics when set:
+1. Fast-path (script-arg → env-var → return) is **skipped entirely**.
+2. Interactive prompt always runs.
+3. Suggested-default priority for the prompt: `-Value` > env-var value > `-Default`.
+4. Pressing Enter accepts the suggested default. Typing anything wins.
+5. If no suggestion exists, `Read-Host` returns empty → `Write-Fail` + `exit 1` (parameter is required).
+
+Semantics when NOT set: unchanged. Byte-for-byte preserved — no migration risk for the ~25 existing call sites (Subscription, RG, ACR, Foundry, Container Apps env, admin login, PG version, SKU tier, etc.).
+
+---
+
+**Patched call sites (2 total):**
+
+| File | Line | Variable | Why patched |
+| --- | --- | --- | --- |
+| `talent_infra_modules/01-postgresql/deploy.ps1` | ~167 | `$PeSubnetName` | **The bug Anil hit.** Param-block default `"pe-subnet"` silently bound. |
+| `talent_infra_modules/00-container-apps-env/deploy.ps1` | ~129 | `$AcaSubnetName` | **Defensive.** No param-block default today, but bug class is identical; future maintainer adding `[string]$AcaSubnetName = "..."` would re-introduce the silent-bind without realising it. Forcing the prompt now makes the contract explicit. |
+
+Both edits ship with a 3-line comment block above the call explaining the `-AlwaysPrompt` rationale, so the next maintainer who reads the script understands why these calls differ from the surrounding ones.
+
+---
+
+**Call sites verified safe WITHOUT the switch (left unchanged):**
+
+| Call site | Variable | Why no patch |
+| --- | --- | --- |
+| `01-postgresql/deploy.ps1:162` | `$VnetResourceGroup` | Wrapped in `if ([string]::IsNullOrEmpty(...))` — only prompts when empty, no param-block default, `-Default $ResourceGroup` is a safe fallback (same RG). |
+| `01-postgresql/deploy.ps1:164` | `$VnetName` | Same `if-empty` guard; no silent default. |
+| `00-container-apps-env/deploy.ps1:127` | `$VnetResourceGroup` | `-Default $ResourceGroup` fallback is safe; operator sees the default in the prompt. |
+| `00-container-apps-env/deploy.ps1:128` | `$VnetName` | No default at all; will always prompt. |
+| All other ~25 `Get-ParameterValue` calls across the toolkit | Subscriptions, RGs, names of Container Apps Env, ACR, Foundry, Cosmos, KV, admin logins, PG version, SKU tier, etc. | Platform invariants — silent default is the intended UX. |
+
+Hooks (`talent_infra/hooks/*.ps1` and `talent_infra_v2/hooks/*.ps1`): **0** `Get-ParameterValue` calls. Out of scope.
+
+---
+
+**Pattern to copy at future call sites (normative):**
+
+```powershell
+# -AlwaysPrompt: <variable> is environment-specific (this RG/VNet/topology may
+# not contain the param-block default). Force operator confirmation so a silent
+# bind cannot happen.
+$SubnetVar = Get-ParameterValue -Name "<human-readable name>" `
+    -Value $SubnetVar -EnvVar "AZURE_<UPPER_SNAKE>_NAME" `
+    -Default "<sensible-default>" -AlwaysPrompt
+```
+
+Always include the comment so the next reader knows why this call differs from neighbours.
+
+---
+
+**Verification (byte-level, all 3 modified files):** UTF-8 + BOM (`EF BB BF`) preserved; pwsh 7+ parse OK 3/3; powershell.exe 5.1 parse OK 3/3 (parser API, out-of-process); smoke-test grep `^\s+-\s+\w+` returns only the one known false positive in `common.ps1` (a literal ` - ` inside a docstring, now at line 524 instead of 482 because the help block grew by ~42 lines). Decision `2026-05-23T01:30:00Z` (byte-level sweep rule) NOT violated — these edits were targeted `replace_string_in_file` operations with 3+ lines of context, not regex sweeps.
+
+**Operator-facing UX after fix (Anil's exact scenario):**
+
+```
+PE subnet name (default: pe-subnet): _   ← cursor waits; Enter accepts; typing wins
+```
+
+For non-interactive CI runs, set `AZURE_PE_SUBNET_NAME=<your-subnet>` in the environment; the env-var value becomes the suggested default and Enter (or any auto-feeder) accepts it.
+
+**Cross-agent impact:**
+- **Ripley (UX):** Any new `.ps1` deployer authored across the squad MUST apply this rule — env-specific Azure resource names use `-AlwaysPrompt`; platform invariants stay silent. Codify in any UX/style guidance for PowerShell deployers.
+- **Kane (Backend):** If you ever wrap PG provisioning in a Python script (e.g., for the data pipeline), the subnet name is NOT a platform invariant — surface it as a required CLI/env input, never default it silently.
+
+**Scope (what this decision does NOT do):** Does NOT change `Get-ParameterValue` behaviour for any of the ~25 existing call sites that omit `-AlwaysPrompt`. Does NOT introduce a new mandatory prompt for every script (each call site opts in explicitly). Does NOT replace env-var-driven CI/CD workflows — operators who set the env var still get a 1-keystroke (Enter) confirmation. Does NOT touch `02-backend/deploy.ps1`, `03-frontend/deploy.ps1`, or `04-data-loading/deploy.ps1` — they have no env-specific resource-name call sites. **Anil owns** the git commit for the 3 modified `.ps1` files; Scribe only commits `.squad/` artifacts this pass.
+
 ### 2026-05-22T23:59:59Z: All `.ps1` files in this repo MUST be UTF-8 *with* BOM (cross-VM PS 5.1 compat)
 
 **By:** Bishop (Deployment Engineer) — proposal to Lambert, merged by Scribe

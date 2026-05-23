@@ -78,3 +78,6 @@ Architectural guardrail (decisions.md `2026-05-22T23:59:59Z`): **all `.ps1` file
 
 ## Cross-agent note - 2026-05-23T01:30:00Z (Scribe, from Bishop)
 - **Sweep methodology hardened (decision `2026-05-23T01:30:00Z`).** Substitution sweeps over source files MUST iterate Unicode codepoints; ASCII bytes (cp < 0x80) are PASSTHROUGH; regex over the ASCII range is FORBIDDEN. Reject any sweep helper at review that contains a regex matching the ASCII range. Supersedes-in-part the implementation contract of `2026-05-23T00:30:00Z` (encoding rule still stands).
+
+## Cross-agent note - 2026-05-22T23:59:59.9Z (Scribe, from Bishop)
+- **UX rule for new `.ps1` deployers (decision `2026-05-22T23:59:59.9Z`).** Env-specific Azure resource names (subnets, NSGs, peering links, route tables, private endpoints, IP ranges) MUST use `-AlwaysPrompt` on `Get-ParameterValue`; platform invariants (PG version, SKU tier, admin login, region defaults) MUST NOT. Silent-bind to a param-block default is a foot-gun — force operator confirmation on anything that varies between environments.

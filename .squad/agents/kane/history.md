@@ -137,3 +137,6 @@ FYI for backend devs touching deploy hooks: per decisions.md `2026-05-22T23:59:5
 
 ## Cross-agent note - 2026-05-23T01:30:00Z (Scribe, from Bishop)
 - **Byte-level sweep rule applies to .ps1 work (decision `2026-05-23T01:30:00Z`).** If you ever touch `.ps1` files: codepoint iteration only, ASCII passthrough, no regex over ASCII range, throw on unknown codepoints >= 0x80. You normally don't, but this is the canonical rule going forward.
+
+## Cross-agent note - 2026-05-22T23:59:59.9Z (Scribe, from Bishop)
+- **Awareness for Python wrappers around PG provisioning (decision `2026-05-22T23:59:59.9Z`).** If you ever wrap Postgres provisioning in a Python script (e.g., for the data pipeline or a future worker), the subnet name (PE subnet, ACA subnet) is **not** a platform invariant — surface it as a required CLI flag or env var, never silently default it. Mirrors the PowerShell `-AlwaysPrompt` contract Bishop just landed in `talent_infra_modules/shared/common.ps1`.

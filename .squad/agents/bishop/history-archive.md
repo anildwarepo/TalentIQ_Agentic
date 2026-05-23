@@ -422,3 +422,31 @@ Anil hit `Get-ParameterValue: A positional parameter cannot be found that accept
 **Final state (12/12 swept clean):** `shared/common.ps1` 1263 subs, `01-postgresql/deploy.ps1` 2405 subs (re-sweep from HEAD~2), `02-backend/deploy.ps1` 2285 subs, `03-frontend/deploy.ps1` 1958 subs, `04-data-loading/deploy.ps1` 2016 subs, `00-container-apps-env/deploy.ps1` 143 subs, `talent_infra/hooks/postprovision.ps1` 82 subs, `talent_infra_v2/hooks/postprovision.ps1` 83 subs, `talent_infra/hooks/postup.ps1` 21 subs, `talent_infra_v2/hooks/postup.ps1` 21 subs, `talent_infra/hooks/preprovision.ps1` 3 subs, `talent_infra_v2/hooks/preprovision.ps1` 3 subs. All BOM `EF BB BF` verified. 0 unknown codepoints across all files. 0 residual non-ASCII bytes. **Step 7 regression smoke test (` - Word` pattern):** 0 real regressions; 1 hit in `shared/common.ps1` line 482 verified as benign comment-help-block prose (originally em-dash separator, correctly substituted to ` - `). **Step 8 dual-engine parse:** all 12 PASS pwsh 7+; 11/12 PASS Windows PowerShell 5.1; `02-backend/deploy.ps1` FAILS PS 5.1 due to pre-existing `?.` + `??` pwsh-7+-only syntax (NOT an encoding regression — tagged `EXPECT_FAIL_PS7_ONLY`, consistent with previous sweep). **Step 9 visual confirmation:** `01-postgresql/deploy.ps1` lines 118-135 show every `Get-ParameterValue` continuation with correct `    -Value $X -EnvVar "Y" -Default "Z"` shape. Per Anil's Step 11: **DO NOT COMMIT** — all 12 swept files left unstaged. Anil owns the code commit. Decision inbox file `.squad/decisions/inbox/bishop-ps1-sweep-byte-level-fix.md` proposes the byte-level mandate to supersede the implementation contract of `2026-05-23T00:30:00Z` (rule statement unchanged).
 
 
+
+## 2026-05-22 - `Get-ParameterValue` silent-default bug for env-specific resource names + `-AlwaysPrompt` switch (moved by Scribe 2026-05-22T23:59:59.9Z)
+
+
+### 2026-05-22 — `Get-ParameterValue` silent-default bug for env-specific resource names + `-AlwaysPrompt` switch
+
+Anil ran `pwsh .\deploy.ps1` from `talent_infra_modules\01-postgresql\` and reported the script prompted for Subscription / VNet RG / VNet name (correctly) but **silently bound `$PeSubnetName` to the param-block default `"pe-subnet"`** — a subnet that does not exist in his target RG/VNet — without ever asking the operator. Subsequent `Test-VnetSubnetExists` failure would have surfaced the mismatch, but the silent bind is a foot-gun by design.
+
+**Root cause:** `Get-ParameterValue` in `shared/common.ps1` short-circuits on a non-empty `-Value` (intentional — script-arg pass-through). When a script declares `[string]$PeSubnetName = "pe-subnet"` in its `param()` block, the variable is ALWAYS non-empty at the call site, so `-Value $PeSubnetName` skips both env-var lookup AND the prompt. The same bug class exists at every call site whose param-block carries a default; subnet/NSG/peering/PE/route-table names are the ones where this is unsafe.
+
+**Fix (Option A — preserves the operator hint while forcing confirmation):** added `[switch]$AlwaysPrompt` to `Get-ParameterValue`. When set, the fast-path is skipped entirely and the function ALWAYS displays the interactive prompt. Suggested-default priority for the prompt is `Value > envVar > Default`; pressing Enter accepts the suggestion, anything else wins. Existing behaviour is byte-for-byte preserved when `-AlwaysPrompt` is NOT set — no migration risk for the ~25 non-env-specific call sites (Subscription, RG, ACR, Foundry, Container Apps env, admin login, PG version, SKU tier, etc.).
+
+**Patched call sites (2 total):**
+- `talent_infra_modules/01-postgresql/deploy.ps1:166` — `$PeSubnetName` (the actual bug Anil hit)
+- `talent_infra_modules/00-container-apps-env/deploy.ps1:129` — `$AcaSubnetName` (defensive — same bug class, would surface the moment a maintainer adds a param-block default)
+
+**Inventory verified empty:** 6 hooks files (`talent_infra/hooks/*.ps1` + `talent_infra_v2/hooks/*.ps1`) have 0 `Get-ParameterValue` calls. No NSG / peering / route-table call sites exist anywhere in the toolkit. VNet name and VNet-RG call sites already prompt (no `-Default` to silently bind, or fall through the `if-empty` guard) — per Anil's directive, "leave already-promptable alone."
+
+**Verification (byte-level, all 3 modified files):** UTF-8 + BOM (`EF BB BF`) preserved; pwsh 7+ parse OK 3/3; powershell.exe 5.1 parse OK 3/3 (parser API, out-of-process); smoke-test grep `^\s+-\s+\w+` returns only the one known false positive in `common.ps1` (a literal ` - ` inside a docstring), now at line 524 instead of 482 because the help block grew by ~42 lines.
+
+**Operator-facing UX after fix (Anil's exact scenario):**
+```
+PE subnet name (default: pe-subnet): _   ← cursor waits; Enter accepts "pe-subnet"; typing wins
+```
+**Anil unblocker:** re-run `pwsh .\deploy.ps1` from `01-postgresql/`; it will now prompt for PE subnet with the param-block default surfaced as `(default: pe-subnet)`. Type the real subnet name (or set `AZURE_PE_SUBNET_NAME` for non-interactive runs).
+
+**Decision proposal landed in `.squad/decisions/inbox/bishop-always-prompt-env-resource-names.md`**: rule statement, allowed/forbidden call shapes, patched call sites, API change. **DO NOT COMMIT** — 3 modified `.ps1` files left unstaged for Anil to commit (Bishop never touches the staging area on code).
+
