@@ -69,8 +69,16 @@ Every script accepts parameters in this order (first match wins):
 
 1. **Explicit script argument** (`./deploy.ps1 -ResourceGroup rg-...`).
 2. **Environment variable** documented per-script.
-3. **Interactive prompt** with a sensible default shown in `(default: ...)`.
-4. The default itself in non-interactive sessions.
+3. **Azure discovery picker** for the primary subscription/resource group
+  (`az account list`, then `az group list` in the selected subscription).
+4. **Interactive prompt** with a sensible default shown in `(default: ...)`.
+5. The default itself in non-interactive sessions.
+
+If `-SubscriptionId` / `AZURE_SUBSCRIPTION_ID` is omitted, the script lists
+visible subscriptions and lets you select by number, subscription ID, or name.
+If `-ResourceGroup` / `AZURE_RESOURCE_GROUP` is omitted, the script lists
+resource groups in the selected subscription and lets you select by number or
+name. Supplying explicit arguments still bypasses discovery.
 
 Run with `-Force` (or set `$env:CI=1`) to auto-confirm all `y/N`
 prompts. See [`shared/README.md`](shared/README.md) for the helper API.

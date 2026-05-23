@@ -109,18 +109,8 @@ Test-AzLoggedIn
 # -----------------------------------------------------------------------------
 Write-Step 'Resolving parameters'
 
-# SubscriptionId: env-var or current-account fallback
-if ([string]::IsNullOrWhiteSpace($SubscriptionId)) {
-    if ($env:AZURE_SUBSCRIPTION_ID) {
-        $SubscriptionId = $env:AZURE_SUBSCRIPTION_ID
-    } else {
-        $account = Invoke-Native { az account show -o json } | ConvertFrom-Json
-        $SubscriptionId = $account.id
-        Write-Info "Using current Azure subscription: $($account.name) ($SubscriptionId)"
-    }
-}
-
-$ResourceGroup = Get-ParameterValue -Name 'Resource group' -EnvVar 'AZURE_RESOURCE_GROUP' -Value $ResourceGroup
+$SubscriptionId = Resolve-AzSubscriptionId -Value $SubscriptionId -EnvVar 'AZURE_SUBSCRIPTION_ID'
+$ResourceGroup = Resolve-AzResourceGroupName -SubscriptionId $SubscriptionId -Name 'Resource group' -EnvVar 'AZURE_RESOURCE_GROUP' -Value $ResourceGroup
 if ([string]::IsNullOrWhiteSpace($Location)) {
     # Canonical region for this project is westus (VNet 'vnet-westus', talent_infra_v2 baseline).
     # Override via -Location <region> or $env:AZURE_LOCATION when targeting a different region.

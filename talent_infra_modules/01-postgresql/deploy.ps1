@@ -123,9 +123,8 @@ $account = Test-AzLoggedIn
 # --------------------------------------------------------------------------
 # 2. Parameter resolution  -  script arg -> env var -> prompt -> default
 # --------------------------------------------------------------------------
-$SubscriptionId = Get-ParameterValue -Name "Subscription ID" `
-    -Value $SubscriptionId -EnvVar "AZURE_SUBSCRIPTION_ID" -Default $account.id
-$ResourceGroup = Get-ParameterValue -Name "Resource group" `
+$SubscriptionId = Resolve-AzSubscriptionId -Value $SubscriptionId -EnvVar "AZURE_SUBSCRIPTION_ID"
+$ResourceGroup = Resolve-AzResourceGroupName -SubscriptionId $SubscriptionId -Name "Resource group" `
     -Value $ResourceGroup -EnvVar "AZURE_RESOURCE_GROUP"
 $Location = Get-ParameterValue -Name "Location" `
     -Value $Location -EnvVar "AZURE_LOCATION" -Default "westus"

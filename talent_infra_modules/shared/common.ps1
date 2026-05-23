@@ -234,6 +234,164 @@ function Test-AzSubscription {
     Write-Success "Switched to $SubscriptionId"
 }
 
+function Resolve-AzSubscriptionId {
+    <#
+    .SYNOPSIS
+        Resolve a subscription from explicit value, env var, or an az CLI
+        subscription list. When multiple subscriptions are available, prints
+        a numbered list and accepts either a number or a subscription ID/name.
+    #>
+    param(
+        [string]$Value = "",
+        [string]$EnvVar = "AZURE_SUBSCRIPTION_ID"
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($Value)) { return $Value.Trim() }
+
+    if (-not [string]::IsNullOrWhiteSpace($EnvVar)) {
+        $envValue = [Environment]::GetEnvironmentVariable($EnvVar)
+        if (-not [string]::IsNullOrWhiteSpace($envValue)) {
+            Write-Info "Subscription ID = (from `$env:$EnvVar)"
+            return $envValue.Trim()
+        }
+    }
+
+    Write-Step "Discovering Azure subscriptions"
+    $raw = Invoke-Native { az account list --output json 2>$null }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($raw)) {
+        Write-Warn "Could not list subscriptions; falling back to current account."
+        $acct = Test-AzLoggedIn
+        return [string]$acct.id
+    }
+
+    try { $subscriptions = @($raw | ConvertFrom-Json) } catch {
+        Write-Fail "Could not parse 'az account list' output."
+        exit 1
+    }
+    if ($subscriptions.Count -eq 0) {
+        Write-Fail "No Azure subscriptions are visible to the signed-in account."
+        exit 1
+    }
+    if ($subscriptions.Count -eq 1) {
+        $only = $subscriptions[0]
+        Write-Success "Using only visible subscription: $($only.name) [$($only.id)]"
+        return [string]$only.id
+    }
+
+    $currentId = (Invoke-Native { az account show --query id -o tsv 2>$null } | Where-Object { $_ -notmatch '^(WARNING|ERROR)' }) -join ""
+    $currentId = $currentId.Trim()
+    $defaultIndex = 0
+
+    Write-Info "Available subscriptions:"
+    for ($i = 0; $i -lt $subscriptions.Count; $i++) {
+        $s = $subscriptions[$i]
+        if ($s.id -eq $currentId) { $defaultIndex = $i }
+        $marker = if ($s.id -eq $currentId) { '*' } else { ' ' }
+        Write-Host ("      [{0}] {1} {2}  {3}  tenant={4}" -f ($i + 1), $marker, $s.name, $s.id, $s.tenantId) -ForegroundColor Gray
+    }
+
+    $choice = Read-Host -Prompt "Select subscription number or paste subscription ID/name (default: $($defaultIndex + 1))"
+    if ([string]::IsNullOrWhiteSpace($choice)) {
+        return [string]$subscriptions[$defaultIndex].id
+    }
+
+    $choice = $choice.Trim()
+    $number = 0
+    if ([int]::TryParse($choice, [ref]$number) -and $number -ge 1 -and $number -le $subscriptions.Count) {
+        return [string]$subscriptions[$number - 1].id
+    }
+
+    foreach ($s in $subscriptions) {
+        if ($s.id -eq $choice -or $s.name -eq $choice) { return [string]$s.id }
+    }
+
+    Write-Fail "No listed subscription matched '$choice'."
+    exit 1
+}
+
+function Resolve-AzResourceGroupName {
+    <#
+    .SYNOPSIS
+        Resolve a resource group from explicit value, env var, default, or
+        a numbered `az group list` selection for the selected subscription.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$SubscriptionId,
+        [string]$Name = "Resource group",
+        [string]$Value = "",
+        [string]$EnvVar = "AZURE_RESOURCE_GROUP",
+        [string]$Default = ""
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($Value)) { return $Value.Trim() }
+
+    if (-not [string]::IsNullOrWhiteSpace($EnvVar)) {
+        $envValue = [Environment]::GetEnvironmentVariable($EnvVar)
+        if (-not [string]::IsNullOrWhiteSpace($envValue)) {
+            Write-Info "$Name = (from `$env:$EnvVar)"
+            return $envValue.Trim()
+        }
+    }
+
+    Write-Step "Discovering resource groups in subscription $SubscriptionId"
+    $raw = Invoke-Native { az group list --subscription $SubscriptionId --query "[].{name:name,location:location}" --output json 2>$null }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($raw)) {
+        Write-Warn "Could not list resource groups; falling back to prompt."
+        return Get-ParameterValue -Name $Name -Default $Default
+    }
+
+    try { $groups = @($raw | ConvertFrom-Json | Sort-Object name) } catch {
+        Write-Fail "Could not parse 'az group list' output."
+        exit 1
+    }
+
+    if ($groups.Count -eq 0) {
+        if (-not [string]::IsNullOrWhiteSpace($Default)) { return $Default.Trim() }
+        Write-Fail "No resource groups were found in subscription $SubscriptionId."
+        exit 1
+    }
+
+    if ($groups.Count -eq 1 -and [string]::IsNullOrWhiteSpace($Default)) {
+        Write-Success "Using only visible resource group: $($groups[0].name) ($($groups[0].location))"
+        return [string]$groups[0].name
+    }
+
+    $defaultIndex = -1
+    if (-not [string]::IsNullOrWhiteSpace($Default)) {
+        for ($i = 0; $i -lt $groups.Count; $i++) {
+            if ($groups[$i].name -eq $Default) { $defaultIndex = $i; break }
+        }
+    }
+
+    Write-Info "Available resource groups:"
+    for ($i = 0; $i -lt $groups.Count; $i++) {
+        $g = $groups[$i]
+        $marker = if ($i -eq $defaultIndex) { '*' } else { ' ' }
+        Write-Host ("      [{0}] {1} {2}  {3}" -f ($i + 1), $marker, $g.name, $g.location) -ForegroundColor Gray
+    }
+
+    $promptDefault = if ($defaultIndex -ge 0) { ($defaultIndex + 1).ToString() } else { "none" }
+    $choice = Read-Host -Prompt "Select $Name number or paste resource group name (default: $promptDefault)"
+    if ([string]::IsNullOrWhiteSpace($choice)) {
+        if ($defaultIndex -ge 0) { return [string]$groups[$defaultIndex].name }
+        Write-Fail "No value supplied for required parameter '$Name'."
+        exit 1
+    }
+
+    $choice = $choice.Trim()
+    $number = 0
+    if ([int]::TryParse($choice, [ref]$number) -and $number -ge 1 -and $number -le $groups.Count) {
+        return [string]$groups[$number - 1].name
+    }
+
+    foreach ($g in $groups) {
+        if ($g.name -eq $choice) { return [string]$g.name }
+    }
+
+    Write-Fail "No listed resource group matched '$choice'."
+    exit 1
+}
+
 # ------------------------------------------------------------------------------
 # Parameter resolution (env var -> prompt -> default)
 # ------------------------------------------------------------------------------
