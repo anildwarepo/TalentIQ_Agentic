@@ -77,7 +77,7 @@ $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $here "..\shared\common.ps1")
 
-Show-AppConfigEnvPreflight -Import -Force:$Force
+Show-AppConfigEnvPreflight -Import -Override -Force:$Force
 
 Write-Host ""
 Write-Host "--------------------------------------------------------------"
