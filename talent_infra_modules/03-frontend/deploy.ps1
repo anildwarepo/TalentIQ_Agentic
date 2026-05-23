@@ -108,8 +108,8 @@ $BackendFqdn = $BackendFqdn -replace '^https?://', '' -replace '/+$', ''
 # Phase 3 - Parameter resolution
 # ------------------------------------------------------------------------------
 
-$SubscriptionId       = Get-ParameterValue -Name "Subscription ID"               -Value $SubscriptionId       -EnvVar "AZURE_SUBSCRIPTION_ID"
-$ResourceGroup        = Get-ParameterValue -Name "Resource group"                -Value $ResourceGroup        -EnvVar "AZURE_RESOURCE_GROUP"
+$SubscriptionId       = Resolve-AzSubscriptionId -Value $SubscriptionId -EnvVar "AZURE_SUBSCRIPTION_ID"
+$ResourceGroup        = Resolve-AzResourceGroupName -SubscriptionId $SubscriptionId -Name "Resource group" -Value $ResourceGroup -EnvVar "AZURE_RESOURCE_GROUP"
 $Location             = Get-ParameterValue -Name "Location"                      -Value $Location             -EnvVar "AZURE_LOCATION"             -Default "westus"
 $AcrName              = Get-ParameterValue -Name "ACR name"                      -Value $AcrName              -EnvVar "AZURE_ACR_NAME"
 $AcrResourceGroup     = Get-ParameterValue -Name "ACR resource group"            -Value $AcrResourceGroup     -EnvVar "AZURE_ACR_RESOURCE_GROUP"   -Default $ResourceGroup

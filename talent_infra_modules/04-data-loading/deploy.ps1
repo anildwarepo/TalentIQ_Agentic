@@ -191,17 +191,16 @@ if ($RestartBackend -and -not $backendOutputs) {
 # ------------------------------------------------------------------------------
 Write-Step "Resolving parameters"
 
-$SubscriptionId = Get-ParameterValue `
-    -Name    "Subscription ID" `
-    -Value   $SubscriptionId `
-    -EnvVar  "AZURE_SUBSCRIPTION_ID" `
-    -Default $acct.id
+$SubscriptionId = Resolve-AzSubscriptionId `
+    -Value  $SubscriptionId `
+    -EnvVar "AZURE_SUBSCRIPTION_ID"
 
 # ResourceGroup is only strictly needed when restarting the backend container
 # app. Skip the prompt otherwise so a vanilla -SkipExtensions run does not
 # require it.
 if ($NarrowBackendGrants -or $RestartBackend) {
-    $ResourceGroup = Get-ParameterValue `
+    $ResourceGroup = Resolve-AzResourceGroupName `
+        -SubscriptionId $SubscriptionId `
         -Name    "Resource group (backend / PG)" `
         -Value   $ResourceGroup `
         -EnvVar  "AZURE_RESOURCE_GROUP"

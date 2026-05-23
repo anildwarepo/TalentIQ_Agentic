@@ -142,8 +142,8 @@ if (-not [string]::IsNullOrEmpty($pgPrivateIp)) {
 # 3. Resolve required parameters
 # ------------------------------------------------------------------------------
 
-$SubscriptionId = Get-ParameterValue -Name 'Subscription ID' -EnvVar 'AZURE_SUBSCRIPTION_ID' -Value $SubscriptionId
-$ResourceGroup = Get-ParameterValue -Name 'Resource group' -EnvVar 'AZURE_RESOURCE_GROUP' -Value $ResourceGroup
+$SubscriptionId = Resolve-AzSubscriptionId -Value $SubscriptionId -EnvVar 'AZURE_SUBSCRIPTION_ID'
+$ResourceGroup = Resolve-AzResourceGroupName -SubscriptionId $SubscriptionId -Name 'Resource group' -EnvVar 'AZURE_RESOURCE_GROUP' -Value $ResourceGroup
 $Location = Get-ParameterValue -Name 'Location' -EnvVar 'AZURE_LOCATION' -Value $Location -Default 'westus'
 $AcrName = Get-ParameterValue -Name 'ACR name' -EnvVar 'AZURE_ACR_NAME' -Value $AcrName
 
