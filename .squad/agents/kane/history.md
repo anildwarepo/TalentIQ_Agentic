@@ -130,3 +130,7 @@ Team-wide rule from GitGuardian remediation on `talent_infra_modules/01-postgres
 ## Team update — 2026-05-22T23:59:59Z (via Scribe, originated by Bishop)
 
 FYI for backend devs touching deploy hooks: per decisions.md `2026-05-22T23:59:59Z`, **all `.ps1` files in this repo MUST be UTF-8 with BOM** (cross-VM PS 5.1 compat). If you ever edit `talent_infra*/hooks/*.ps1` or any `talent_infra_modules/*/deploy.ps1`, save with BOM and avoid non-ASCII characters (em-dashes, smart quotes, box-drawing chars) — or you'll silently break the file on any Windows PowerShell 5.1 host. See the substitution map + `.editorconfig`/`.vscode/settings.json` prevention guards in the decision entry.
+
+## Cross-agent note — 2026-05-23T00:30:00Z (Scribe, from Bishop)
+
+- **Backend devs touching `talent_infra*/hooks/*.ps1`:** the UTF-8-with-BOM encoding rule from `2026-05-22T23:59:59Z` is now enforced via `.editorconfig` (root-level `[*.ps1]` charset=utf-8-bom) **and** `.vscode/settings.json` (`"[powershell]": { "files.encoding": "utf8bom" }`). Keep VS Code's PowerShell extension on (default for this workspace) and the guards will handle BOM on save — no more manual `[System.IO.File]::WriteAllText(..., UTF8Encoding(true))` discipline required as long as you don't bypass the editor. Per `decisions.md 2026-05-23T00:30:00Z`.

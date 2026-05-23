@@ -5,6 +5,90 @@
 
 <!-- Decisions appear below, newest first. -->
 
+### 2026-05-23T00:30:00Z: 11-file `.ps1` UTF-8-with-BOM sweep COMPLETE — rule fully enforced + prevention guards landed
+
+**By:** Bishop (Deployment Engineer) — requested by Anil, merged by Scribe
+**Status:** Implemented (11/11 files swept clean, parse OK in pwsh 7+); `.editorconfig` + `.vscode/settings.json` prevention guards added; Anil owns the code + guards git commit
+**Executes:** Decision `2026-05-22T23:59:59Z` (the deferred 11-file sweep portion). Rule statement is unchanged and reaffirmed below.
+
+**Trigger (recap):** Same root cause as `2026-05-22T23:59:59Z` — UTF-8-no-BOM `.ps1` files containing non-ASCII chars cascade-fail on Windows PowerShell 5.1 (CP1252 fallback). `adwarakanat2@CXAILABDevBox-3` hit the same bug a second time on `shared/common.ps1` (dot-sourced by every component `deploy.ps1`), promoting the deferred sweep to urgent. This pass clears the whole class — not just the one file from 2026-05-22.
+
+**Verbatim rule (reaffirmed, unchanged from `2026-05-22T23:59:59Z`):**
+
+> **All `.ps1` files in this repository MUST be saved as UTF-8 *with* BOM (byte order mark `0xEF 0xBB 0xBF`).** This is required for cross-VM compatibility with Windows PowerShell 5.1 (Desktop, .NET Framework), which defaults to the current ANSI codepage (CP1252 on en-US locales) when reading a `.ps1` that has no BOM. pwsh 7+ (Core, .NET 8+) defaults to UTF-8 for BOM-less `.ps1`, so the bug is invisible on developer boxes that only have pwsh 7 installed — but it triggers a cascade of parser errors on any 5.1 host. Bishop must verify BOM presence before committing any `.ps1` edit. Future agents authoring or editing `.ps1` files must do the same.
+
+**11/11 files swept clean (BOM `EF BB BF`, 0 non-ASCII bytes, parse OK in pwsh 7+):**
+
+| Risk | File | Chars substituted |
+|---|---|---|
+| HIGH | `talent_infra_modules/04-data-loading/deploy.ps1` | 2016 |
+| HIGH | `talent_infra_modules/03-frontend/deploy.ps1` | 1958 |
+| HIGH | `talent_infra_modules/02-backend/deploy.ps1` | (already swept in earlier run — idempotent no-op this pass) |
+| HIGH | `talent_infra_modules/shared/common.ps1` | (already swept in earlier run — idempotent no-op this pass) |
+| MED | `talent_infra_modules/00-container-apps-env/deploy.ps1` | 143 |
+| MED | `talent_infra/hooks/postprovision.ps1` | 82 |
+| MED | `talent_infra_v2/hooks/postprovision.ps1` | 83 |
+| LOW | `talent_infra/hooks/postup.ps1` | 21 |
+| LOW | `talent_infra_v2/hooks/postup.ps1` | 21 |
+| LOW | `talent_infra/hooks/preprovision.ps1` | 3 |
+| LOW | `talent_infra_v2/hooks/preprovision.ps1` | 3 |
+
+**Total chars substituted this pass: ~4330 (final run); ~6927 cumulative across all sweep runs (run-1 + run-2 + final).** Per-file detailed counts preserved in `.squad/agents/bishop/history.md` (2026-05-22 sweep entry; archived stub once history.md is summarized).
+
+**Extended substitution map (5 new entries beyond the original 11; full 18-entry table preserved in Bishop's sweep helper notes):**
+
+| Codepoint | Glyph | → Replacement | Source |
+|---|---|---|---|
+| U+2014 | `—` em-dash | ` - ` (space-hyphen-space) | original |
+| U+2013 | `–` en-dash | `-` | original |
+| U+2018 | `'` left single quote | `'` | original |
+| U+2019 | `'` right single quote | `'` | original |
+| U+201C | `"` left double quote | `"` | original |
+| U+201D | `"` right double quote | `"` | original |
+| U+00A0 | NBSP | ` ` (space) | original |
+| U+2026 | `…` ellipsis | `...` | original |
+| U+2192 | `→` right arrow | `->` | original |
+| U+2190 | `←` left arrow | `<-` | original |
+| U+2500 | `─` box-drawing horizontal | `-` | original |
+| U+2194 | `↔` left-right arrow | `<->` | **new (sweep)** |
+| U+2550 | `═` box double horizontal | `=` | **new (sweep)** |
+| U+2588 | `█` full block | `#` | **new (sweep)** |
+| U+26A0 | `⚠` warning sign | `[WARN]` | **new (sweep)** |
+| U+2705 / U+2713 | `✅` / `✓` check marks | `[OK]` | **new (sweep)** |
+
+Future agents: when an unfamiliar non-ASCII codepoint surfaces in a `.ps1`, add it to this map (decisions.md entry + sweep helper) and re-run the sweep on that file. The sweep helper must throw BEFORE write on unknown codepoints — never silently drop or guess.
+
+**One language-level asymmetry surfaced (NOT an encoding regression):** `talent_infra_modules/02-backend/deploy.ps1` uses `?.` (null-conditional, 2x) and `??` (null-coalesce, 1x), both of which are pwsh 7+-only language features. Windows PowerShell 5.1 cannot parse them under any encoding. The HEAD version of the file ALSO failed PS 5.1 parse — so the encoding fix STRICTLY IMPROVES the file: mojibake red-herring errors are gone; the genuine PS 7+ dependency is now the only remaining PS 5.1 parse blocker, and it is intentional. Recorded as `EXPECT_FAIL_PS7_ONLY` in the sweep report. Consistent with `01-postgresql/deploy.ps1` line 43 documenting `pwsh ./deploy.ps1` as the invocation pattern — all `talent_infra_modules/*/deploy.ps1` deployers target pwsh 7+. Survey across all 11 swept files confirmed only `02-backend/deploy.ps1` uses PS 7+-only syntax; the other 10 parse clean in both engines.
+
+**Prevention guards landed (per the recommendation in `2026-05-22T23:59:59Z`):**
+
+1. **`.editorconfig`** at repo root: `root=true`, `[*.ps1]` block with `charset = utf-8-bom`, `end_of_line = crlf`, `insert_final_newline = true`. VS Code EditorConfig extension will save new `.ps1` files with BOM automatically.
+2. **`.vscode/settings.json`** (workspace-scoped, belt-and-braces): `"[powershell]": { "files.encoding": "utf8bom" }`. Acts even when EditorConfig is disabled.
+3. **(Future, optional, NOT in this pass)** Pre-commit hook checking first 3 bytes of staged `.ps1` files = `EF BB BF`. Bishop flagged for a later round.
+4. **(Future, optional, NOT in this pass)** Skill: `powershell-utf8-bom-for-5.1-compat` packaging the substitution map + BOM-save + dual-engine parse test as a reusable pattern. Lambert candidate.
+
+**Two BOM-less `.ps1` files with non-ASCII bytes flagged for a future cleanup pass (NOT in this decision's scope):**
+
+- `.squad/templates/skills/distributed-mesh/sync-mesh.ps1` — squad template, ASCII-only would be safer for any consumer who copies it.
+- `talent_infra_v2/scripts/Purge-SoftDeletedFoundryAccounts.ps1` — standalone admin script outside the `talent_infra_modules` toolkit's blast radius.
+
+Repo-wide post-sweep scan (informational, NOT in decision scope): 12 `.ps1` files now have BOM (the 11 swept + `01-postgresql/deploy.ps1` from the 2026-05-22 fix). 15 remain BOM-less but ASCII-only and therefore safe: 8 `_tmp_*.ps1` author-scratch in repo root, 4 admin/test scripts under `talent_infra*/scripts/`, 1 reference snapshot under `talentiq_requirements/reference_code/azd_deploy/hooks/`.
+
+**Validation (Bishop, this pass):**
+- Atomic fail-fast sweep helper (`.scratch/ps1_utf8bom_sweep.ps1`, since deleted) threw BEFORE write on unknown codepoints; threw AFTER write on parse-test failure.
+- Dual-engine parse verification via external-process `[scriptblock]::Create((Get-Content -Raw))` in BOTH `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe` (PS 5.1.26100, source-of-bug) AND `C:\Program Files\WindowsApps\Microsoft.PowerShell_7.6.1.0_x64__8wekyb3d8bbwe\pwsh.exe` (PS 7.6.1, tolerant).
+- Helpers deleted from `.scratch/` post-sweep: `ps1_utf8bom_sweep.ps1`, `enumerate_nonascii.ps1`, `context_surprises.ps1`, `parse_test.ps1`, `survey_ps7_syntax.ps1` (5 files). `.scratch/` left clean.
+
+**Cross-agent impact:**
+- **Ripley (Lead / Architect):** Architectural guardrail is now fully enforced in the toolkit + prevention guards in editor config. Future infra modules + PS-based tooling MUST honor `.editorconfig`. Never bypass.
+- **Lambert (Tester):** Pre-release sweep simplifies — `.editorconfig` + `.vscode/settings.json` are the new first-line check. Verify (a) any new `.ps1` has BOM on commit (b) dual-engine parse for any `talent_infra_modules/*/deploy.ps1` edit. Two flagged BOM-less files (`sync-mesh.ps1`, `Purge-SoftDeletedFoundryAccounts.ps1`) need a future pass.
+- **Kane (Backend Dev):** Encoding rule is now enforced via editor config; backend devs touching `talent_infra*/hooks/*.ps1` just need to keep VS Code's PowerShell extension on (default for the repo). No manual BOM-save discipline required as long as the guards stay in place.
+- **Bishop (Deployment Engineer):** Sweep helpers preserved in this entry's description for a future flare-up; rebuild from this entry if needed.
+
+**adwarakanat2 unblocker:** `git pull` + retry `pwsh talent_infra_modules\01-postgresql\deploy.ps1` (or any other module) — `shared/common.ps1` will now dot-source clean in PS 5.1 AND pwsh 7+.
+
+**Scope:** Encoding sweep + prevention guards only. Out of scope: the two flagged BOM-less files above (future pass), line-ending normalization on other file types, logic refactoring of any swept `.ps1`. **Anil owns** the git commit for the 11 `.ps1` files + `.editorconfig` + `.vscode/settings.json`. Scribe only commits `.squad/` artifacts this pass.
+
 ### 2026-05-22T23:59:59Z: All `.ps1` files in this repo MUST be UTF-8 *with* BOM (cross-VM PS 5.1 compat)
 
 **By:** Bishop (Deployment Engineer) — proposal to Lambert, merged by Scribe

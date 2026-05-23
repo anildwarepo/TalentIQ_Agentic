@@ -71,3 +71,7 @@ Team-wide rule from GitGuardian remediation on `talent_infra_modules/01-postgres
 ## Team update — 2026-05-22T23:59:59Z (via Scribe, originated by Bishop)
 
 Architectural guardrail (decisions.md `2026-05-22T23:59:59Z`): **all `.ps1` files in this repo MUST be UTF-8 with BOM.** Cross-VM PS 5.1 parser-cascade failure (em-dash in BOM-less UTF-8 → CP1252 mojibake → quoted-string break → 30+ misleading errors) just hit Bishop's `talent_infra_modules\01-postgresql\deploy.ps1`. One file fixed; 11 sibling `.ps1` files identified with the same latent bug and deferred. Apply when reviewing any new infra module or PS-based tooling — `shared/common.ps1` is the cross-cutting hazard since every component deploy.ps1 sources it.
+
+## Cross-agent note — 2026-05-23T00:30:00Z (Scribe, from Bishop)
+
+- **11-file `.ps1` UTF-8-with-BOM sweep COMPLETE** — the architectural guardrail from `2026-05-22T23:59:59Z` is now fully enforced across `talent_infra_modules/`, `talent_infra/hooks/`, and `talent_infra_v2/hooks/`. Bishop also landed `.editorconfig` (root=true; `[*.ps1]` charset=utf-8-bom, end_of_line=crlf, insert_final_newline=true) plus `.vscode/settings.json` (`"[powershell]": { "files.encoding": "utf8bom" }`) prevention guards at the repo root, so new `.ps1` files will save with BOM automatically. Two BOM-less files still flagged for a future cleanup pass: `.squad/templates/skills/distributed-mesh/sync-mesh.ps1` and `talent_infra_v2/scripts/Purge-SoftDeletedFoundryAccounts.ps1`. Per `decisions.md 2026-05-23T00:30:00Z`.

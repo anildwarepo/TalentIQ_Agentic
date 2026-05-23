@@ -87,3 +87,7 @@
 
 ## Cross-agent note — 2026-05-22T23:59:59Z (Scribe, from Bishop)
 - **Testing implication (decisions.md `2026-05-22T23:59:59Z`):** add a Lambert pre-deploy quality sweep that greps every `.ps1` file for (a) missing BOM (first 3 bytes ≠ `EF BB BF`) and (b) any non-ASCII byte before any release. Both checks are cheap and would have caught the cross-VM PS 5.1 parser-cascade Bishop fixed in `talent_infra_modules\01-postgresql\deploy.ps1` this round. 11 sibling `.ps1` files in `talent_infra_modules/`, `talent_infra/hooks/`, `talent_infra_v2/hooks/` are still pending the remediation sweep — `shared/common.ps1` is highest priority because every module sources it.
+
+## Cross-agent note — 2026-05-23T00:30:00Z (Scribe, from Bishop)
+
+- **Testing implication of the 11-file `.ps1` sweep:** any future `.ps1` edit must verify (a) first 3 bytes = `EF BB BF` and (b) `[scriptblock]::Create((Get-Content -Raw))` parses clean in BOTH `powershell.exe` 5.1 **and** `pwsh` 7+. `.editorconfig` + `.vscode/settings.json` prevention guards now handle the BOM half automatically; dual-engine parse is still a release-sweep candidate. **Two BOM-less `.ps1` files with non-ASCII bytes need a future cleanup pass** (NOT in this round's 11-file scope): `.squad/templates/skills/distributed-mesh/sync-mesh.ps1` (squad template) and `talent_infra_v2/scripts/Purge-SoftDeletedFoundryAccounts.ps1` (standalone admin script). Per `decisions.md 2026-05-23T00:30:00Z`.
