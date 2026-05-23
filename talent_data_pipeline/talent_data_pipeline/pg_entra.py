@@ -64,9 +64,12 @@ def _credential():
 
 def get_pg_token() -> str:
     """Acquire a fresh Entra access token for PostgreSQL."""
+    print("  Acquiring Entra token for PostgreSQL...", flush=True)
     cred = _credential()
     try:
-        return cred.get_token(OSSRDBMS_SCOPE).token
+        token = cred.get_token(OSSRDBMS_SCOPE).token
+        print("  Entra token acquired.", flush=True)
+        return token
     finally:
         close = getattr(cred, "close", None)
         if close is not None:
@@ -133,6 +136,11 @@ def pg_connect(**overrides: Any) -> psycopg2.extensions.connection:
     kwargs: dict[str, Any] = {**db_config.connection_dict, **overrides}
     kwargs["password"] = get_pg_token()
     try:
+        print(
+            "  Opening PostgreSQL connection "
+            f"(timeout={kwargs.get('connect_timeout', 'default')}s)...",
+            flush=True,
+        )
         return psycopg2.connect(**kwargs)
     except psycopg2.OperationalError as exc:
         message = str(exc)

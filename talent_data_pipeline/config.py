@@ -37,6 +37,7 @@ class DatabaseConfig:
     database: str = field(default_factory=lambda: os.getenv("PGDATABASE", "postgres"))
     user: str = field(default_factory=lambda: os.getenv("PGUSER", ""))
     sslmode: str = field(default_factory=lambda: os.getenv("PGSSLMODE", "require"))
+    connect_timeout: int = field(default_factory=lambda: int(os.getenv("PGCONNECT_TIMEOUT", "15")))
     pool_min: int = 2
     pool_max: int = 10
 
@@ -62,6 +63,8 @@ class DatabaseConfig:
         }
         if self.sslmode:
             d["sslmode"] = self.sslmode
+        if self.connect_timeout:
+            d["connect_timeout"] = self.connect_timeout
         return d
 
 
