@@ -1,17 +1,16 @@
 """Entra ID authentication helpers for PostgreSQL (psycopg2 / data pipeline).
 
-Acquires short-lived bearer tokens for the Azure OSSRDBMS resource scope and
-injects them as the libpq ``password`` parameter at every connect.
+Acquires short-lived bearer tokens for the Azure OSSRDBMS resource scope,
+caches them until near expiry, and injects them as the libpq ``password``
+parameter at every connect.
 
 Three integration points are exposed:
 
-- :func:`get_pg_token` — raw sync token acquisition (uses ``DefaultAzureCredential``).
+- :func:`get_pg_token` — cached sync token acquisition.
 - :func:`pg_connect` — drop-in replacement for ``psycopg2.connect(**db_config.connection_dict)``
-  that attaches a fresh token before each call.
+    that attaches a valid cached token before each call.
 - :class:`EntraThreadedConnectionPool` — subclass of ``psycopg2.pool.ThreadedConnectionPool``
-  that refreshes the token before every new physical connection (so long-running
-  loads survive across the ~60 minute token lifetime, since the pool calls
-  ``_connect`` again when it needs to add or replace a connection).
+    that attaches a valid cached token before every new physical connection.
 
 In Azure Container Apps the user-assigned managed identity (via the injected
 ``AZURE_CLIENT_ID`` env var) is picked up automatically by
@@ -21,12 +20,18 @@ In Azure Container Apps the user-assigned managed identity (via the injected
 from __future__ import annotations
 
 import os
+import threading
+import time
 from typing import Any
 
 import psycopg2
 from psycopg2 import pool as _pool
 
 OSSRDBMS_SCOPE = "https://ossrdbms-aad.database.windows.net/.default"
+_TOKEN_LOCK = threading.Lock()
+_TOKEN_VALUE: str | None = None
+_TOKEN_EXPIRES_ON = 0
+_TOKEN_REFRESH_MARGIN_SECONDS = 300
 
 
 def _is_azure_hosted() -> bool:
@@ -49,34 +54,47 @@ def _credential():
 
     On Azure-hosted compute (Container Apps, App Service, AKS, etc.) the full
     credential chain runs, so the managed identity is discovered via IMDS.
-    Locally, the IMDS / managed-identity probes are excluded so we don't pay a
-    ~5 second timeout per token acquisition.
+    Locally, use Azure CLI directly so token acquisition is visible and bounded;
+    the full local DefaultAzureCredential chain can hang on workstation-specific
+    providers such as shared token cache, broker, or IDE credentials.
     """
-    from azure.identity import DefaultAzureCredential
+    from azure.identity import AzureCliCredential, DefaultAzureCredential
 
     if _is_azure_hosted() or os.getenv("AZURE_FORCE_FULL_CREDENTIAL_CHAIN") == "1":
         return DefaultAzureCredential()
-    return DefaultAzureCredential(
-        exclude_managed_identity_credential=True,
-        exclude_workload_identity_credential=True,
-    )
+    timeout = int(os.getenv("AZURE_CLI_CREDENTIAL_TIMEOUT", "15"))
+    return AzureCliCredential(process_timeout=timeout)
 
 
 def get_pg_token() -> str:
-    """Acquire a fresh Entra access token for PostgreSQL."""
-    print("  Acquiring Entra token for PostgreSQL...", flush=True)
-    cred = _credential()
-    try:
-        token = cred.get_token(OSSRDBMS_SCOPE).token
-        print("  Entra token acquired.", flush=True)
-        return token
-    finally:
-        close = getattr(cred, "close", None)
-        if close is not None:
-            try:
-                close()
-            except Exception:  # noqa: BLE001
-                pass
+    """Return a cached Entra access token for PostgreSQL, refreshing near expiry."""
+    global _TOKEN_EXPIRES_ON, _TOKEN_VALUE
+
+    now = int(time.time())
+    if _TOKEN_VALUE and (_TOKEN_EXPIRES_ON - now) > _TOKEN_REFRESH_MARGIN_SECONDS:
+        return _TOKEN_VALUE
+
+    with _TOKEN_LOCK:
+        now = int(time.time())
+        if _TOKEN_VALUE and (_TOKEN_EXPIRES_ON - now) > _TOKEN_REFRESH_MARGIN_SECONDS:
+            return _TOKEN_VALUE
+
+        print("  Acquiring Entra token for PostgreSQL...", flush=True)
+        cred = _credential()
+        try:
+            access_token = cred.get_token(OSSRDBMS_SCOPE)
+            _TOKEN_VALUE = access_token.token
+            _TOKEN_EXPIRES_ON = int(access_token.expires_on)
+            ttl_minutes = max(0, (_TOKEN_EXPIRES_ON - int(time.time())) // 60)
+            print(f"  Entra token acquired (valid for ~{ttl_minutes} min).", flush=True)
+            return _TOKEN_VALUE
+        finally:
+            close = getattr(cred, "close", None)
+            if close is not None:
+                try:
+                    close()
+                except Exception:  # noqa: BLE001
+                    pass
 
 
 def _build_pguser_hint(pg_user: str, host: str, libpq_message: str) -> str:
@@ -121,7 +139,7 @@ def pg_connect(**overrides: Any) -> psycopg2.extensions.connection:
 
     ``overrides`` are merged on top of ``db_config.connection_dict`` so callers
     can selectively change a field (e.g. ``application_name``). The password is
-    always replaced with a freshly acquired token.
+    always replaced with a valid cached token.
 
     When libpq reports a password-authentication failure (which on this stack
     really means the Entra principal bound to the token does not match a
@@ -154,13 +172,13 @@ def pg_connect(**overrides: Any) -> psycopg2.extensions.connection:
 
 
 class EntraThreadedConnectionPool(_pool.ThreadedConnectionPool):
-    """``ThreadedConnectionPool`` that injects a fresh Entra token per connect.
+    """``ThreadedConnectionPool`` that injects a cached Entra token per connect.
 
     psycopg2's pool calls ``_connect`` whenever it needs to open a new physical
     connection (initial fill, replacement after error, or when ``getconn`` is
-    asked for a key not yet bound). Refreshing ``self._kwargs["password"]``
-    immediately before delegating keeps every new connection within the
-    ~60 minute token validity window.
+    asked for a key not yet bound). Updating ``self._kwargs["password"]``
+    immediately before delegating keeps every new connection within the token
+    validity window without calling Azure CLI for every worker connection.
 
     Password-authentication failures are wrapped with the same PGUSER hint
     used by :func:`pg_connect`, so a misconfigured ``PGUSER`` produces an
