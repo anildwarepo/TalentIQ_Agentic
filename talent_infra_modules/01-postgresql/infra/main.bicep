@@ -76,6 +76,9 @@ param enablePrivateEndpoint bool = true
 @description('Resource group holding the existing VNet (defaults to the current resource group). Used when enablePrivateEndpoint is true.')
 param vnetResourceGroup string = resourceGroup().name
 
+@description('Subscription holding the existing VNet. Defaults to the deployment subscription. Used when enablePrivateEndpoint is true.')
+param vnetSubscriptionId string = subscription().subscriptionId
+
 @description('Name of the existing VNet. Required when enablePrivateEndpoint is true.')
 param vnetName string = ''
 
@@ -94,7 +97,7 @@ param tags object = {}
 // Existing VNet + PE subnet — only referenced when enablePrivateEndpoint is true.
 resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' existing = if (enablePrivateEndpoint) {
   name: vnetName
-  scope: resourceGroup(vnetResourceGroup)
+  scope: resourceGroup(vnetSubscriptionId, vnetResourceGroup)
 }
 
 resource peSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-11-01' existing = if (enablePrivateEndpoint) {

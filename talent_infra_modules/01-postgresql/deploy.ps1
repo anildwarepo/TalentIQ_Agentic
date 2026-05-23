@@ -78,6 +78,7 @@ param(
     [string]$SkuTier = "GeneralPurpose",
     [int]$StorageSizeGB = 32,
     [bool]$EnablePrivateEndpoint = $true,
+    [string]$VnetSubscriptionId,
     [string]$VnetResourceGroup,
     [string]$VnetName,
     [string]$PeSubnetName = "pe-subnet",
@@ -155,6 +156,10 @@ if ($null -eq $AdminPassword -or $AdminPassword.Length -eq 0) {
 
 # VNet wiring  -  only required when PE is enabled.
 if ($EnablePrivateEndpoint) {
+    if ([string]::IsNullOrEmpty($VnetSubscriptionId)) {
+        $VnetSubscriptionId = [Environment]::GetEnvironmentVariable("AZURE_VNET_SUBSCRIPTION_ID")
+        if ([string]::IsNullOrEmpty($VnetSubscriptionId)) { $VnetSubscriptionId = $SubscriptionId }
+    }
     if ([string]::IsNullOrEmpty($VnetResourceGroup)) {
         $VnetResourceGroup = Get-ParameterValue -Name "VNet resource group" `
             -EnvVar "AZURE_VNET_RESOURCE_GROUP" -Default $ResourceGroup
@@ -169,6 +174,7 @@ if ($EnablePrivateEndpoint) {
     $PeSubnetName = Get-ParameterValue -Name "PE subnet name" `
         -Value $PeSubnetName -EnvVar "AZURE_PE_SUBNET_NAME" -Default "pe-subnet" -AlwaysPrompt
 } else {
+    $VnetSubscriptionId = ""
     $VnetResourceGroup = ""
     $VnetName = ""
 }
@@ -283,17 +289,32 @@ $ExistingDnsZoneLinked = $true   # default matches Bicep  -  skip link creation
 if ($EnablePrivateEndpoint -and [string]::IsNullOrEmpty($ExistingDnsZoneId)) {
     Write-Step "Discovering PostgreSQL Private DNS zone linked to VNet '$VnetName'"
 
-    $vnetId = "/subscriptions/$SubscriptionId/resourceGroups/$VnetResourceGroup/providers/Microsoft.Network/virtualNetworks/$VnetName"
+    $vnetId = "/subscriptions/$VnetSubscriptionId/resourceGroups/$VnetResourceGroup/providers/Microsoft.Network/virtualNetworks/$VnetName"
 
-    $linkedZoneId = Get-LinkedPostgresqlPrivateDnsZoneId `
+    $linkedZone = Get-LinkedPostgresqlPrivateDnsZoneId `
         -SubscriptionId $SubscriptionId `
         -VnetId $vnetId `
-        -VnetName $VnetName
+        -VnetName $VnetName `
+        -IncludeDetails
 
-    if (-not [string]::IsNullOrEmpty($linkedZoneId)) {
-        $ExistingDnsZoneId = $linkedZoneId
+    if ($null -ne $linkedZone -and -not [string]::IsNullOrEmpty([string]$linkedZone.Id)) {
+        $ExistingDnsZoneId = [string]$linkedZone.Id
         $ExistingDnsZoneLinked = $true
-        Write-Success "Reusing existing linked Private DNS zone: $linkedZoneId"
+        Write-Success "Reusing existing linked Private DNS zone: $ExistingDnsZoneId"
+        if (-not [string]::IsNullOrEmpty([string]$linkedZone.VnetId)) {
+            $linkedVnetSegments = ([string]$linkedZone.VnetId).Split('/')
+            if ($linkedVnetSegments.Length -ge 9) {
+                $linkedVnetSubscriptionId = $linkedVnetSegments[2]
+                $linkedVnetResourceGroup = $linkedVnetSegments[4]
+                $linkedVnetName = $linkedVnetSegments[8]
+                if (($linkedVnetSubscriptionId -ne $VnetSubscriptionId) -or ($linkedVnetResourceGroup -ne $VnetResourceGroup) -or ($linkedVnetName -ne $VnetName)) {
+                    Write-Warn "Using exact VNet from DNS link: $($linkedZone.VnetId)"
+                    $VnetSubscriptionId = $linkedVnetSubscriptionId
+                    $VnetResourceGroup = $linkedVnetResourceGroup
+                    $VnetName = $linkedVnetName
+                }
+            }
+        }
     } else {
         $unlinkedZoneId = Get-PrivateDnsZoneIdByName `
             -SubscriptionId $SubscriptionId `
@@ -382,6 +403,7 @@ Write-Host ("    Admin login           : {0}" -f $AdminLogin)
 Write-Host ("    Password auth         : {0}" -f $(if ($EntraOnly) { 'DISABLED (Entra-only)' } else { 'Enabled' }))
 Write-Host ("    Private Endpoint      : {0}" -f $EnablePrivateEndpoint)
 if ($EnablePrivateEndpoint) {
+    Write-Host ("    VNet subscription    : {0}" -f $VnetSubscriptionId)
     Write-Host ("    VNet                  : {0}/{1}" -f $VnetResourceGroup, $VnetName)
     Write-Host ("    PE subnet             : {0}" -f $PeSubnetName)
     Write-Host ("    Existing DNS zone ID  : {0}" -f $(if ([string]::IsNullOrEmpty($ExistingDnsZoneId)) { '(create new)' } else { $ExistingDnsZoneId }))
@@ -572,6 +594,7 @@ $overrides = @(
     "clientIpAddress=$ClientIpAddress"
 )
 if ($EnablePrivateEndpoint) {
+    $overrides += "vnetSubscriptionId=$VnetSubscriptionId"
     $overrides += "vnetResourceGroup=$VnetResourceGroup"
     $overrides += "vnetName=$VnetName"
     $overrides += "peSubnetName=$PeSubnetName"

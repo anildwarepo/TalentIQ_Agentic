@@ -554,7 +554,8 @@ function Get-LinkedPostgresqlPrivateDnsZoneId {
     param(
         [Parameter(Mandatory)][string]$SubscriptionId,
         [Parameter(Mandatory)][string]$VnetId,
-        [string]$VnetName = ''
+        [string]$VnetName = '',
+        [switch]$IncludeDetails
     )
 
     $zonesJson = Invoke-Native {
@@ -601,6 +602,8 @@ function Get-LinkedPostgresqlPrivateDnsZoneId {
                 $linkedMatches += [pscustomobject]@{
                     Id = $zoneId
                     Name = $zoneNm
+                    VnetId = $linkVnetId
+                    VnetName = $linkVnetName
                 }
                 break
             }
@@ -616,9 +619,15 @@ function Get-LinkedPostgresqlPrivateDnsZoneId {
     if ($preferred.Count -eq 0) {
         $preferred = @($linkedMatches | Where-Object { $_.Name -ieq 'privatelink.postgres.database.azure.com' } | Select-Object -First 1)
     }
-    if ($preferred.Count -gt 0) { return [string]$preferred[0].Id }
+    if ($preferred.Count -gt 0) {
+        if ($IncludeDetails) { return $preferred[0] }
+        return [string]$preferred[0].Id
+    }
 
-    if ($linkedMatches.Count -eq 1) { return [string]$linkedMatches[0].Id }
+    if ($linkedMatches.Count -eq 1) {
+        if ($IncludeDetails) { return $linkedMatches[0] }
+        return [string]$linkedMatches[0].Id
+    }
 
     Write-Warn "Multiple PostgreSQL Private DNS zones are linked to the target VNet: $((@($linkedMatches | ForEach-Object { $_.Id })) -join ', ')"
     Write-Info "Set POSTGRESQL_DNS_ZONE_ID or -ExistingDnsZoneId to choose one."
