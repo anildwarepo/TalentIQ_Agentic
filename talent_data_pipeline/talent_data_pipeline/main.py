@@ -12,13 +12,34 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from talent_data_pipeline.config import _REPO_ROOT, apply_host_override, db_config, pipeline_config
+from talent_data_pipeline.config import _ENV_PATH, _REPO_ROOT, apply_host_override, db_config, pipeline_config
 
 
 _VALID_MODES = ("env", "manual")
 _MAX_HOST_PROMPT_ATTEMPTS = 3
 _GENERATION_CHECKPOINT_DIR = _REPO_ROOT / "talent_synthetic_data" / ".generation_checkpoint"
 _GENERATION_CHECKPOINT_VERSION = 1
+
+
+def _display_value(value: str | None) -> str:
+    return value if value else "(empty)"
+
+
+def _print_runtime_config() -> None:
+    """Print the resolved non-secret runtime configuration before work starts."""
+    print("Runtime configuration")
+    print(f"  app_config/.env path : {_ENV_PATH}")
+    print(f"  app_config/.env found: {_ENV_PATH.exists()}")
+    print(f"  PGHOST              : {_display_value(db_config.host)}")
+    print(f"  PGPORT              : {db_config.port}")
+    print(f"  PGDATABASE          : {_display_value(db_config.database)}")
+    print(f"  PGUSER              : {_display_value(db_config.user)}")
+    print(f"  PGSSLMODE           : {_display_value(db_config.sslmode)}")
+    print(f"  GRAPH_NAME          : {_display_value(pipeline_config.graph_name)}")
+    print(f"  AZURE_OPENAI_ENDPOINT             : {_display_value(pipeline_config.azure_openai_endpoint)}")
+    print(f"  AZURE_OPENAI_EMBEDDING_DEPLOYMENT : {_display_value(pipeline_config.azure_openai_embedding_deployment)}")
+    print(f"  AZURE_OPENAI_EMBEDDING_DIMENSIONS : {pipeline_config.embedding_dim}")
+    print()
 
 
 def _generation_metadata() -> dict[str, int]:
@@ -505,6 +526,8 @@ if __name__ == "__main__":
         ),
     )
     args = parser.parse_args()
+
+    _print_runtime_config()
 
     mode = _resolve_mode(args.mode)
     if mode == "manual":
