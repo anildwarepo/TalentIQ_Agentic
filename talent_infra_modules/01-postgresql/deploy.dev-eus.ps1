@@ -8,6 +8,7 @@ param(
     [string]$Location = "eastus",
     [string]$ServerName,
     [SecureString]$AdminPassword,
+    [string]$ExtraEntraUserUpns = "anil.dwarakanath@dxc.com",
     [switch]$Force,
     [switch]$EntraOnly
 )
@@ -22,6 +23,7 @@ $params = @{
     VnetName = "VNET-Mgmt-AI-Apps-Dev-EUS"
     PeSubnetName = "SNET-Private-Endpoints"
     EnablePrivateEndpoint = $true
+    ExtraEntraUserUpns = $ExtraEntraUserUpns
 }
 
 if (-not [string]::IsNullOrEmpty($SubscriptionId)) { $params.SubscriptionId = $SubscriptionId }

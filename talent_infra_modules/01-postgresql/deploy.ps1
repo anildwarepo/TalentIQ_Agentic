@@ -84,6 +84,7 @@ param(
     [string]$PeSubnetName = "pe-subnet",
     [string]$ExistingDnsZoneId,
     [string]$ClientIpAddress,
+    [string]$ExtraEntraUserUpns,
     [string]$UamiPrincipalIds,
     [switch]$EntraOnly,
     # Self-heal flag for the
@@ -189,6 +190,20 @@ if ([string]::IsNullOrEmpty($ExistingDnsZoneId)) {
 if ([string]::IsNullOrEmpty($UamiPrincipalIds)) {
     $UamiPrincipalIds = [Environment]::GetEnvironmentVariable("POSTGRESQL_UAMI_PRINCIPALS")
     if ($null -eq $UamiPrincipalIds) { $UamiPrincipalIds = "" }
+}
+
+# Extra human Entra users to register as PG Entra admins. Comma/semicolon separated UPNs.
+if ([string]::IsNullOrEmpty($ExtraEntraUserUpns)) {
+    $ExtraEntraUserUpns = [Environment]::GetEnvironmentVariable("POSTGRESQL_EXTRA_ENTRA_USER_UPNS")
+    if ($null -eq $ExtraEntraUserUpns) { $ExtraEntraUserUpns = "" }
+}
+$extraEntraUserUpnList = @()
+if (-not [string]::IsNullOrWhiteSpace($ExtraEntraUserUpns)) {
+    $extraEntraUserUpnList = @(
+        $ExtraEntraUserUpns -split '[,;]' |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
 }
 
 # 3. Set subscription
@@ -425,6 +440,7 @@ if ($EnablePrivateEndpoint) {
 }
 Write-Host ("    Client IP firewall    : {0}" -f $(if ([string]::IsNullOrEmpty($ClientIpAddress)) { '(none)' } else { $ClientIpAddress }))
 Write-Host ("    Deployer admin (Entra): {0}" -f $account.user.name)
+Write-Host ("    Extra Entra users    : {0}" -f $(if ($extraEntraUserUpnList.Count -eq 0) { '(none)' } else { $extraEntraUserUpnList -join ', ' }))
 $uamiList = @()
 if (-not [string]::IsNullOrEmpty($UamiPrincipalIds)) {
     try { $uamiList = @($UamiPrincipalIds | ConvertFrom-Json) } catch {
@@ -764,6 +780,72 @@ if ($existingAdmins | Where-Object { $_.objectId -eq $deployerOid }) {
         Write-Fail "Failed to register deployer as Entra admin (exit $LASTEXITCODE):"
         $adminOut | ForEach-Object { Write-Host "      $_" -ForegroundColor DarkRed }
         exit 1
+    }
+}
+
+# --------------------------------------------------------------------------
+# 10b. Register extra human Entra users as User Entra admins
+# --------------------------------------------------------------------------
+if ($extraEntraUserUpnList.Count -gt 0) {
+    Write-Step "Registering extra PG Entra User administrators"
+
+    $refreshAdminsJson = Invoke-Native {
+        az postgres flexible-server microsoft-entra-admin list `
+            --resource-group $ResourceGroup `
+            --server-name $ServerName `
+            --output json 2>$null
+    }
+    $existingAdmins = @()
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($refreshAdminsJson)) {
+        try { $existingAdmins = @($refreshAdminsJson | ConvertFrom-Json) } catch { $existingAdmins = @() }
+    }
+    $existingOids = @($existingAdmins | ForEach-Object { $_.objectId })
+
+    foreach ($extraUpn in $extraEntraUserUpnList) {
+        Write-Info "User: $extraUpn"
+        $extraUserJson = Invoke-Native {
+            az ad user show --id $extraUpn --output json 2>$null
+        }
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($extraUserJson)) {
+            Write-Fail "  Could not resolve Entra user '$extraUpn' with 'az ad user show'."
+            exit 1
+        }
+        try { $extraUser = $extraUserJson | ConvertFrom-Json } catch {
+            Write-Fail "  Could not parse Entra user lookup for '$extraUpn'."
+            exit 1
+        }
+        $extraOid = [string]$extraUser.id
+        if ([string]::IsNullOrWhiteSpace($extraOid)) {
+            Write-Fail "  Entra user lookup for '$extraUpn' returned no object id."
+            exit 1
+        }
+
+        if ($existingOids -contains $extraOid) {
+            Write-Success "  Already registered (objectId match)."
+            continue
+        }
+
+        $extraAdminOut = Invoke-Native {
+            az postgres flexible-server microsoft-entra-admin create `
+                --resource-group $ResourceGroup `
+                --server-name $ServerName `
+                --display-name $extraUpn `
+                --object-id $extraOid `
+                --type User `
+                --only-show-errors `
+                --output none 2>&1
+        }
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "  Registered $extraUpn as PG Entra User admin."
+            $existingOids += $extraOid
+        } elseif ("$extraAdminOut" -match 'already exists|conflict') {
+            Write-Success "  User admin already exists (control-plane idempotent)."
+            $existingOids += $extraOid
+        } else {
+            Write-Fail "  Failed to register $extraUpn (exit $LASTEXITCODE):"
+            $extraAdminOut | ForEach-Object { Write-Host "      $_" -ForegroundColor DarkRed }
+            exit 1
+        }
     }
 }
 
