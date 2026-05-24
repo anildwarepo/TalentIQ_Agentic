@@ -64,6 +64,8 @@ param(
     [string]$McpMemory = "1Gi",
 
     [switch]$SkipBuild,
+    [switch]$UseLocalDocker,
+    [switch]$UseAcrBuild,
     [switch]$Force,
     [switch]$RestartActive
 )
@@ -346,6 +348,26 @@ Write-Success "ACR login server: $acrLoginServer"
 $backendImage = "$acrLoginServer/backend:$BackendImageTag"
 $mcpImage = "$acrLoginServer/mcp-server:$McpImageTag"
 
+if ($UseLocalDocker -and $UseAcrBuild) {
+    Write-Fail "Use only one build mode switch: -UseLocalDocker or -UseAcrBuild."
+    exit 1
+}
+
+$buildWithLocalDocker = $false
+if (-not $SkipBuild) {
+    if ($UseLocalDocker) {
+        $buildWithLocalDocker = $true
+    } elseif ($UseAcrBuild) {
+        $buildWithLocalDocker = $false
+    } elseif ($Force -or -not [string]::IsNullOrEmpty($env:CI) -or -not [Environment]::UserInteractive) {
+        $buildWithLocalDocker = $true
+        Write-Info "Build mode defaulted to local Docker. Pass -UseAcrBuild to use remote az acr build."
+    } else {
+        $ans = Read-Host -Prompt "Build images locally with Docker and push to ACR? [Y/n]"
+        $buildWithLocalDocker = ($ans -notmatch '^(n|no)$')
+    }
+}
+
 Write-Step "Deployment plan"
 Write-Info "Subscription           : $SubscriptionId"
 Write-Info "Resource group         : $ResourceGroup"
@@ -367,6 +389,10 @@ if ([string]::IsNullOrEmpty($CosmosAccountName)) {
 }
 if ($SkipBuild) {
     Write-Warn "-SkipBuild set: assuming both images already exist with the supplied tags."
+} elseif ($buildWithLocalDocker) {
+    Write-Info "Image build mode       : local Docker build + docker push"
+} else {
+    Write-Info "Image build mode       : remote az acr build"
 }
 if ($RestartActive) {
     Write-Info "Post-deploy revision restart: ENABLED"
@@ -379,12 +405,10 @@ if (-not (Confirm-Action -Message "Proceed with deployment?" -Force:$Force)) {
 }
 
 # ------------------------------------------------------------------------------
-# 7. Build + push images via az acr build
+# 7. Build + push images
 # ------------------------------------------------------------------------------
 
 if (-not $SkipBuild) {
-    Write-Step "Building + pushing backend image"
-
     $backendSourceResolved = (Resolve-Path -LiteralPath (Join-Path $here $BackendSourcePath) -ErrorAction SilentlyContinue)?.Path
     if ([string]::IsNullOrEmpty($backendSourceResolved)) {
         Write-Fail "BackendSourcePath '$BackendSourcePath' does not exist."
@@ -402,37 +426,76 @@ if (-not $SkipBuild) {
         exit 1
     }
 
-    Write-Info "Source: $backendSourceResolved"
-    Write-Info "Target: $backendImage"
-    Invoke-Native {
-        az acr build `
-            --registry $AcrName `
-            --resource-group $AcrResourceGroup `
-            --image "backend:$BackendImageTag" `
-            --file $backendDockerfilePath `
-            $backendSourceResolved
-    }
-    if ($LASTEXITCODE -ne 0) {
-        Write-Fail "az acr build (backend) failed with exit code $LASTEXITCODE."
-        exit 1
-    }
-    Write-Success "Built and pushed $backendImage"
+    if ($buildWithLocalDocker) {
+        Write-Step "Logging in to ACR for local Docker push"
+        Invoke-Native { az acr login --name $AcrName }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Fail "az acr login failed with exit code $LASTEXITCODE."
+            exit 1
+        }
 
-    Write-Step "Building + pushing MCP sidecar image"
-    Write-Info "Target: $mcpImage"
-    Invoke-Native {
-        az acr build `
-            --registry $AcrName `
-            --resource-group $AcrResourceGroup `
-            --image "mcp-server:$McpImageTag" `
-            --file $mcpDockerfilePath `
-            $backendSourceResolved
+        Write-Step "Building + pushing backend image with local Docker"
+        Write-Info "Source: $backendSourceResolved"
+        Write-Info "Target: $backendImage"
+        Invoke-Native { docker build --file $backendDockerfilePath --tag $backendImage $backendSourceResolved }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Fail "docker build (backend) failed with exit code $LASTEXITCODE."
+            exit 1
+        }
+        Invoke-Native { docker push $backendImage }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Fail "docker push (backend) failed with exit code $LASTEXITCODE."
+            exit 1
+        }
+        Write-Success "Built and pushed $backendImage"
+
+        Write-Step "Building + pushing MCP sidecar image with local Docker"
+        Write-Info "Target: $mcpImage"
+        Invoke-Native { docker build --file $mcpDockerfilePath --tag $mcpImage $backendSourceResolved }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Fail "docker build (mcp-server) failed with exit code $LASTEXITCODE."
+            exit 1
+        }
+        Invoke-Native { docker push $mcpImage }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Fail "docker push (mcp-server) failed with exit code $LASTEXITCODE."
+            exit 1
+        }
+        Write-Success "Built and pushed $mcpImage"
+    } else {
+        Write-Step "Building + pushing backend image via az acr build"
+        Write-Info "Source: $backendSourceResolved"
+        Write-Info "Target: $backendImage"
+        Invoke-Native {
+            az acr build `
+                --registry $AcrName `
+                --resource-group $AcrResourceGroup `
+                --image "backend:$BackendImageTag" `
+                --file $backendDockerfilePath `
+                $backendSourceResolved
+        }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Fail "az acr build (backend) failed with exit code $LASTEXITCODE."
+            exit 1
+        }
+        Write-Success "Built and pushed $backendImage"
+
+        Write-Step "Building + pushing MCP sidecar image via az acr build"
+        Write-Info "Target: $mcpImage"
+        Invoke-Native {
+            az acr build `
+                --registry $AcrName `
+                --resource-group $AcrResourceGroup `
+                --image "mcp-server:$McpImageTag" `
+                --file $mcpDockerfilePath `
+                $backendSourceResolved
+        }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Fail "az acr build (mcp-server) failed with exit code $LASTEXITCODE."
+            exit 1
+        }
+        Write-Success "Built and pushed $mcpImage"
     }
-    if ($LASTEXITCODE -ne 0) {
-        Write-Fail "az acr build (mcp-server) failed with exit code $LASTEXITCODE."
-        exit 1
-    }
-    Write-Success "Built and pushed $mcpImage"
 } else {
     Write-Step "Skipping image build (-SkipBuild)"
     Write-Info "Assuming $backendImage and $mcpImage already exist in $AcrName."
