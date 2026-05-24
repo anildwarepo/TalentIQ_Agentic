@@ -43,3 +43,8 @@ az resource list `
   --resource-type "Microsoft.CognitiveServices/accounts/projects" `
   --query "[].{name:name,id:id,type:type}" `
   -o table
+
+az acr login --name benchiqdeveus
+
+docker build -t benchiqdeveus.azurecr.io/backend:latest C:\repos\TalentIQ_Agentic\talent_backend
+docker push benchiqdeveus.azurecr.io/backend:latest
