@@ -298,12 +298,20 @@ initialize_postgres_age_and_data() {
 
   # Ensure Microsoft Entra ID authentication is enabled (idempotent).
   echo "Ensuring Microsoft Entra ID authentication is enabled..."
-  az postgres flexible-server update \
+  current_entra_auth=$(az postgres flexible-server show \
     --resource-group "$resource_group" \
     --name "$server_name" \
-    --microsoft-entra-auth Enabled \
-    --output none >/dev/null
-  wait_postgres_ready "$resource_group" "$server_name"
+    --query "authConfig.activeDirectoryAuth" -o tsv 2>/dev/null || true)
+  if [ "$current_entra_auth" != "Enabled" ]; then
+    az postgres flexible-server update \
+      --resource-group "$resource_group" \
+      --name "$server_name" \
+      --microsoft-entra-auth Enabled \
+      --output none >/dev/null
+    wait_postgres_ready "$resource_group" "$server_name"
+  else
+    echo "  Microsoft Entra ID authentication already enabled."
+  fi
 
   # Ensure the deploying user is registered as an Entra administrator.
   if [ -n "$entra_admin_object_id" ] && [ -n "$entra_admin_upn" ]; then

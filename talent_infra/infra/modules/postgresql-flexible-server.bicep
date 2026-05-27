@@ -79,6 +79,9 @@ param entraAdminPrincipalType string = 'User'
 @description('Tenant ID for Entra ID authentication. Defaults to the subscription tenant.')
 param entraTenantId string = subscription().tenantId
 
+@description('Create the initial Entra ID administrator as an ARM child resource. Disabled by default because PostgreSQL Flexible Server can reject administrator operations while newly-created servers are still settling; postprovision adds the administrator after restart/readiness checks.')
+param createEntraAdministratorResource bool = false
+
 @description('Tags for the resources')
 param tags object = {}
 
@@ -113,16 +116,15 @@ resource postgresqlServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-
   }
 }
 
-// First Entra ID administrator (idempotent — replays as no-op).
-// The deploying user (or a designated group) is added here so the
-// postprovision hook can connect with an Entra token and then provision
-// additional principals (container app managed identities, app users, etc.).
+// Optional first Entra ID administrator (idempotent — replays as no-op).
+// Disabled by default; the postprovision hook adds the deploying user after
+// restarting the server and waiting for the control plane to report Ready.
 //
 // dependsOn the config resources because PG flex server allows only ONE
 // data-plane operation at a time; if the admin PUT fires while azureExtensions
 // or sharedPreloadLibraries is still applying, it fails with
 // 'AadAuthOperationCannotBePerformedWhenServerIsNotAccessible'.
-resource entraAdministrator 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2023-12-01-preview' = if (enableEntraAuth && !empty(entraAdminObjectId)) {
+resource entraAdministrator 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2023-12-01-preview' = if (createEntraAdministratorResource && enableEntraAuth && !empty(entraAdminObjectId)) {
   parent: postgresqlServer
   name: entraAdminObjectId
   properties: {

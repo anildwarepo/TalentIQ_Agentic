@@ -201,7 +201,7 @@ class TalentIQOrchestrator:
             ),
             query_agent.as_tool(
                 name="handoff_to_query_agent",
-                description="Hand off to the Query Agent to search the talent graph for employees matching criteria.",
+                description="Hand off to the Query Agent to search the talent graph for employees matching explicit criteria. RFP/tender matching requires uploaded document context or previously extracted requirements.",
                 propagate_session=True,
             ),
             cv_agent.as_tool(

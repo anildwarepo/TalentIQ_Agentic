@@ -73,6 +73,10 @@ async def vector_search(
     - Multi-role searches: combine into ONE call separated by ' | ', set limit=25
     - Geographic filtering: pass countries=['Spain', 'Mexico'] to restrict results
 
+    Returns candidate details suitable for display: workday_id, name, email,
+    job_title, seniority, years of experience, location, bench status, skills,
+    certifications, resume summary, and similarity.
+
     Do NOT use for entity lookups (skills, certifications, countries, etc.)
     — use resolve_entities instead.
     Do NOT use when you already have resolved entity codes from resolve_entities
@@ -183,6 +187,7 @@ async def vector_search(
         results.append({
             "workday_id": wid,
             "name": row["name"],
+            "email": extra.get("email"),
             "job_title": row["job_title"],
             "skill_level": extra.get("skill_level"),
             "years_of_experience": extra.get("years_of_experience"),
@@ -228,13 +233,14 @@ async def _enrich_from_graph(pg, workday_ids: list[str]) -> dict[str, dict] | No
               WHERE e.workday_id IN [{','.join("'" + wid.replace("'", "") + "'" for wid in workday_ids)}]
               OPTIONAL MATCH (e)-[:LOCATED_IN]->(l:Location)-[:IN_COUNTRY]->(c:Country)
               WITH e.workday_id AS wid,
+                                     e.email AS email,
                    e.skill_level AS skill_level,
                    e.years_of_experience AS yoe,
                    e.is_bench AS is_bench,
                    l.city AS city,
                    c.name AS country
-              RETURN wid, skill_level, yoe, is_bench, city, country
-            $$) AS (wid ag_catalog.agtype, skill_level ag_catalog.agtype,
+                            RETURN wid, email, skill_level, yoe, is_bench, city, country
+                        $$) AS (wid ag_catalog.agtype, email ag_catalog.agtype, skill_level ag_catalog.agtype,
                     yoe ag_catalog.agtype, is_bench ag_catalog.agtype,
                     city ag_catalog.agtype, country ag_catalog.agtype)
         """
@@ -250,6 +256,7 @@ async def _enrich_from_graph(pg, workday_ids: list[str]) -> dict[str, dict] | No
             # AGE returns agtype values — strip quotes for strings
             wid = str(row["wid"]).strip('"')
             result[wid] = {
+                "email": _agtype_str(row.get("email")),
                 "skill_level": _agtype_str(row.get("skill_level")),
                 "years_of_experience": _agtype_int(row.get("yoe")),
                 "is_bench": _agtype_bool(row.get("is_bench")),

@@ -81,3 +81,6 @@ Architectural guardrail (decisions.md `2026-05-22T23:59:59Z`): **all `.ps1` file
 
 ## Cross-agent note - 2026-05-22T23:59:59.9Z (Scribe, from Bishop)
 - **UX rule for new `.ps1` deployers (decision `2026-05-22T23:59:59.9Z`).** Env-specific Azure resource names (subnets, NSGs, peering links, route tables, private endpoints, IP ranges) MUST use `-AlwaysPrompt` on `Get-ParameterValue`; platform invariants (PG version, SKU tier, admin login, region defaults) MUST NOT. Silent-bind to a param-block default is a foot-gun — force operator confirmation on anything that varies between environments.
+
+## Cross-agent note - 2026-05-26 (Scribe)
+- **Ripley planning artifact delivered for chat history (plan mode).** Scope includes current state, target architecture, phased implementation sequence, test strategy, risk register, and sprint order. Use this as the execution baseline for upcoming chat history implementation tasks.
