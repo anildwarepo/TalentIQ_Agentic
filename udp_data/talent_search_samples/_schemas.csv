@@ -1,0 +1,1524 @@
+table_catalog,table_schema,table_name,ordinal_position,column_name,full_data_type,is_nullable,comment
+luxoft_dev,datawarehouse_gld,gold_internal_mobility_data_gras,0,type,string,YES,Free text description
+luxoft_dev,datawarehouse_gld,gold_internal_mobility_data_gras,1,hrsys_rotation_id,string,YES,Unique identifier for employee rotation in HR system
+luxoft_dev,datawarehouse_gld,gold_internal_mobility_data_gras,2,etl_date,timestamp,YES,Timestamp of when the data was processed by ETL
+luxoft_dev,datawarehouse_gld,gold_internal_mobility_data_gras,3,etl_date2,timestamp,YES,Timestamp of data processing
+luxoft_dev,datawarehouse_gld,gold_internal_mobility_data_gras,4,profile_id,string,YES,Unique identifier for the profile
+luxoft_dev,datawarehouse_gld,gold_internal_mobility_data_gras,5,desired_location,string,YES,Desired job location
+luxoft_dev,datawarehouse_gld,gold_internal_mobility_data_gras,6,desired_country,string,YES,Desired country of residence or operation
+luxoft_dev,datawarehouse_gld,gold_internal_mobility_data_gras,7,ingest_ts,timestamp,YES,Timestamp when data was ingested
+luxoft_dev,datawarehouse_gld,gold_internal_mobility_data_gras,8,ingest_ts_offset,string,YES,Timestamp offset in string format
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,0,employee_id,string,YES,Unique identifier for the employee
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,1,location_id,string,YES,Unique identifier for location as a string
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,2,location,string,YES,Location name or identifier
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,3,country,string,YES,Country name
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,4,position_id,string,YES,Unique identifier for the position
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,5,position,string,YES,Employee job title or role
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,6,role_degree_id,string,YES,Role degree identifier
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,7,role_degree,string,YES,Role degree or level
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,8,role_id,string,YES,"Unique identifier for the role, in string format"
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,9,role,string,YES,Employee role or position
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,10,specialization_id,string,YES,Unique identifier for a specialization
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,11,specialization,string,YES,Professional specialization
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,12,business_unit_id,string,YES,Unique identifier for the business unit as a string
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,13,management_unit_id,string,YES,Unique identifier for management unit
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,14,is_on_public_internal_mobility,boolean,YES,Whether the employee is on public internal mobility
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,15,is_on_any_internal_mobility,boolean,YES,Whether the individual is on any internal mobility
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,16,about_employee,string,YES,Employee information
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,17,contact_id,string,YES,Unique identifier for the contact
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,18,employee_relocation_preferences_id,string,YES,Unique identifier for employee relocation preferences
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,19,imm_relocation_preferences_id,string,YES,Immigration relocation preferences identifier
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,20,chapter_id,string,YES,Unique identifier for the chapter
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,21,job_level,int,YES,Job level identifier
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,22,contact_email,string,YES,Contact's email address
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,23,etl_date,timestamp,YES,Timestamp when data was last processed by ETL
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,24,ingest_ts,timestamp,YES,Timestamp when data was ingested
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,25,ingest_ts_offset,string,YES,Timestamp offset for data ingest in string format
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,26,contact_type,string,YES,Type of contact
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,27,full_name_eng,string,YES,Full name in English
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,28,email,string,YES,Contact email address
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,29,region,string,YES,Geographic region as a string value
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,30,business_unit_name,string,YES,Name of the business unit
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee,31,business_unit_path,string,YES,Business unit hierarchical path
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_domain,0,employee_id,string,YES,Unique identifier for the employee
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_domain,1,business_domain_id,string,YES,Unique identifier for the business domain as a string
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_domain,2,domain_name,string,YES,Domain name of the entity
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_domain,3,proficiency,int,YES,Level of proficiency measured on a numerical scale
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_domain,4,experience_value,double,YES,Numerical value representing experience
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_domain,5,etl_date,timestamp,YES,Timestamp of when the data was processed by ETL
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_domain,6,ingest_ts,timestamp,YES,Timestamp when data was ingested
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_domain,7,ingest_ts_offset,string,YES,Timestamp offset in string format
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_language_proficiency,0,employee_id,string,YES,Unique identifier for the employee
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_language_proficiency,1,language_id,string,YES,Language identifier as a string
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_language_proficiency,2,language,string,YES,Language of the content
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_language_proficiency,3,language_proficiency_level_id,string,YES,Language proficiency level identifier
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_language_proficiency,4,code,string,YES,Code represented as a string
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_language_proficiency,5,level,int,YES,Level or tier identifier
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_language_proficiency,6,etl_date,timestamp,YES,Timestamp of when the data was last processed by ETL
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_language_proficiency,7,ingest_ts,timestamp,YES,Timestamp when data was ingested
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_language_proficiency,8,ingest_ts_offset,string,YES,Timestamp offset in string format
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_skill,0,employee_id,string,YES,Unique identifier for the employee
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_skill,1,skill_id,string,YES,Unique identifier for a skill
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_skill,2,skill_name,string,YES,Name of the skill
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_skill,3,proficiency,int,YES,Level of skill or competence measured on a numerical scale
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_skill,4,experience_value,double,YES,Numerical value representing experience
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_skill,5,last_used_year_value,int,YES,Most recent year the data was used
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_skill,6,etl_date,timestamp,YES,Timestamp of when the data was processed by ETL
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_skill,7,ingest_ts,timestamp,YES,Timestamp when data was ingested
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_employee_skill,8,ingest_ts_offset,string,YES,Timestamp offset in string format
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_job_experience,0,employee_id,string,YES,Unique identifier for the employee
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_job_experience,1,company_name,string,YES,Name of the company
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_job_experience,2,description,string,YES,Free text description
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_job_experience,3,start_date,timestamp,YES,Timestamp when the business event or record started
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_job_experience,4,end_date,timestamp,YES,Timestamp when the record ends
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_job_experience,5,role,string,YES,Employee role or position
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_job_experience,6,responsibilities,string,YES,Employee responsibilities or job duties
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_job_experience,7,customer,string,YES,Customer name or identifier
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_job_experience,8,etl_date,timestamp,YES,Timestamp of when the data was processed by ETL
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_job_experience,9,ingest_ts,timestamp,YES,Timestamp when data was ingested
+luxoft_dev,datawarehouse_gld,gold_luxskill_benchiq_job_experience,10,ingest_ts_offset,string,YES,Timestamp offset for data ingest in string format
+delivery_dev,service_project_management_gld,assignment_allocation,0,udp_update_utc_ts,timestamp,YES,
+delivery_dev,service_project_management_gld,assignment_allocation,1,udp_create_utc_ts,timestamp,YES,
+delivery_dev,service_project_management_gld,assignment_allocation,2,source_create_utc_ts,timestamp,YES,
+delivery_dev,service_project_management_gld,assignment_allocation,3,source_update_utc_ts,timestamp,YES,
+delivery_dev,service_project_management_gld,assignment_allocation,4,source_file_nm,string,YES,
+delivery_dev,service_project_management_gld,assignment_allocation,5,source_file_ts,timestamp,YES,
+delivery_dev,service_project_management_gld,assignment_allocation,6,resource_id,string,YES,
+delivery_dev,service_project_management_gld,assignment_allocation,7,assignment_id,string,YES,The primary key for this table
+delivery_dev,service_project_management_gld,assignment_allocation,8,resource_request_id,string,YES,
+delivery_dev,service_project_management_gld,assignment_allocation,9,hourly_bill_rate_usd_amt,"decimal(18,2)",YES,
+delivery_dev,service_project_management_gld,assignment_allocation,10,hourly_cost_rate_usd_amt,"decimal(18,2)",YES,
+delivery_dev,service_project_management_gld,assignment_allocation,11,allctn_hrs_qty,"decimal(38,18)",YES,
+delivery_dev,service_project_management_gld,assignment_allocation,12,allctn_yr_mth_id,int,YES,
+delivery_dev,service_project_management_gld,assignment_allocation,13,avail_hrs_qty,"decimal(38,6)",YES,
+delivery_dev,service_project_management_gld,assignment_allocation,14,allctn_fte_qty,"decimal(16,3)",YES,
+delivery_dev,service_project_management_gld,assignment_allocation,15,total_monthly_bill_rate_usd_amt,"decimal(18,2)",YES,
+delivery_dev,service_project_management_gld,assignment_allocation,16,total_monthly_cost_rate_usd_amt,"decimal(18,2)",YES,
+delivery_dev,service_project_management_gld,contact,0,id,string,YES,"Unique identifier, string data type.
+Alias: `Contact Record Identifier`
+key constraints: This column acts as primary key for the `contact` table"
+delivery_dev,service_project_management_gld,contact,1,delivery_role_id,string,YES,"Identifier for the delivery role, stored as a string.
+Alias: `Delivery Role Identifier`
+key constraints: `delivery_role_id` is a foreign key column in this table which refers to `delviery_role` table where the primary key column is `id`."
+delivery_dev,service_project_management_gld,contact,2,account_id,string,YES,"A string representing the unique identifier for an account.
+Alias: `Account Identifier`"
+delivery_dev,service_project_management_gld,contact,3,account_nm,string,YES,"Account name, represented as a string
+Alias: `Account Name`"
+delivery_dev,service_project_management_gld,contact,4,account_record_type_contact_nm,string,YES,"Type of contact record for the account
+Alias: `Account Record Type Contact Name`"
+delivery_dev,service_project_management_gld,contact,5,active_ind,boolean,YES,Indicator for active status; boolean data type
+delivery_dev,service_project_management_gld,contact,6,billable_external_hours_nbr,"decimal(16,2)",YES,"Decimal values representing billable external hours for a given entity.
+Alias: `Bill Able External Hours Number`"
+delivery_dev,service_project_management_gld,contact,7,billable_internal_hours_nbr,"decimal(16,2)",YES,"Records the number of billable internal hours as a decimal.
+Alias: `Bill Able Internal Hours Number`"
+delivery_dev,service_project_management_gld,contact,8,case_safe_id,string,YES,"A string representing a unique identifier for each record.
+Alias: `Case Safe Identifier`"
+delivery_dev,service_project_management_gld,contact,9,contact_full_nm,string,YES,"Contact's full name, string data type.
+Alias: `Contact Full Name`"
+delivery_dev,service_project_management_gld,contact,10,cost_centre_nm,string,YES,"Cost centre name, stored as a string.
+Alias: `Cost Centre Name`"
+delivery_dev,service_project_management_gld,contact,11,country_iso_cd,string,YES,"Country ISO code, string data type.
+Alias: `Country Iso Code`"
+delivery_dev,service_project_management_gld,contact,12,country_nm,string,YES,"Country name, stored as a string.
+Alias: `Country Name`"
+delivery_dev,service_project_management_gld,contact,13,created_by_employee_email_txt,string,YES,"The email address of the employee who created the record, stored as a string."
+delivery_dev,service_project_management_gld,contact,14,created_by_employee_nm,string,YES,"The username or ID of the employee who created the record, stored as a string.
+Alias: `Created By Employee Name`"
+delivery_dev,service_project_management_gld,contact,15,created_by_employee_reference_nbr,string,YES,"Employee reference number for the creator of the record.
+Alias: `Created By Employee Reference Number`"
+delivery_dev,service_project_management_gld,contact,16,created_by_id,string,YES,"Identifier for the creator of the record, stored as a string.
+Alias: `Created By Identifier`"
+delivery_dev,service_project_management_gld,contact,17,created_dt,timestamp,YES,"Timestamp indicating when a record was created.
+Alias: `Created Date`"
+delivery_dev,service_project_management_gld,contact,18,credited_non_billable_internal_hours_nbr,"decimal(16,2)",YES,"Records the number of non-billable hours credited for internal tasks, stored as a decimal value.
+Alias: `Credited Non Bill Able Internal Hours Number`"
+delivery_dev,service_project_management_gld,contact,19,currency_iso_cd,string,YES,"The ISO 4217 currency code represented as a string.
+Alias: `Currency ISO Code`"
+delivery_dev,service_project_management_gld,contact,20,current_time_period_id,string,YES,"Identifier for the current time period, stored as a string.
+Alias: `Current Time Period Identifier`"
+delivery_dev,service_project_management_gld,contact,21,current_time_period_nm,string,YES,"Contains the current time period label as a string.
+Alias: `Current Time Period Name`"
+delivery_dev,service_project_management_gld,contact,22,default_cost_rate_lc_amt,"decimal(38,18)",YES,"Default cost rate lower currency amount, represented as a decimal."
+delivery_dev,service_project_management_gld,contact,23,default_cost_rate_usd_amt,"decimal(18,2)",YES,"Default cost rate in USD, stored as a decimal value."
+delivery_dev,service_project_management_gld,contact,24,delivery_role_nm,string,YES,"Role related to order delivery, string value.
+Alias: `Delivery Role Name`"
+delivery_dev,service_project_management_gld,contact,25,email_txt,string,YES,"Text field containing email addresses.
+Alias: `Contact Email `"
+delivery_dev,service_project_management_gld,contact,26,exclude_from_resource_planner_ind,boolean,YES,Indicator flagging records to be excluded from resource planning (Boolean)
+delivery_dev,service_project_management_gld,contact,27,exclude_from_time_calculations_ind,boolean,YES,Indicator specifying whether to exclude data from time calculations (Boolean type)
+delivery_dev,service_project_management_gld,contact,28,excluded_hours_nbr,"decimal(16,2)",YES,"Excluded hours for non-branded activities (decimal)
+Alias: `Excluded Hours Number`"
+delivery_dev,service_project_management_gld,contact,29,external_resource_ind,boolean,YES,"Indicator for external resource usage, boolean data type."
+delivery_dev,service_project_management_gld,contact,30,first_name_local_nm,string,YES,"Local first name of the individual, represented as a string.
+Alias: `First Name Local Name`"
+delivery_dev,service_project_management_gld,contact,31,gdn_rsrc_ind,boolean,YES,"Indicator for garden resources, boolean data type."
+delivery_dev,service_project_management_gld,contact,32,generic_resource_ind,boolean,YES,"Indicator for generic resource usage, with boolean data type."
+delivery_dev,service_project_management_gld,contact,33,group_id,string,YES,"Identifier for a specific group, stored as a string.
+Alias: `Group Identifier`
+key constraints: `group_id` is a foreign key column in this table which refers to `pse_group` table where the primary key column is `id`."
+delivery_dev,service_project_management_gld,contact,34,hist_sch_utilization_billable_hours_nbr,"decimal(16,2)",YES,Historical school utilization - billable hours for a non-branded data type (DECIMAL)
+delivery_dev,service_project_management_gld,contact,35,hist_sch_utilization_credited_hours_nbr,"decimal(16,2)",YES,"Historical school utilization credited hours for non-branded data, stored as a decimal."
+delivery_dev,service_project_management_gld,contact,36,hist_sch_utilization_excluded_hours_nbr,"decimal(16,2)",YES,Historical school utilization excluded hours (decimal)
+delivery_dev,service_project_management_gld,contact,37,hist_sch_utilization_held_hours_nbr,"decimal(16,2)",YES,"Historical school utilization, measured in hours, for non-branded schools. Data type: DECIMAL."
+delivery_dev,service_project_management_gld,contact,38,hist_sch_utilization_non_billable_hrs_nbr,"decimal(16,2)",YES,Historical school non-billable hours (decimal)
+delivery_dev,service_project_management_gld,contact,39,hist_sch_utilization_pct,"decimal(38,18)",YES,"Historical school utilization percentage, stored as a decimal."
+delivery_dev,service_project_management_gld,contact,40,historical_utilization_billable_hours_nbr,"decimal(16,2)",YES,"Historical billable hours utilization for NBRA, stored as a decimal value.
+Alias: `Historical Utilization Bill Able Hours Number`"
+delivery_dev,service_project_management_gld,contact,41,historical_utilization_calendar_hours_nbr,"decimal(16,2)",YES,"Historical utilization rate in decimal format, based on calendar hours for the Nth brand.
+Alias: `Historical Utilization Calendar Hours Number`"
+delivery_dev,service_project_management_gld,contact,42,historical_utilization_credited_hours_nbr,"decimal(16,2)",YES,"Historical credited hours for utilization, represented as a decimal.
+Alias: `Historical Utilization Credited Hours Number`"
+delivery_dev,service_project_management_gld,contact,43,historical_utilization_excluded_hours_nbr,"decimal(16,2)",YES,"Historical utilization excluded hours for the Nth brand, represented as a decimal.
+Alias: `Historical Utilization Excluded Hours Number`"
+delivery_dev,service_project_management_gld,contact,44,historical_utilization_non_billable_hrs_nbr,"decimal(16,2)",YES,"Historical non-billable hours utilization, decimal
+Alias: `Historical Utilization Non Bill Able Hours Number`"
+delivery_dev,service_project_management_gld,contact,45,historical_utilization_pct,"decimal(38,18)",YES,"Historical utilization percentage, stored as a decimal.
+Alias: `Historical Utilization Percent`"
+delivery_dev,service_project_management_gld,contact,46,historical_utilization_target_attainment_pct,"decimal(38,18)",YES,"Historical utilization target attainment percentage (Decimal)
+Alias: `Historical Utilization Target Attainment Percent`"
+delivery_dev,service_project_management_gld,contact,47,historical_utilization_target_hours_nbr,"decimal(16,2)",YES,"Target hours of utilization for a brand (decimal)
+Alias: `Historical Utilization Target Hours Number`"
+delivery_dev,service_project_management_gld,contact,48,historical_utilization_target_pct,"decimal(38,18)",YES,"Historical utilization target percentage (DECIMAL)
+Alias: `Historical Utilization Target Percent`"
+delivery_dev,service_project_management_gld,contact,49,is_deleted_ind,boolean,YES,"Indicator flag denoting whether a record has been deleted (TRUE) or not (FALSE).
+Alias: `Is Record Logically Deleted?`"
+delivery_dev,service_project_management_gld,contact,50,is_resource_active_ind,boolean,YES,"Indicator flag denoting whether a resource is active or not, with boolean data type."
+delivery_dev,service_project_management_gld,contact,51,is_resource_id,boolean,YES,"Indicates if the record is a resource ID, with boolean data type.
+Alias: `Is Resource Identifier`"
+delivery_dev,service_project_management_gld,contact,52,job_cd,string,YES,"Job code as a string
+Alias: `Job Code`"
+delivery_dev,service_project_management_gld,contact,53,job_level_nm,string,YES,"Job level designation, represented as a string.
+Alias: `Job Level Name`"
+delivery_dev,service_project_management_gld,contact,54,last_modified_by_employee_email_txt,string,YES,"The email address of the employee who last modified the record.
+Alias: `Last Modified By Employee Email Text`"
+delivery_dev,service_project_management_gld,contact,55,last_modified_by_employee_nm,string,YES,"Name of the employee who last modified the data
+Alias: `Last Modified By Employee Name`"
+delivery_dev,service_project_management_gld,contact,56,last_modified_by_employee_reference_nbr,string,YES,"Employee reference number for the last modifier
+Alias: `Last Modified By Employee Reference Number`"
+delivery_dev,service_project_management_gld,contact,57,last_modified_by_id,string,YES,"Identifier for the user who last modified the record
+Alias: `Last Modified By Identifier`"
+delivery_dev,service_project_management_gld,contact,58,last_modified_dt,timestamp,YES,"Timestamp indicating the last modification of the respective data entry.
+Alias: `Last Modified Date`"
+delivery_dev,service_project_management_gld,contact,59,last_name_local_nm,string,YES,"Customer last name in local format, string data type.
+Alias: `Last Name Local Name`"
+delivery_dev,service_project_management_gld,contact,60,mailing_address_txt,string,YES,"Text field containing mailing address information.
+Alias: `Mailing Address Text`"
+delivery_dev,service_project_management_gld,contact,61,manager_nm,string,YES,"Name of the manager, string data type
+Alias: `Manager Name`"
+delivery_dev,service_project_management_gld,contact,62,manager_pern_nbr,string,YES,"Manager's personal number, stored as a string.
+Alias: `Manager Person Number`"
+delivery_dev,service_project_management_gld,contact,63,name_nm,string,YES,"Description: Specifies the contact or resource name.
+Alias: `Contact Name`"
+delivery_dev,service_project_management_gld,contact,64,non_billable_external_hours_nbr,"decimal(16,2)",YES,"Records non-billable hours spent on external tasks, stored as a decimal value.
+Alias: `Non Bill Able External Hours Number`"
+delivery_dev,service_project_management_gld,contact,65,non_billable_internal_hours_nbr,"decimal(16,2)",YES,"Records non-billable hours worked by internal staff, stored as a decimal data type.
+Alias: `Non Bill Able Internal Hours Number`"
+delivery_dev,service_project_management_gld,contact,66,pern_id,string,YES,"Employee ID in string format
+Alias: `Person Identifier`"
+delivery_dev,service_project_management_gld,contact,67,practice_id,string,YES,"Unique identifier for a practice session
+Alias: `Practice Identifier`
+key constraints: `practice_id` is a foreign key column in this table which refers to `pse_practice` table where the primary key column is `id`."
+delivery_dev,service_project_management_gld,contact,68,region_id,string,YES,"The region identifier, stored as a string.
+Alias: `Region Identifier`
+key constraints: `region_id` is a foreign key column in this table which refers to `pse_region` table where the primary key column is `id`."
+delivery_dev,service_project_management_gld,contact,69,resource_nm,string,YES,"The name of the resource, represented as a string.
+Alias: `Resource Name`"
+delivery_dev,service_project_management_gld,contact,70,resource_role_nm,string,YES,"Role name of the resource, string data type.
+Alias: `Resource Role Name`"
+delivery_dev,service_project_management_gld,contact,71,scheduled_utilization_billable_hours_nbr,"decimal(16,2)",YES,"Scheduled billable hours for the NBRAnd department, represented as a decimal value.
+Alias: `Scheduled Utilization Bill Able Hours Number`"
+delivery_dev,service_project_management_gld,contact,72,scheduled_utilization_calendar_hours_nbr,"decimal(16,2)",YES,"Scheduled utilization percentage during business hours for a given brand, represented as a decimal.
+Alias: `Scheduled Utilization Calendar Hours Number`"
+delivery_dev,service_project_management_gld,contact,73,scheduled_utilization_credited_hours_nbr,"decimal(16,2)",YES,"Scheduled utilization credited hours for a specific brand, stored as a decimal value.
+Alias: `Scheduled Utilization Credited Hours Number`"
+delivery_dev,service_project_management_gld,contact,74,scheduled_utilization_excluded_hours_nbr,"decimal(16,2)",YES,"Scheduled utilization excluded hours for a specific brand, stored as a decimal.
+Alias: `Scheduled Utilization Excluded Hours Number`"
+delivery_dev,service_project_management_gld,contact,75,scheduled_utilization_held_hours_nbr,"decimal(16,2)",YES,"Scheduled utilization held hours for the specified brand, stored as a decimal value.
+Alias: `Scheduled Utilization Held Hours Number`"
+delivery_dev,service_project_management_gld,contact,76,scheduled_utilization_non_billable_hrs_nbr,"decimal(16,2)",YES,"Scheduled non-billable hours for a non-billable resource, decimal data type.
+Alias: `Scheduled Utilization Non Bill Able Hours Number`"
+delivery_dev,service_project_management_gld,contact,77,scheduled_utilization_pct,"decimal(38,18)",YES,"Scheduled utilization percentage as a decimal
+Alias: `Scheduled Utilization Percent`"
+delivery_dev,service_project_management_gld,contact,78,scheduled_utilization_target_attainment_pct,"decimal(38,18)",YES,"Scheduled Utilization Target Attainment Percentage (Decimal)
+Alias: `Scheduled Utilization Target Attainment Percent`"
+delivery_dev,service_project_management_gld,contact,79,scheduled_utilization_target_hours_nbr,"decimal(16,2)",YES,"Scheduled utilization target hours for a specific brand, represented as a decimal value.
+Alias: `Scheduled Utilization Target Hours Number`"
+delivery_dev,service_project_management_gld,contact,80,scheduled_utilization_target_pct,"decimal(38,18)",YES,"Scheduled Utilization Target Percentage (Decimal)
+Alias: `Scheduled Utilization Target Percent`"
+delivery_dev,service_project_management_gld,contact,81,source_create_utc_ts,timestamp,YES,"Timestamp indicating when the data was created in the source system (UTC).
+Alias: `Source Create Utc Timestamp`"
+delivery_dev,service_project_management_gld,contact,82,source_file_nm,string,YES,"The name of the source file from which the data was extracted.
+Alias: `Source File Name`"
+delivery_dev,service_project_management_gld,contact,83,source_file_ts,timestamp,YES,"Timestamp indicating the source file's creation or modification time.
+Alias: `Source File Timestamp`"
+delivery_dev,service_project_management_gld,contact,84,source_system_cd,string,YES,"Code indicating the source system of the data.
+Alias: `Source System Code`"
+delivery_dev,service_project_management_gld,contact,85,source_update_utc_ts,timestamp,YES,"Timestamp of the source's last update in Coordinated Universal Time (UTC).
+Alias: `Source Update Utc Timestamp`"
+delivery_dev,service_project_management_gld,contact,86,system_mod_stamp_ts,timestamp,YES,Timestamp indicating the last system modification time.
+delivery_dev,service_project_management_gld,contact,87,title_txt,string,YES,"Textual data representing the title of a document or entry.
+Alias: `Contact Title`"
+delivery_dev,service_project_management_gld,contact,88,total_utilization_pct,"decimal(8,2)",YES,"Percentage of total utilization, stored as a decimal.
+Alias: `Total Utilization Percent`"
+delivery_dev,service_project_management_gld,contact,89,udp_create_utc_ts,timestamp,YES,UTC timestamp indicating when a record was created.
+delivery_dev,service_project_management_gld,contact,90,udp_update_utc_ts,timestamp,YES,Timestamp of the most recent UDP update (UTC).
+delivery_dev,service_project_management_gld,contact,91,utilization_calculation_ts,timestamp,YES,"Timestamp of utilization calculation
+Alias: `Utilization Calculation Timestamp`"
+delivery_dev,service_project_management_gld,contact,92,utilization_last_update_ts,timestamp,YES,"Timestamp of the last update to the utilization data.
+Alias: `Utilization Last Update Timestamp`"
+delivery_dev,service_project_management_gld,contact,93,utilization_last_updated_by_id,string,YES,"Identifier of the user who last updated the utilization data.
+Alias: `Utilization Last Updated By Identifier`"
+delivery_dev,service_project_management_gld,contact,94,utilization_target_attainment_pct,"decimal(8,2)",YES,"Percentage of attainment towards the utilization target.
+Alias: `Utilization Target Attainment Percent`"
+delivery_dev,service_project_management_gld,contact,95,utilization_target_average_pct,"decimal(8,2)",YES,"Average percentage of utilization target, decimal data type.
+Alias: `Utilization Target Average Percent`"
+delivery_dev,service_project_management_gld,contact,96,utilization_target_pct,"decimal(8,2)",YES,"Percentage of target utilization, decimal format
+Alias: `Utilization Target Percent`"
+delivery_dev,service_project_management_gld,contact,97,work_calendar_id,string,YES,"Identifier for work calendar, stored as a string.
+key constraints: `work_calendar_id` is a foreign key column in this table which refers to `pse_work_calendar` table where the primary key column is `id`."
+delivery_dev,service_project_management_gld,contact,98,worker_status_nm,string,YES,Employee employment status code or abbreviation.
+delivery_dev,service_project_management_gld,contact,99,start_dt,timestamp,YES,"Start date and time, TIMESTAMP data type."
+delivery_dev,service_project_management_gld,contact,100,last_dt,timestamp,YES,The last date and time at which the corresponding data was updated or processed.
+delivery_dev,service_project_management_gld,contact,101,sales_organization_lookup_id,string,YES,"Identifier for sales organization lookup, stored as a string."
+delivery_dev,service_project_management_gld,contact,102,original_pern_nbr,string,YES,"The original name of the brand, stored as a string."
+delivery_dev,service_project_management_gld,contact,103,intercompany_gsap_id,string,YES,"Intercompany GSAP identifier, stored as a string."
+delivery_dev,service_project_management_gld,contact,104,intercompany_pernr_nbr,string,YES,Intercompany personnel number in string format
+delivery_dev,service_project_management_gld,contact,105,record_type_id,string,YES,"Identifier for the type of record, stored as a string."
+delivery_dev,service_project_management_gld,contact,106,enabled_override_ind,boolean,YES,Indicator for enabled override status
+delivery_dev,service_project_management_gld,contact,107,psa_enabled_ind,boolean,YES,Indicator if PSA is enabled
+delivery_dev,service_project_management_gld,pse_assignment,0,id,string,YES,Unique identifier as a string
+delivery_dev,service_project_management_gld,pse_assignment,1,owner_id,string,YES,Unique identifier for the owner
+delivery_dev,service_project_management_gld,pse_assignment,2,is_deleted_ind,boolean,YES,Flag indicating whether record is deleted
+delivery_dev,service_project_management_gld,pse_assignment,3,name_nm,string,YES,Name in normal form
+delivery_dev,service_project_management_gld,pse_assignment,4,currency_iso_cd,string,YES,ISO 4217 currency code
+delivery_dev,service_project_management_gld,pse_assignment,5,created_dt,timestamp,YES,Timestamp when the record was created
+delivery_dev,service_project_management_gld,pse_assignment,6,created_by_id,string,YES,User ID of the creator
+delivery_dev,service_project_management_gld,pse_assignment,7,last_modified_dt,timestamp,YES,Timestamp of last modification
+delivery_dev,service_project_management_gld,pse_assignment,8,last_modified_by_id,string,YES,ID of the user who last modified the record
+delivery_dev,service_project_management_gld,pse_assignment,9,assignment_nbr,string,YES,Brand name assigned
+delivery_dev,service_project_management_gld,pse_assignment,10,bill_rate_lc_amt,"decimal(38,18)",YES,Bill rate in local currency amount
+delivery_dev,service_project_management_gld,pse_assignment,11,cost_rate_lc_amt,"decimal(38,18)",YES,Local currency cost rate amount
+delivery_dev,service_project_management_gld,pse_assignment,12,cost_rate_currency_cd,string,YES,Currency code for cost rate
+delivery_dev,service_project_management_gld,pse_assignment,13,description_dsc,string,YES,Concise description of the item
+delivery_dev,service_project_management_gld,pse_assignment,14,end_dt,date,YES,End date
+delivery_dev,service_project_management_gld,pse_assignment,15,is_billable_ind,boolean,YES,Indicator if the item is billable
+delivery_dev,service_project_management_gld,pse_assignment,16,percent_allocated_pct,"decimal(18,2)",YES,Percentage of total allocation
+delivery_dev,service_project_management_gld,pse_assignment,17,project_id,string,YES,Unique identifier for the project
+delivery_dev,service_project_management_gld,pse_assignment,18,resource_request_id,string,YES,Unique identifier for the resource request
+delivery_dev,service_project_management_gld,pse_assignment,19,resource_id,string,YES,Unique identifier for the resource as a string
+delivery_dev,service_project_management_gld,pse_assignment,20,role_nm,string,YES,Role name
+delivery_dev,service_project_management_gld,pse_assignment,21,schedule_id,string,YES,Unique identifier for the schedule
+delivery_dev,service_project_management_gld,pse_assignment,22,start_dt,date,YES,Start date
+delivery_dev,service_project_management_gld,pse_assignment,23,status_nm,string,YES,Current status of the entity
+delivery_dev,service_project_management_gld,pse_assignment,24,project_key,string,YES,Unique project identifier
+delivery_dev,service_project_management_gld,pse_assignment,25,resource_email_address2_txt,string,YES,Secondary email address
+delivery_dev,service_project_management_gld,pse_assignment,26,wbs_element_cd,string,YES,Work Breakdown Structure Element Code
+delivery_dev,service_project_management_gld,pse_assignment,27,project_wbs_cd,string,YES,Project Work Breakdown Structure code
+delivery_dev,service_project_management_gld,pse_assignment,28,resource_pern_nbr,string,YES,Brand name associated with the resource pern
+delivery_dev,service_project_management_gld,pse_assignment,29,system_mod_stamp_ts,timestamp,YES,Timestamp of last system modification
+delivery_dev,service_project_management_gld,pse_assignment,30,source_update_utc_ts,timestamp,YES,Timestamp of last update from source in UTC
+delivery_dev,service_project_management_gld,pse_assignment,31,source_create_utc_ts,timestamp,YES,Timestamp when the record was created in UTC
+delivery_dev,service_project_management_gld,pse_assignment,32,source_file_nm,string,YES,Name of the source file
+delivery_dev,service_project_management_gld,pse_assignment,33,source_file_ts,timestamp,YES,Timestamp of source file
+delivery_dev,service_project_management_gld,pse_assignment,34,udp_create_utc_ts,timestamp,YES,Timestamp when record was created in UTC
+delivery_dev,service_project_management_gld,pse_assignment,35,delivery_role_id,string,YES,Identifier for delivery role
+delivery_dev,service_project_management_gld,pse_assignment,36,job_level_nm,string,YES,Job level name
+delivery_dev,service_project_management_gld,pse_assignment,37,labor_type_id,string,YES,Labor type identifier
+delivery_dev,service_project_management_gld,pse_assignment,38,billable_amount_in_financials_lc_amt,"decimal(18,2)",YES,Billable amount in financials in local currency
+delivery_dev,service_project_management_gld,pse_assignment,39,billable_amount_submitted_lc_amt,"decimal(18,2)",YES,Billable amount submitted in local currency
+delivery_dev,service_project_management_gld,pse_assignment,40,billable_expenses_in_financials_lc_amt,"decimal(18,2)",YES,Total billable expenses in local currency
+delivery_dev,service_project_management_gld,pse_assignment,41,billable_expenses_submitted_lc_amt,"decimal(18,2)",YES,Total billable expenses submitted in local currency
+delivery_dev,service_project_management_gld,pse_assignment,42,billable_hours_in_financials_nbr,"decimal(14,2)",YES,Total billable hours recorded in financials
+delivery_dev,service_project_management_gld,pse_assignment,43,billable_hours_submitted_nbr,"decimal(14,2)",YES,Total billable hours submitted
+delivery_dev,service_project_management_gld,pse_assignment,44,closed_for_time_entry_ind,boolean,YES,Indicator if closed for time entry
+delivery_dev,service_project_management_gld,pse_assignment,45,estimated_time_to_completion_nbr,"decimal(8,2)",YES,Estimated time to completion in decimal format
+delivery_dev,service_project_management_gld,pse_assignment,46,exclude_from_billing_ind,boolean,YES,Flag indicating whether to exclude from billing
+delivery_dev,service_project_management_gld,pse_assignment,47,exclude_from_planners_ind,boolean,YES,Indicator for exclusion from planners
+delivery_dev,service_project_management_gld,pse_assignment,48,non_billable_expenses_in_financials_lc_amt,"decimal(18,2)",YES,Non-billable expenses amount in local currency
+delivery_dev,service_project_management_gld,pse_assignment,49,non_billable_expenses_submitted_lc_amt,"decimal(18,2)",YES,Non-billable expenses submitted amount in local currency
+delivery_dev,service_project_management_gld,pse_assignment,50,non_billable_hours_in_financials_nbr,"decimal(14,2)",YES,Total non-billable hours recorded in financials
+delivery_dev,service_project_management_gld,pse_assignment,51,non_billable_hours_submitted_nbr,"decimal(14,2)",YES,Total non-billable hours submitted
+delivery_dev,service_project_management_gld,pse_assignment,52,planned_bill_rate_lc_amt,"decimal(18,2)",YES,Planned bill rate in local currency amount
+delivery_dev,service_project_management_gld,pse_assignment,53,planned_hours_nbr,"decimal(12,2)",YES,Total planned hours for N brand
+delivery_dev,service_project_management_gld,pse_assignment,54,planned_revenue_lc_amt,"decimal(18,2)",YES,Planned revenue amount in local currency
+delivery_dev,service_project_management_gld,pse_assignment,55,projected_revenue_lc_amt,"decimal(18,2)",YES,Projected revenue amount in local currency
+delivery_dev,service_project_management_gld,pse_assignment,56,scheduled_days_nbr,"decimal(18,2)",YES,Number of days scheduled
+delivery_dev,service_project_management_gld,pse_assignment,57,scheduled_hours_nbr,"decimal(18,2)",YES,Total scheduled hours
+delivery_dev,service_project_management_gld,pse_assignment,58,assignments_estimate_to_completion_lc_amt,"decimal(18,2)",YES,Estimated total cost from assignment to completion in local currency
+delivery_dev,service_project_management_gld,pse_assignment,59,assignments_future_scheduled_hours_nbr,"decimal(18,2)",YES,Future scheduled hours for the brand
+delivery_dev,service_project_management_gld,pse_assignment,60,cross_charge_cost_rate_lc_amt,"decimal(16,2)",YES,Cross charge cost rate in local currency
+delivery_dev,service_project_management_gld,pse_assignment,61,days_until_end_date_nbr,"decimal(18,2)",YES,Number of days until end date
+delivery_dev,service_project_management_gld,pse_assignment,62,is_cross_charge_resource_ind,boolean,YES,Indicates if the resource is a cross-charge resource
+delivery_dev,service_project_management_gld,pse_assignment,63,projected_cost_lc_amt,"decimal(18,2)",YES,Projected cost in local currency
+delivery_dev,service_project_management_gld,pse_assignment,64,replicon_provisioning_status_nm,string,YES,Replicon provisioning status
+delivery_dev,service_project_management_gld,pse_assignment,65,replicon_status_message_dsc,string,YES,Replicon status message description
+delivery_dev,service_project_management_gld,pse_assignment,66,daily_bill_rate_ind,string,YES,Indicator for daily bill rate
+delivery_dev,service_project_management_gld,pse_assignment,67,suggested_bill_rate_currency_cd,string,YES,Currency code for suggested bill rate
+delivery_dev,service_project_management_gld,pse_assignment,68,suggested_bill_rate_amt,string,YES,Suggested bill rate amount
+delivery_dev,service_project_management_gld,pse_assignment,69,cross_charge_bill_rate_lc_amt,"decimal(18,2)",YES,Cross charge bill rate in local currency
+delivery_dev,service_project_management_gld,pse_assignment,70,hourly_bill_rate_lc_amt,"decimal(18,2)",YES,Local currency hourly billing rate
+delivery_dev,service_project_management_gld,pse_assignment,71,parent_wbs_cd,string,YES,Parent Work Breakdown Structure code
+delivery_dev,service_project_management_gld,pse_assignment,72,child_wbs_iwo_only_cd,string,YES,Child WBS code for IWO only
+delivery_dev,service_project_management_gld,pse_assignment,73,gdn_resource_ind,boolean,YES,Indicator for GDN resource
+delivery_dev,service_project_management_gld,pse_assignment,74,daily_cost_rate_ind,boolean,YES,Indicator for daily cost rate
+delivery_dev,service_project_management_gld,pse_assignment,75,billing_key_txt,string,YES,Text identifier for billing purposes
+delivery_dev,service_project_management_gld,pse_assignment,76,closed_for_expense_entry_ind,boolean,YES,Indicator if closed for expense entry
+delivery_dev,service_project_management_gld,pse_assignment,77,optimization_tag_nm,string,YES,Optimization tag name
+delivery_dev,service_project_management_gld,pse_assignment,78,automation_id,string,YES,Unique identifier for automation
+delivery_dev,service_project_management_gld,pse_assignment,79,optimization_effective_dt,string,YES,Date when optimization became effective
+delivery_dev,service_project_management_gld,pse_assignment,80,reference_assignment_nbr,string,YES,Brand assigned to the reference
+delivery_dev,service_project_management_gld,pse_assignment,81,udp_update_utc_ts,timestamp,YES,Timestamp of last update in UTC
+delivery_dev,service_project_management_gld,pse_assignment,82,delivery_role_nm,string,YES,"Name of the individual or entity, stored as a string."
+delivery_dev,service_project_management_gld,pse_assignment,83,labor_type_nm,string,YES,"Name of the individual or entity, stored as a string."
+delivery_dev,service_project_management_gld,pse_assignment,84,labor_type_erp_system_nm,string,YES,"Name of the SAP system, represented as a string."
+delivery_dev,service_project_management_gld,pse_assignment,85,assignment_owner_nm,string,YES,Name of the assignment owner
+delivery_dev,service_project_management_gld,pse_assignment,86,split_clone_record_ind,boolean,YES,Indicator for cloned record
+delivery_dev,service_project_management_gld,pse_assignment,87,created_by_employee_nm,string,YES,Employee who created the record
+delivery_dev,service_project_management_gld,pse_assignment,88,created_by_employee_reference_nbr,string,YES,Employee reference number of the creator
+delivery_dev,service_project_management_gld,pse_assignment,89,created_by_employee_email_txt,string,YES,Email of the employee who created the record
+delivery_dev,service_project_management_gld,pse_assignment,90,last_modified_by_employee_nm,string,YES,Employee who last modified the record
+delivery_dev,service_project_management_gld,pse_assignment,91,last_modified_by_employee_reference_nbr,string,YES,Employee reference number of the person who last modified the record
+delivery_dev,service_project_management_gld,pse_assignment,92,last_modified_by_employee_email_txt,string,YES,Email of the employee who last modified the record
+delivery_dev,service_project_management_gld,pse_assignment,93,resource_nm,string,YES,"Description: Specifies the contact or resource name.
+Alias: `Contact Name`"
+delivery_dev,service_project_management_gld,pse_assignment,94,resource_employee_reference_nbr,string,YES,"Employee ID in string format
+Alias: `Person Identifier`"
+delivery_dev,service_project_management_gld,pse_assignment,95,resource_email_txt,string,YES,"Text field containing email addresses.
+Alias: `Contact Email `"
+delivery_dev,service_project_management_gld,pse_assignment,96,bill_rate_usd_amt,"decimal(18,2)",YES,Bill rate in USD
+delivery_dev,service_project_management_gld,pse_assignment,97,cost_rate_usd_amt,"decimal(18,2)",YES,Cost rate in USD
+delivery_dev,service_project_management_gld,pse_assignment,98,billable_amount_in_financials_usd_amt,"decimal(18,2)",YES,Billable amount in USD
+delivery_dev,service_project_management_gld,pse_assignment,99,billable_amount_submitted_usd_amt,"decimal(18,2)",YES,Billable amount submitted in USD
+delivery_dev,service_project_management_gld,pse_assignment,100,billable_expenses_in_financials_usd_amt,"decimal(18,2)",YES,Total billable expenses in USD
+delivery_dev,service_project_management_gld,pse_assignment,101,billable_expenses_submitted_usd_amt,"decimal(18,2)",YES,Total billable expenses submitted in USD
+delivery_dev,service_project_management_gld,pse_assignment,102,non_billable_expenses_in_financials_usd_amt,"decimal(18,2)",YES,Non-billable expenses amount in USD
+delivery_dev,service_project_management_gld,pse_assignment,103,non_billable_expenses_submitted_usd_amt,"decimal(18,2)",YES,Non-billable expenses submitted amount in USD
+delivery_dev,service_project_management_gld,pse_assignment,104,planned_bill_rate_usd_amt,"decimal(18,2)",YES,Planned bill rate in USD
+delivery_dev,service_project_management_gld,pse_assignment,105,planned_revenue_usd_amt,"decimal(18,2)",YES,Planned revenue amount in USD
+delivery_dev,service_project_management_gld,pse_assignment,106,projected_revenue_usd_amt,"decimal(18,2)",YES,Projected revenue amount in USD
+delivery_dev,service_project_management_gld,pse_assignment,107,assignments_estimate_to_completion_usd_amt,"decimal(18,2)",YES,Estimated total cost in USD from assignment to completion
+delivery_dev,service_project_management_gld,pse_assignment,108,cross_charge_cost_rate_usd_amt,"decimal(18,2)",YES,Cross charge cost rate in USD
+delivery_dev,service_project_management_gld,pse_assignment,109,projected_cost_usd_amt,"decimal(18,2)",YES,Projected cost in USD
+delivery_dev,service_project_management_gld,pse_assignment,110,cross_charge_bill_rate_usd_amt,"decimal(18,2)",YES,Cross charge bill rate in USD
+delivery_dev,service_project_management_gld,pse_assignment,111,hourly_bill_rate_usd_amt,"decimal(18,2)",YES,Hourly bill rate in USD
+delivery_dev,service_project_management_gld,pse_assignment,112,hourly_cost_rate_usd_amt,"decimal(18,2)",YES,Hourly cost rate in USD
+delivery_dev,service_project_management_gld,pse_assignment,113,job_title_nm,string,YES,Job title name
+delivery_dev,service_project_management_gld,pse_assignment,114,assignment_owner_eml,string,YES,Owner of the assignment in EmLand
+delivery_dev,service_project_management_gld,pse_holidays,0,id,string,YES,Unique identifier as a string
+delivery_dev,service_project_management_gld,pse_holidays,1,owner_id,string,YES,Unique identifier for the owner
+delivery_dev,service_project_management_gld,pse_holidays,2,is_deleted_ind,boolean,YES,Flag indicating whether record is deleted
+delivery_dev,service_project_management_gld,pse_holidays,3,name_nm,string,YES,Name in normalized format
+delivery_dev,service_project_management_gld,pse_holidays,4,currency_iso_cd,string,YES,ISO 4217 currency code
+delivery_dev,service_project_management_gld,pse_holidays,5,created_dt,timestamp,YES,Timestamp when the record was created
+delivery_dev,service_project_management_gld,pse_holidays,6,created_by_id,string,YES,User ID of the creator
+delivery_dev,service_project_management_gld,pse_holidays,7,last_modified_dt,timestamp,YES,Timestamp of last modification
+delivery_dev,service_project_management_gld,pse_holidays,8,last_modified_by_id,string,YES,ID of the user who last modified the record
+delivery_dev,service_project_management_gld,pse_holidays,9,system_mod_stamp_ts,timestamp,YES,Timestamp of last system modification
+delivery_dev,service_project_management_gld,pse_holidays,10,last_viewed_dt,timestamp,YES,Timestamp of when the record was last viewed
+delivery_dev,service_project_management_gld,pse_holidays,11,last_referenced_dt,timestamp,YES,Timestamp of last reference
+delivery_dev,service_project_management_gld,pse_holidays,12,connection_received_id,string,YES,Unique identifier for the received connection
+delivery_dev,service_project_management_gld,pse_holidays,13,connection_sent_id,string,YES,Unique identifier for the sent connection
+delivery_dev,service_project_management_gld,pse_holidays,14,holiday_dt,timestamp,YES,Date of holiday in timestamp format
+delivery_dev,service_project_management_gld,pse_holidays,15,work_calendar_id,string,YES,Unique identifier for work calendar
+delivery_dev,service_project_management_gld,pse_holidays,16,work_hours_nbr,"decimal(4,2)",YES,Total work hours for brand N
+delivery_dev,service_project_management_gld,pse_holidays,17,source_create_utc_ts,timestamp,YES,Timestamp when the record was created in UTC
+delivery_dev,service_project_management_gld,pse_holidays,18,source_update_utc_ts,timestamp,YES,Timestamp of last update in UTC
+delivery_dev,service_project_management_gld,pse_holidays,19,source_file_nm,string,YES,Name of the source file
+delivery_dev,service_project_management_gld,pse_holidays,20,source_file_ts,timestamp,YES,Timestamp of source file
+delivery_dev,service_project_management_gld,pse_holidays,21,udp_create_utc_ts,timestamp,YES,Timestamp when record was created in UTC
+delivery_dev,service_project_management_gld,pse_holidays,22,udp_update_utc_ts,timestamp,YES,Timestamp of last update in UTC
+delivery_dev,service_project_management_gld,pse_holidays,23,work_calendar_nm,string,YES,"Name of the individual or entity, stored as a string."
+delivery_dev,service_project_management_gld,pse_holidays,24,created_by_employee_nm,string,YES,Employee who created the record
+delivery_dev,service_project_management_gld,pse_holidays,25,created_by_employee_reference_nbr,string,YES,Employee reference number of the creator
+delivery_dev,service_project_management_gld,pse_holidays,26,created_by_employee_email_txt,string,YES,Email of the employee who created the record
+delivery_dev,service_project_management_gld,pse_holidays,27,last_modified_by_employee_nm,string,YES,Employee name who last modified the record
+delivery_dev,service_project_management_gld,pse_holidays,28,last_modified_by_employee_reference_nbr,string,YES,Employee reference number of the last modifier
+delivery_dev,service_project_management_gld,pse_holidays,29,last_modified_by_employee_email_txt,string,YES,Email of the employee who last modified the record
+delivery_dev,service_project_management_gld,pse_practice,0,current_time_period_nm,string,YES,"Contains the current time period label as a string.
+Alias: `Current Time Period Name`"
+delivery_dev,service_project_management_gld,pse_practice,1,id,string,YES,"Unique identifier, string data type.
+Alias: `Identifier`
+key constraints: This column acts as primary key for the `pse_practice` table"
+delivery_dev,service_project_management_gld,pse_practice,2,owner_id,string,YES,"The unique identifier for the owner, stored as a string.
+Alias: `Owner Identifier`"
+delivery_dev,service_project_management_gld,pse_practice,3,is_deleted_ind,boolean,YES,Description: Indicates whether the record is deleted or not.
+delivery_dev,service_project_management_gld,pse_practice,4,name_nm,string,YES,"Description: Specifies the practice name for the given practice level.
+If hierarchy_depth_nbr = 0 then this column contains ""Organization"" data.
+If hierarchy_depth_nbr = 1 then this column contains ""External Service"" or ""Services - Level 1"" or ""Segment"" data.
+If hierarchy_depth_nbr = 2 then this column contains ""Internal Services"" or ""Services - Level 2"" data.
+If hierarchy_depth_nbr = 3 then this column contains ""Simplified Offering"" or ""Offering"" data.
+If hierarchy_depth_nbr = 4 then this column contains ""Delivery Capabilities"" or ""Major Offering"" data.
+If hierarchy_depth_nbr = 5 then this column contains "" Sub Offering"" or ""Sub Capability"" data."
+delivery_dev,service_project_management_gld,pse_practice,5,created_dt,timestamp,YES,"Timestamp indicating when a record was created.
+Alias: `Created Date`"
+delivery_dev,service_project_management_gld,pse_practice,6,created_by_id,string,YES,"The unique identifier of the user who created the record, stored as a string.
+Alias: `Created By Identifier`"
+delivery_dev,service_project_management_gld,pse_practice,7,last_modified_dt,timestamp,YES,"Timestamp indicating the last modification of the respective data entry.
+Alias: `Last Modified Date`"
+delivery_dev,service_project_management_gld,pse_practice,8,last_modified_by_id,string,YES,"Identifier for the user who last modified the record
+Alias: `Last Modified By Identifier`"
+delivery_dev,service_project_management_gld,pse_practice,9,parent_practice_id,string,YES,"Identifier for the parent practice, stored as a string.
+Alias: `Parent Practice Identifier`
+key constraints: This column values refers to `parent_pratice_id` for the given `practice_id` value in this table."
+delivery_dev,service_project_management_gld,pse_practice,10,hierarchy_depth_nbr,int,YES,"Number of levels in the brand hierarchy
+Alias: `Hierarchy Depth Number`"
+delivery_dev,service_project_management_gld,pse_practice,11,active_ind,boolean,YES,Description:Indicates whether the record is active or not.
+delivery_dev,service_project_management_gld,pse_practice,12,system_mod_stamp_ts,timestamp,YES,Timestamp indicating the last system modification time.
+delivery_dev,service_project_management_gld,pse_practice,13,source_update_utc_ts,timestamp,YES,"Timestamp of the source's last update in Coordinated Universal Time (UTC).
+Alias: `Source Update Utc Timestamp`"
+delivery_dev,service_project_management_gld,pse_practice,14,source_create_utc_ts,timestamp,YES,"Timestamp indicating when the data was created in the source system (UTC).
+Alias: `Source Create Utc Timestamp`"
+delivery_dev,service_project_management_gld,pse_practice,15,source_file_nm,string,YES,"The name of the source file from which the data was extracted.
+Alias: `Source File Name`"
+delivery_dev,service_project_management_gld,pse_practice,16,source_file_ts,timestamp,YES,"Timestamp indicating the source file's creation or modification time.
+Alias: `Source File Timestamp`"
+delivery_dev,service_project_management_gld,pse_practice,17,udp_create_utc_ts,timestamp,YES,UTC timestamp for when the record was created.
+delivery_dev,service_project_management_gld,pse_practice,18,billable_external_hour_nbr,"decimal(16,2)",YES,"Hourly billable rate for external clients (decimal)
+Alias: `Bill Able External Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,19,billable_internal_hour_nbr,"decimal(16,2)",YES,"Hourly internal billable rate, represented as a decimal.
+Alias: `Bill Able Internal Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,20,credited_non_billable_internal_hour_nbr,"decimal(16,2)",YES,"Decimal values representing credited non-billable internal hours for a specific brand.
+Alias: `Credited Non Bill Able Internal Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,21,excluded_hour_nbr,"decimal(16,2)",YES,"Excluded hour-based data for a specific brand, stored as a decimal value.
+Alias: `Excluded Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,22,hist_sch_utilization_billable_hour_nbr,"decimal(16,2)",YES,"Historical school billable hour utilization by brand, decimal data type."
+delivery_dev,service_project_management_gld,pse_practice,23,hist_sch_utilization_credited_hour_nbr,"decimal(16,2)",YES,"Historical school utilization credited hours, decimal data type"
+delivery_dev,service_project_management_gld,pse_practice,24,hist_sch_utilization_excluded_hour_nbr,"decimal(16,2)",YES,"Historical school utilization excluded hour numerator, decimal data type"
+delivery_dev,service_project_management_gld,pse_practice,25,hist_sch_utilization_held_hour_nbr,"decimal(16,2)",YES,"Historical school utilization rate for a given hour, represented as a decimal."
+delivery_dev,service_project_management_gld,pse_practice,26,hist_sch_utilization_non_billable_hr_nbr,"decimal(16,2)",YES,"Historical school utilization rate for non-billable hours, decimal data type"
+delivery_dev,service_project_management_gld,pse_practice,27,historical_utilization_billable_hour_nbr,"decimal(16,2)",YES,"Historical billable hour utilization by brand, stored as a decimal.
+Alias: `Historical Utilization Bill Able Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,28,historical_utilization_calendar_hour_nbr,"decimal(16,2)",YES,"Historical utilization rate per calendar hour for a specific brand, represented as a decimal.
+Alias: `Historical Utilization Calendar Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,29,historical_utilization_credited_hour_nbr,"decimal(16,2)",YES,"Historical credited hourly utilization, stored as a decimal.
+Alias: `Historical Utilization Credited Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,30,historical_utilization_excluded_hour_nbr,"decimal(16,2)",YES,"Historical utilization excluded hour-based decimal data
+Alias: `Historical Utilization Excluded Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,31,historical_utilization_non_billable_hr_nbr,"decimal(16,2)",YES,"Historical non-billable hours utilization rate (decimal).
+Alias: `Historical Utilization Non Bill Able Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,32,historical_utilization_target_hour_nbr,"decimal(16,2)",YES,"Historical target hourly utilization for a given brand, represented as a decimal.
+Alias: `Historical Utilization Target Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,33,historical_utilization_target_pct,"decimal(38,18)",YES,"Historical utilization target percentage (DECIMAL)
+Alias: `Historical Utilization Target Percent`"
+delivery_dev,service_project_management_gld,pse_practice,34,historical_utilization_pct,"decimal(8,2)",YES,"Historical utilization percentage, stored as a decimal.
+Alias: `Historical Utilization Percent`"
+delivery_dev,service_project_management_gld,pse_practice,35,non_billable_external_hour_nbr,"decimal(16,2)",YES,"Non-billable external hours (decimal)
+Alias: `Non Bill Able External Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,36,non_billable_internal_hour_nbr,"decimal(16,2)",YES,"Non-billable internal hours (decimal)
+Alias: `Non Bill Able Internal Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,37,planned_utilization_pct,"decimal(3,2)",YES,"Planned utilization percentage, stored as a decimal data type.
+Alias: `Planned Utilization Percent`"
+delivery_dev,service_project_management_gld,pse_practice,38,scheduled_utilization_billable_hour_nbr,"decimal(16,2)",YES,"Scheduled billable hours for the brand, represented as a decimal.
+Alias: `Scheduled Utilization Bill Able Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,39,scheduled_utilization_calendar_hour_nbr,"decimal(18,2)",YES,"Scheduled utilization percentage for a specific calendar hour and brand, stored as a decimal.
+Alias: `Scheduled Utilization Calendar Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,40,scheduled_utilization_credited_hour_nbr,"decimal(16,2)",YES,"Scheduled utilization credited hours (decimal)
+Alias: `Scheduled Utilization Credited Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,41,scheduled_utilization_excluded_hour_nbr,"decimal(16,2)",YES,"Scheduled utilization excluded hour-based decimal data
+Alias: `Scheduled Utilization Excluded Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,42,scheduled_utilization_held_hour_nbr,"decimal(16,2)",YES,"Scheduled utilization held per hour for a specific brand, represented as a decimal.
+Alias: `Scheduled Utilization Held Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,43,scheduled_utilization_non_billable_hr_nbr,"decimal(16,2)",YES,"Scheduled non-billable hours utilization rate for a brand, represented as a decimal.
+Alias: `Scheduled Utilization Non Bill Able Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,44,scheduled_utilization_target_hour_nbr,"decimal(16,2)",YES,"Scheduled utilization target for a specific hour (decimal)
+Alias: `Scheduled Utilization Target Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,45,scheduled_utilization_target_pct,"decimal(38,18)",YES,"Scheduled Utilization Target Percentage (Decimal)
+Alias: `Scheduled Utilization Target Percent`"
+delivery_dev,service_project_management_gld,pse_practice,46,scheduled_utilization_pct,"decimal(8,2)",YES,"Scheduled utilization percentage as a decimal value.
+Alias: `Scheduled Utilization Percent`"
+delivery_dev,service_project_management_gld,pse_practice,47,total_utilization_pct,"decimal(8,2)",YES,"Percentage of total utilization, stored as a decimal.
+Alias: `Total Utilization Percent`"
+delivery_dev,service_project_management_gld,pse_practice,48,utilization_calculation_ts,timestamp,YES,"Timestamp of utilization calculation
+Alias: `Utilization Calculation Timestamp`"
+delivery_dev,service_project_management_gld,pse_practice,49,utilization_period_end_ts,timestamp,YES,"Timestamp indicating the end of a utilization period, data type TIMESTAMP
+Alias: `Utilization Period End Timestamp`"
+delivery_dev,service_project_management_gld,pse_practice,50,utilization_period_start_ts,timestamp,YES,"Timestamp indicating the start of the utilization period, data type TIMESTAMP
+Alias: `Utilization Period Start Timestamp`"
+delivery_dev,service_project_management_gld,pse_practice,51,utilization_target_hour_nbr,"decimal(16,2)",YES,"Target hourly utilization for a specific brand, expressed as a decimal.
+Alias: `Utilization Target Hour Number`"
+delivery_dev,service_project_management_gld,pse_practice,52,utilization_target_pct,"decimal(38,18)",YES,"Target utilization percentage as a decimal.
+Alias: `Utilization Target Percent`"
+delivery_dev,service_project_management_gld,pse_practice,53,exclude_from_utilization_ind,boolean,YES,Indicator for exclusion from utilization calculation (Boolean)
+delivery_dev,service_project_management_gld,pse_practice,54,current_time_period_id,string,YES,"Identifier for the current time period, stored as a string.
+Alias: `Current Time Period Identifier`"
+delivery_dev,service_project_management_gld,pse_practice,55,udp_update_utc_ts,timestamp,YES,Timestamp of the most recent UDP update (UTC).
+delivery_dev,service_project_management_gld,pse_practice,56,practice_level_0_id,string,YES,"Identifier for the initial practice level, stored as a string.
+Alias: `Practice Level 0 Identifier`"
+delivery_dev,service_project_management_gld,pse_practice,57,practice_level_1_id,string,YES,"Identifier for Level 1 of practice, stored as a string.
+Alias: `Practice Level 1 Identifier`"
+delivery_dev,service_project_management_gld,pse_practice,58,practice_level_2_id,string,YES,"Identifier for Level 2 of practice, stored as a string.
+Alias: `Practice Level 2 Identifier`"
+delivery_dev,service_project_management_gld,pse_practice,59,practice_level_3_id,string,YES,"Identifier for Level 3 practice sessions, stored as a string.
+Alias: `Practice Level 3 Identifier`"
+delivery_dev,service_project_management_gld,pse_practice,60,practice_level_4_id,string,YES,"Identifier for Practice Level 4, stored as a string.
+Alias: `Practice Level 4 Identifier`"
+delivery_dev,service_project_management_gld,pse_practice,61,practice_level_5_id,string,YES,"Identifier for Practice Level 5, stored as a string.
+Alias: `Practice Level 5 Identifier`"
+delivery_dev,service_project_management_gld,pse_practice,62,practice_level_0_nm,string,YES,"Description: Specifies the Name of Organization - DXC
+Alias: `Practice Level 0 Name`"
+delivery_dev,service_project_management_gld,pse_practice,63,practice_level_1_nm,string,YES,"Description: Practice Level 1 name is also known as External Service or Services - Level 1 or Segment which is a simplified list of the services that DXC communicates to external customers and the market within the two segments of GIS and GBS.
+Alias: `Practice Level 1 Name`"
+delivery_dev,service_project_management_gld,pse_practice,64,practice_level_2_nm,string,YES,"Description: Practice Level 2 name is also know as Internal Services or Services - Level 2 are a slightly expanded list of services that the are used internally within DXC. They provide DXC leaders and organizations an ability to apply additional focus on critical subsets of the broader External Service areas.
+Some sample values:
+CES = `Consulting & Engineering Services`
+ITO = `IT Outsourcing`
+
+Alias: `Practice Level 2 Name`"
+delivery_dev,service_project_management_gld,pse_practice,65,practice_level_3_nm,string,YES,"Description: Practice Level 3 name is also known as Simplified Offering or Offering.  Simplified Offering layer of the taxonomy identifies key areas where DXC can have discussions with customers about what it offers them to help manage and transform their business. It is at the Offering layer that DXC has the value discussion with our customers. Offerings are all about sales and account conversations about the value DXC can bring to the customers business.
+Alias: `Practice Level 3 Name`"
+delivery_dev,service_project_management_gld,pse_practice,66,practice_level_4_nm,string,YES,"Description: Practice Level 4 name is also known Delivery Capabilities layer or Major Offering. This layer of offering of the taxonomy organizes the underlying people, process, and technology that DXC manages in order to deliver value to the customers in support of the value propositions that are described at the Offering layer.
+Each Simplified Offerings has one or more Delivery Capabilities that are needed to deliver value promised to DXC customers. Delivery Capabilities enable DXC to define and contract specific solutions for our customers, and manage the delivery of those contracted commitments.
+Alias: `Practice Level 4 Name`"
+delivery_dev,service_project_management_gld,pse_practice,67,practice_level_5_nm,string,YES,"Description: Practice Level 5 name is also known Sub Offering or Sub Capability that captures the additional level of detail for a delivery capability. A Sub Offering often defines a technical variation, but it may also define any selectable feature or functionality that requires tailoring for the customer’s needs.
+What distinguishes a sub offering from a capability is the need for additional, separate solution and delivery kit collateral, especially if the component needs a separate cost model and solution pack.
+Alias: `Practice Level 5 Name`"
+delivery_dev,service_project_management_gld,pse_practice,68,created_by_employee_nm,string,YES,"The username or ID of the employee who created the record, stored as a string.
+Alias: `Created By Employee Name`"
+delivery_dev,service_project_management_gld,pse_practice,69,created_by_employee_reference_nbr,string,YES,"Employee reference number for the creator of the record.
+Alias: `Created By Employee Reference Number`"
+delivery_dev,service_project_management_gld,pse_practice,70,created_by_employee_email_txt,string,YES,"The email address of the employee who created the record, stored as a string."
+delivery_dev,service_project_management_gld,pse_practice,71,last_modified_by_employee_nm,string,YES,"Name of the employee who last modified the record, stored as a string.
+Alias: `Last Modified By Employee Name`"
+delivery_dev,service_project_management_gld,pse_practice,72,last_modified_by_employee_reference_nbr,string,YES,"Employee reference number for the last modifier
+Alias: `Last Modified By Employee Reference Number`"
+delivery_dev,service_project_management_gld,pse_practice,73,last_modified_by_employee_email_txt,string,YES,"The email address of the employee who last modified the record.
+Alias: `Last Modified By Employee Email Text`"
+delivery_dev,service_project_management_gld,pse_practice,74,external_id,string,YES,A string representing the external ID for a given record.
+delivery_dev,service_project_management_gld,pse_project,0,id,string,YES,"Unique identifier, string data type."
+delivery_dev,service_project_management_gld,pse_project,1,owner_id,string,YES,"The unique identifier for the owner, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,2,is_deleted_ind,boolean,YES,Indicator flag denoting whether a record has been deleted (TRUE) or not (FALSE).
+delivery_dev,service_project_management_gld,pse_project,3,name_nm,string,YES,"Name of the individual or entity, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,4,currency_iso_cd,string,YES,The ISO 4217 currency code represented as a string.
+delivery_dev,service_project_management_gld,pse_project,5,created_dt,timestamp,YES,Timestamp indicating when a record was created.
+delivery_dev,service_project_management_gld,pse_project,6,created_by_id,string,YES,"Identifier for the creator of the record, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,7,last_modified_dt,timestamp,YES,Timestamp indicating the last modification of the respective data entry.
+delivery_dev,service_project_management_gld,pse_project,8,last_modified_by_id,string,YES,Identifier for the user who last modified the record
+delivery_dev,service_project_management_gld,pse_project,9,account_id,string,YES,"The unique identifier for an account, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,10,billing_type_txt,string,YES,Text representation of the billing type.
+delivery_dev,service_project_management_gld,pse_project,11,end_dt,date,YES,"End date of a business event or period, stored in DATE data type."
+delivery_dev,service_project_management_gld,pse_project,12,group_id,string,YES,"Identifier for a group, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,13,is_active_ind,boolean,YES,"Indicator flag denoting whether a business entity is currently active or inactive, with BOOLEAN data type representing true for active and false for inactive."
+delivery_dev,service_project_management_gld,pse_project,14,is_billable_ind,boolean,YES,Indicates if the item is billable (true) or not (false)
+delivery_dev,service_project_management_gld,pse_project,15,master_project_nm,string,YES,"Name of the master project, string value."
+delivery_dev,service_project_management_gld,pse_project,16,opportunity_id,string,YES,"Unique identifier for an opportunity, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,17,parent_project_id,string,YES,"Identifier for the parent project, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,18,practice_id,string,YES,A string representing a unique identifier for a practice.
+delivery_dev,service_project_management_gld,pse_project,19,project_id,string,YES,"Identifier for projects, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,20,project_manager_id,string,YES,"Identifier for the project manager, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,21,project_status_nm,string,YES,Project status code represented as a string.
+delivery_dev,service_project_management_gld,pse_project,22,project_type_nm,string,YES,"Type of project, string value."
+delivery_dev,service_project_management_gld,pse_project,23,region_id,string,YES,"Identifier for a geographical region, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,24,stage_nm,string,YES,"Stage name, string data type"
+delivery_dev,service_project_management_gld,pse_project,25,start_dt,date,YES,"Start date of the event or transaction, stored in DATE data type."
+delivery_dev,service_project_management_gld,pse_project,26,account_nm,string,YES,"The name of the account, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,27,c1_wbs_code_2_cd,string,YES,A string representing the Work Breakdown Structure (WBS) code for category 2.
+delivery_dev,service_project_management_gld,pse_project,28,c1_wbs_code_3_cd,string,YES,Alphanumeric code representing the third level Work Breakdown Structure (WBS) for a project or business unit.
+delivery_dev,service_project_management_gld,pse_project,29,c1_wbs_cd,string,YES,A string representing the Work Breakdown Structure code.
+delivery_dev,service_project_management_gld,pse_project,30,country_nm,string,YES,"Country name, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,31,dxc_sales_opportunity_id,string,YES,"Unique identifier for sales opportunities in the Xcelsius system, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,32,gsap_project_type_cd,string,YES,"Indicates the type of project in GSAP, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,33,gsap_project_wbs_element_cd,string,YES,"Code for GSAP project WBS element, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,34,gsap_wbs_cd,string,YES,A string representing the GSAP WBS code.
+delivery_dev,service_project_management_gld,pse_project,35,ic_wbs_cd,string,YES,Code representing the work breakdown structure (WBS) for a project or initiative. String data type.
+delivery_dev,service_project_management_gld,pse_project,36,integration_status_nm,string,YES,"Indicates the integration status of a particular record, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,37,project_approver_id,string,YES,"Identifies the approver for a specific project, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,38,sap_system_nm,string,YES,"Business description for the SAP system ID, string data type."
+delivery_dev,service_project_management_gld,pse_project,39,contract_model_txt,string,YES,Textual description of the contract model
+delivery_dev,service_project_management_gld,pse_project,40,opportunity_line_item_id,string,YES,"Identifier for Opportunity Line Item, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,41,product_nm,string,YES,"Product name, string data type"
+delivery_dev,service_project_management_gld,pse_project,42,solution_type_nm,string,YES,"Type of solution, represented as a string."
+delivery_dev,service_project_management_gld,pse_project,43,project_definition_txt,string,YES,"Project definition text, string data type"
+delivery_dev,service_project_management_gld,pse_project,44,system_mod_stamp_ts,timestamp,YES,Timestamp indicating the last system modification.
+delivery_dev,service_project_management_gld,pse_project,45,planned_hours_nbr,"decimal(18,2)",YES,"Planned hours for a project or task, represented as a decimal value."
+delivery_dev,service_project_management_gld,pse_project,46,source_update_utc_ts,timestamp,YES,Timestamp of the source's last update in Coordinated Universal Time (UTC).
+delivery_dev,service_project_management_gld,pse_project,47,source_create_utc_ts,timestamp,YES,Timestamp indicating when the data was created in the source system (UTC).
+delivery_dev,service_project_management_gld,pse_project,48,source_file_nm,string,YES,The name of the source file from which the data was extracted.
+delivery_dev,service_project_management_gld,pse_project,49,source_file_ts,timestamp,YES,Timestamp indicating the source file's creation or modification time.
+delivery_dev,service_project_management_gld,pse_project,50,udp_create_utc_ts,timestamp,YES,UTC timestamp of when the record was created.
+delivery_dev,service_project_management_gld,pse_project,51,action_update_current_time_period_ind,string,YES,"Indicator for the current time period of an action update, represented as a string."
+delivery_dev,service_project_management_gld,pse_project,52,billable_external_hours_nbr,"decimal(18,2)",YES,Decimal values representing billable external hours for a given entity.
+delivery_dev,service_project_management_gld,pse_project,53,billable_internal_hours_nbr,"decimal(18,2)",YES,Records billable internal hours (decimal) for a company's operations.
+delivery_dev,service_project_management_gld,pse_project,54,billings_lc_amt,"decimal(18,2)",YES,Billing amount in decimal format
+delivery_dev,service_project_management_gld,pse_project,55,bookings_lc_amt,"decimal(18,2)",YES,Represents booking amounts in decimal format.
+delivery_dev,service_project_management_gld,pse_project,56,credited_non_billable_internal_hours_nbr,"decimal(18,2)",YES,"Records internal hours credited to non-billable tasks, stored as a decimal value."
+delivery_dev,service_project_management_gld,pse_project,57,current_time_period_id,string,YES,"Identifier for the current time period, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,58,estimated_hours_at_completion_nbr,"decimal(18,2)",YES,"Estimated hours spent on completion for a specific brand, stored as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,59,excluded_hours_nbr,"decimal(18,2)",YES,Excluded hours for non-branded activities (decimal)
+delivery_dev,service_project_management_gld,pse_project,60,expense_budget_lc_amt,"decimal(18,2)",YES,Budgeted expense amount in decimal format
+delivery_dev,service_project_management_gld,pse_project,61,expense_costs_lc_amt,"decimal(18,2)",YES,Represents expense costs in decimal format.
+delivery_dev,service_project_management_gld,pse_project,62,external_costs_lc_amt,"decimal(18,2)",YES,Represents external costs amount in decimal format.
+delivery_dev,service_project_management_gld,pse_project,63,financial_status_txt,string,YES,Textual representation of a financial status.
+delivery_dev,service_project_management_gld,pse_project,64,hours_cut_off_dt,date,YES,Date representing the cut-off time for business hours.
+delivery_dev,service_project_management_gld,pse_project,65,internal_budget_lc_amt,"decimal(18,2)",YES,"Internal budget lower limit amount, represented as a decimal value."
+delivery_dev,service_project_management_gld,pse_project,66,internal_costs_lc_amt,"decimal(18,2)",YES,Represents internal costs in decimal format.
+delivery_dev,service_project_management_gld,pse_project,67,invoiced_lc_amt,"decimal(18,2)",YES,"Represents the invoice amount in local currency, stored as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,68,margin_lc_amt,"decimal(18,2)",YES,Represents the lower confidence limit for the margin of error in decimal format.
+delivery_dev,service_project_management_gld,pse_project,69,non_billable_external_hours_nbr,"decimal(18,2)",YES,"Records non-billable hours spent on external tasks, stored as a decimal value."
+delivery_dev,service_project_management_gld,pse_project,70,non_billable_internal_hours_nbr,"decimal(18,2)",YES,Records non-billable internal hours (decimal) for a specific brand.
+delivery_dev,service_project_management_gld,pse_project,71,other_costs_lc_amt,"decimal(18,2)",YES,Represents other costs amount in decimal format.
+delivery_dev,service_project_management_gld,pse_project,72,pass_through_billings_lc_amt,"decimal(18,2)",YES,Amount of pass-through billings in decimal format.
+delivery_dev,service_project_management_gld,pse_project,73,pre_billed_lc_amt,"decimal(18,2)",YES,Pre-billed local currency amount (decimal)
+delivery_dev,service_project_management_gld,pse_project,74,schedule_status_txt,string,YES,Text representation of a schedule status.
+delivery_dev,service_project_management_gld,pse_project,75,scheduled_hours_remaining_nbr,"decimal(18,2)",YES,"Scheduled hours remaining for non-billable resources, decimal data type"
+delivery_dev,service_project_management_gld,pse_project,76,scope_status_txt,string,YES,Textual representation of a scope status.
+delivery_dev,service_project_management_gld,pse_project,77,total_costs_lc_amt,"decimal(18,2)",YES,"Represents total costs in local currency, stored as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,78,total_projected_revenue_from_assignments_lc_amt,"decimal(18,2)",YES,"Projected total revenue from assignments, in local currency, with decimal data type."
+delivery_dev,service_project_management_gld,pse_project,79,total_submitted_hours_nbr,"decimal(18,2)",YES,"Total submitted hours for non-branded tasks, decimal format"
+delivery_dev,service_project_management_gld,pse_project,80,variance_from_plan_nbr,"decimal(18,2)",YES,"Indicates the deviation from the planned amount for a specific brand, with a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,81,actual_services_cost_lc_amt,"decimal(18,2)",YES,Represents the actual cost amount of services in LC (Local Currency) with decimal data type.
+delivery_dev,service_project_management_gld,pse_project,82,alternate_project_contact_id,string,YES,"Alternate project contact ID, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,83,approval_status_txt,string,YES,Text field representing the approval status.
+delivery_dev,service_project_management_gld,pse_project,84,contract_number_txt,string,YES,Contract number in string format
+delivery_dev,service_project_management_gld,pse_project,85,date_p_complete_pct,"decimal(18,2)",YES,"Percentage of completed date-related tasks, stored as a decimal value."
+delivery_dev,service_project_management_gld,pse_project,86,date_to_first_100_worked_timecard_ts,timestamp,YES,Timestamp of date when first 100 worked timecards were submitted
+delivery_dev,service_project_management_gld,pse_project,87,days_to_first_100_hours_worked_nbr,"decimal(18,2)",YES,Decimal values representing namedays to first 100 hours worked by brand
+delivery_dev,service_project_management_gld,pse_project,88,eac_margin_percent_pct,"decimal(18,2)",YES,Percentage of Extended Average Margin
+delivery_dev,service_project_management_gld,pse_project,89,em_email_address_txt,string,YES,"Email address of the employee, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,90,gdn2_code_txt,string,YES,Textual representation of GDN2 code
+delivery_dev,service_project_management_gld,pse_project,91,gdn_code_txt,string,YES,Text label for Garden Code
+delivery_dev,service_project_management_gld,pse_project,92,go_live_dt,date,YES,"Go live date, indicating when a product or feature was launched."
+delivery_dev,service_project_management_gld,pse_project,93,hours_variance_at_completion_nbr,"decimal(18,2)",YES,"Variance in hours at completion for non-revenue projects, decimal data type"
+delivery_dev,service_project_management_gld,pse_project,94,planned_revenue_baseline_lc_amt,"decimal(18,2)",YES,Planned Revenue Baseline Amount in Local Currency (Decimal)
+delivery_dev,service_project_management_gld,pse_project,95,revised_cost_baseline_lc_amt,"decimal(18,2)",YES,Revised cost baseline amount in decimal format
+delivery_dev,service_project_management_gld,pse_project,96,total_billings_lc_amt,"decimal(18,2)",YES,"Total billings amount in local currency, represented as a decimal."
+delivery_dev,service_project_management_gld,pse_project,97,variance_at_completion_hours_pct,"decimal(18,2)",YES,"Percentage of variance in completion time, measured in hours"
+delivery_dev,service_project_management_gld,pse_project,98,fru_margin_percent_pct,"decimal(18,2)",YES,"Fraction of revenue retained after cost of goods sold, represented as a percentage."
+delivery_dev,service_project_management_gld,pse_project,99,fru_hours_remaining_nbr,"decimal(18,2)",YES,"Remaining hours for new brand tasks, decimal values."
+delivery_dev,service_project_management_gld,pse_project,100,fru_hours_variance_pct,"decimal(18,2)",YES,"Variance in fruit hours as a percentage, decimal data type"
+delivery_dev,service_project_management_gld,pse_project,101,fru_total_actual_hours_nbr,"decimal(18,2)",YES,"Decimal values representing actual hours spent on fruit-related tasks, excluding any branded activities."
+delivery_dev,service_project_management_gld,pse_project,102,client_status_comment_txt,string,YES,Textual comments regarding client status.
+delivery_dev,service_project_management_gld,pse_project,103,client_status_txt,string,YES,Textual representation of a client's status.
+delivery_dev,service_project_management_gld,pse_project,104,customer_satisfaction_survey_comments_txt,string,YES,Textual comments from customer satisfaction surveys
+delivery_dev,service_project_management_gld,pse_project,105,customer_satisfaction_survey_max_score_nbr,int,YES,"Maximum score achieved in customer satisfaction surveys, data type: INT"
+delivery_dev,service_project_management_gld,pse_project,106,customer_satisfaction_survey_requested_ind,boolean,YES,Indicates if a customer satisfaction survey was requested; Boolean data type with true (1) meaning a survey was requested and false (0) meaning a survey was not requested.
+delivery_dev,service_project_management_gld,pse_project,107,enable_status_report_creation_ind,boolean,YES,Indicator for whether a user can create status reports. Data type: BOOLEAN.
+delivery_dev,service_project_management_gld,pse_project,108,financial_status_comment_txt,string,YES,Textual comments regarding the financial status of a given entity.
+delivery_dev,service_project_management_gld,pse_project,109,issue_status_comment_txt,string,YES,Textual comments regarding the status of an issue.
+delivery_dev,service_project_management_gld,pse_project,110,issue_status_txt,string,YES,Text representation of an issue's status.
+delivery_dev,service_project_management_gld,pse_project,111,legal_status_comment_txt,string,YES,Text commentaries regarding the legal status of a particular entity or individual.
+delivery_dev,service_project_management_gld,pse_project,112,legal_status_txt,string,YES,"Description of the legal status of an entity, represented as a string."
+delivery_dev,service_project_management_gld,pse_project,113,lessons_learned_txt,string,YES,"Textual description of lessons learned from a particular event or situation, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,114,methodology_txt,string,YES,Text description of the methodology used
+delivery_dev,service_project_management_gld,pse_project,115,overall_status_comment_txt,string,YES,Textual comments regarding the overall status of a project or task.
+delivery_dev,service_project_management_gld,pse_project,116,overall_status_txt,string,YES,Text representation of the overall project status.
+delivery_dev,service_project_management_gld,pse_project,117,planned_margin_baseline_pct,"decimal(18,2)",YES,Planned margin baseline percentage (decimal)
+delivery_dev,service_project_management_gld,pse_project,118,project_problem_statement_txt,string,YES,Textual description of the problem statement for a given project.
+delivery_dev,service_project_management_gld,pse_project,119,resource_status_comment_txt,string,YES,Text comment regarding resource status.
+delivery_dev,service_project_management_gld,pse_project,120,resource_status_txt,string,YES,Textual description of resource status.
+delivery_dev,service_project_management_gld,pse_project,121,risk_status_comment_txt,string,YES,Textual comments related to a person or entity's risk status.
+delivery_dev,service_project_management_gld,pse_project,122,risk_status_txt,string,YES,"Text representation of a risk status, providing a descriptive evaluation of potential risks."
+delivery_dev,service_project_management_gld,pse_project,123,schedule_status_comment_txt,string,YES,Text comment regarding schedule status.
+delivery_dev,service_project_management_gld,pse_project,124,scope_status_comment_txt,string,YES,Textual comments regarding the status of a scope.
+delivery_dev,service_project_management_gld,pse_project,125,total_projected_cost_from_assignments_lc_amt,"decimal(18,2)",YES,Projected total cost (decimal) from assignments
+delivery_dev,service_project_management_gld,pse_project,126,eac_costs_lc_amt,"decimal(18,2)",YES,"Amount of costs in local currency, stored as a decimal."
+delivery_dev,service_project_management_gld,pse_project,127,eac_revenue_lc_amt,"decimal(18,2)",YES,"Revenue amount in local currency, decimal data type"
+delivery_dev,service_project_management_gld,pse_project,128,alternative_pm_1_id,string,YES,Identifier for the first alternative PM
+delivery_dev,service_project_management_gld,pse_project,129,alternative_pm_2_id,string,YES,Identifier for the second alternative PM
+delivery_dev,service_project_management_gld,pse_project,130,is_parent_project_ind,boolean,YES,Indicator flag denoting if a project is a parent project (true) or not (false).
+delivery_dev,service_project_management_gld,pse_project,131,financial_region_nm,string,YES,"Name of the financial region, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,132,financial_sub_region_nm,string,YES,"Name of the financial sub-region, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,133,segment_nm,string,YES,"Customer segment name, stored as a string"
+delivery_dev,service_project_management_gld,pse_project,134,services_level_1_nm,string,YES,"Indicates the first level of services for a given entry, as a string."
+delivery_dev,service_project_management_gld,pse_project,135,services_level_2_nm,string,YES,"Description of the services at level 2, string data type."
+delivery_dev,service_project_management_gld,pse_project,136,managed_services_pod_nm,string,YES,"The name of the managed services pod, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,137,billings_manual_lc_amt,"decimal(18,2)",YES,Manual billing amount in decimal format
+delivery_dev,service_project_management_gld,pse_project,138,eac_costs_manual_lc_amt,"decimal(18,2)",YES,"Manual labor cost amount, expressed as a decimal"
+delivery_dev,service_project_management_gld,pse_project,139,eac_revenue_manual_lc_amt,"decimal(18,2)",YES,"Manual revenue amount in local currency, decimal data type."
+delivery_dev,service_project_management_gld,pse_project,140,non_labor_etc_costs_lc_amt,"decimal(18,2)",YES,"Non-labor related costs amount in local currency, decimal datatype"
+delivery_dev,service_project_management_gld,pse_project,141,non_labor_etc_revenue_lc_amt,"decimal(18,2)",YES,"Non-labor related revenue amount, decimal data type"
+delivery_dev,service_project_management_gld,pse_project,142,total_costs_manual_lc_amt,"decimal(18,2)",YES,Represents total manual labor costs in decimal format.
+delivery_dev,service_project_management_gld,pse_project,143,planned_initial_cost_baseline_lc_amt,"decimal(18,2)",YES,Planned initial cost baseline amount in local currency (decimal)
+delivery_dev,service_project_management_gld,pse_project,144,eac_costs_parent_lc_amt,"decimal(18,2)",YES,"Parent level expense amount in local currency, stored as a decimal."
+delivery_dev,service_project_management_gld,pse_project,145,revised_cost_parent_lc_amt,"decimal(18,2)",YES,"Revised cost amount in parent local currency, decimal data type"
+delivery_dev,service_project_management_gld,pse_project,146,eac_revenue_parent_lc_amt,"decimal(18,2)",YES,Parent level revenue amount in local currency (decimal)
+delivery_dev,service_project_management_gld,pse_project,147,notes_txt,string,YES,Text notes related to business data
+delivery_dev,service_project_management_gld,pse_project,148,revenue_lc_amt,"decimal(18,2)",YES,Revenue amount in decimal format
+delivery_dev,service_project_management_gld,pse_project,149,project_id_chain_lst,string,YES,Project ID chain in string format
+delivery_dev,service_project_management_gld,pse_project,150,planned_project_hours_baseline_nbr,"decimal(16,2)",YES,"Planned project hours baseline for NBRAND, stored as a decimal value."
+delivery_dev,service_project_management_gld,pse_project,151,profit_center_id,string,YES,"Identifier for profit centers, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,152,sales_organization_nm,string,YES,"Name of the sales organization, represented as a string."
+delivery_dev,service_project_management_gld,pse_project,153,fru_date_rag_cd,string,YES,"A string representing a date rating, with possible values such as 'Red', 'Amber', or 'Green'."
+delivery_dev,service_project_management_gld,pse_project,154,fru_hours_rag_cd,string,YES,"Code indicating the number of hours worked by an employee in the FRU (Field Resource Unit), represented as a string."
+delivery_dev,service_project_management_gld,pse_project,155,opportunity_owner_id,string,YES,"The unique identifier for the owner of an opportunity, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,156,aldea_number_txt,string,YES,"Aldea number in text format, string data type."
+delivery_dev,service_project_management_gld,pse_project,157,do_not_sync_to_erp_ind,boolean,YES,Indicator flag denoting whether a record should not be synced to ERP (Boolean).
+delivery_dev,service_project_management_gld,pse_project,158,allow_timecards_without_assignment_ind,boolean,YES,Indicates whether timecards without assignment are allowed (BOOLEAN)
+delivery_dev,service_project_management_gld,pse_project,159,closed_for_expense_entry_ind,boolean,YES,Indicator for whether the business is closed for expense entry (Boolean)
+delivery_dev,service_project_management_gld,pse_project,160,closed_for_time_entry_ind,boolean,YES,Indicates whether time entry is closed (true) or open (false)
+delivery_dev,service_project_management_gld,pse_project,161,project_ind,boolean,YES,"Indicates project involvement; true if associated with a project, false otherwise (Boolean)"
+delivery_dev,service_project_management_gld,pse_project,162,udp_update_utc_ts,timestamp,YES,Timestamp of the most recent UDP update (UTC).
+delivery_dev,service_project_management_gld,pse_project,163,current_time_period_nm,string,YES,"Name of the individual or entity, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,164,practice_nm,string,YES,"Description: Specifies the practice name for the given practice level.
+If hierarchy_depth_nbr = 0 then this column contains ""Organization"" data.
+If hierarchy_depth_nbr = 1 then this column contains ""External Service"" or ""Services - Level 1"" or ""Segment"" data.
+If hierarchy_depth_nbr = 2 then this column contains ""Internal Services"" or ""Services - Level 2"" data.
+If hierarchy_depth_nbr = 3 then this column contains ""Simplified Offering"" or ""Offering"" data.
+If hierarchy_depth_nbr = 4 then this column contains ""Delivery Capabilities"" or ""Major Offering"" data.
+If hierarchy_depth_nbr = 5 then this column contains "" Sub Offering"" or ""Sub Capability"" data."
+delivery_dev,service_project_management_gld,pse_project,165,region_nm,string,YES,"Description: Specifies either the ""Region"" or ""Delivery Sub Region"" or ""Country"" depending on the hierarchy depth nbr value.
+If hierarchy_depth_nbr = 1 then this column contains Region value.
+If hierarchy_depth_nbr = 2 then this column contains ""Delivery Sub Region"" value.
+If hierarchy_depth_nbr = 3 then this column contains ""Country"" value.
+
+Currently used values are: `Indonesia`, `Myanmar`, `Ghana`, `Liechtenstein`, `Australia`, `Israel`, `Christchurch`, `NT`, `VIC`, `Kosovo (retired)`, `Czech Republic (retired)`, `Antilles (retired)`, `Togo`, `South Sudan`, `Nicaragua`, `Moldova, Republic of`, `Lao People's Democratic Republic`, `Equatorial Guinea`, `Guadeloupe`, `French Guiana`, `Cameroon`, `Congo`, `Burkina Faso`, `Romania`, `Turkey`, `Sweden`, `Thailand`, `Afghanistan`, `Croatia`, `Cambodia`, `Seychelles`, `Brunei Darussalam`, `Moldavia (retired)`, `Americas`, `Beneluce`, `APJ-MEA`, `Somalia`, `Saint Lucia`, `Christmas Island`, `Cabo Verde`, `Bermuda`, `Armenia`, `Netherlands Antilles`, `Sierra Leone`, `Sri Lanka`, `Rwanda`, `Tunisia`, `Namibia`, `Slovakia`, `Denmark`, `Bahrain`, `Tanzania (retired)`, `ASEAN`, `Samoa`, `Virgin Islands (U.S.)`, `Uzbekistan`, `French Southern Territories`, `Slovenia`, `Palestine, State of`, `North Macedonia`, `Saint Martin (French part)`, `Korea (Democratic People's Republic of)`, `Kyrgyzstan`, `CÃ´te d'Ivoire`, `Bhutan`, `Benin`, `Antarctica`, `Antigua and Barbuda`, `United States`, `Morocco`, `Lithuania`, `Switzerland`, `Bangladesh`, `United Kingdom`, `Central, Northern, & Eastern Europe`, `Syrian Arab Republic`, `Viet Nam`, `Saint Kitts and Nevis`, `Bahamas`, `Zambia`, `Bosnia and Herzegovina`, `Hungary`, `Albania`, `Austria`, `Belarus`, `North & Central Europe (retired)`, `Trinidad and Tobago`, `RÃ©union`, `Martinique`, `Macao`, `Guyana`, `Guinea`, `Gabon`, `Saudi Arabia`, `Hong Kong`, `Iraq`, `Costa Rica`, `Spain`, `Philippines`, `Belgium`, `Japan`, `UK & I, MEA (retired)`, `Taiwan, Province of China`, `Virgin Islands (British)`, `Palau`, `Jersey`, `Haiti`, `Eritrea`, `Belize`, `New Caledonia`, `Libya`, `Poland`, `Kuwait`, `Ethiopia`, `Latin America`, `Europe`, `Venezuela (Bolivarian Republic of)`, `Uganda`, `Timor-Leste`, `French Polynesia`, `Nauru`, `Northern Mariana Islands`, `Iran (Islamic Republic of)`, `British Indian Ocean Territory`, `South Georgia and the South Sandwich Islands`, `Cuba`, `American Samoa`, `Canada`, `Lebanon`, `Singapore`, `Ireland`, `Latvia`, `ACT`, `CNEE (retired)`, `Iberia`, `Pitcairn`, `Mauritania`, `Jamaica`, `Georgia`, `CuraÃ§ao`, `Senegal`, `South Africa`, `Iceland`, `Papua New Guinea`, `United Arab Emirates`, `Algeria`, `Fiji`, `Qatar`, `Ecuador`, `Czechia`, `SA`, `Taiwan (retired)`, `UKI`, `Southern Europe (retired)`, `United States of America`, `United Kingdom of Great Britain and Northern Ireland`, `Greater China`, `Australia & New Zealand`, `Sao Tome and Principe`, `Suriname`, `Niue`, `Isle of Man`, `Bolivia (Plurinational State of)`, `Saint BarthÃ©lemy`, `Luxembourg`, `Lesotho`, `Cyprus`, `Gibraltar`, `Russia (retired)`, `Asia (retired)`, `Saint Vincent and the Grenadines`, `Tuvalu`, `Tokelau`, `Chad`, `Marshall Islands`, `Guinea-Bissau`, `Guernsey`, `Micronesia (Federated States of)`, `Cocos (Keeling) Islands`, `Jordan`, `Peru`, `New Zealand`, `Bulgaria`, `Mauritius`, `Wellington`, `TAS`, `DXC Technology`, `Mayotte`, `Holy See`, `Solomon Islands`, `Paraguay`, `Niger`, `Maldives`, `Liberia`, `Kiribati`, `Faroe Islands`, `Central African Republic`, `Burundi`, `Ã…land Islands`, `Anguilla`, `Puerto Rico`, `Nigeria`, `Monaco`, `Mozambique`, `China`, `Chile`, `Colombia`, `Honduras`, `Andorra`, `India`, `Auckland`, `WA`, `Uruguay`, `United States Minor Outlying Islands`, `Tajikistan`, `Svalbard and Jan Mayen`, `Sudan`, `Mongolia`, `Guam`, `Guatemala`, `Dominican Republic`, `Barbados`, `Madagascar`, `Norway`, `Mexico`, `Malawi`, `Panama`, `Argentina`, `Brunei (retired)`, `NSW`, `Tanzania, United Republic of`, `Turkmenistan`, `Saint Helena, Ascension and Tristan da Cunha`, `Nepal`, `Montserrat`, `Korea, Republic of`, `Greenland`, `Western Sahara`, `Cook Islands`, `Congo, Democratic Republic of the`, `Bouvet Island`, `Egypt`, `Finland`, `Angola`, `Brazil`, `Netherlands`, `Kazakhstan`, `Botswana`, `Italy`, `QLD`, `Macedonia (FYROM) (retired)`, `Sint Maarten (Dutch part)`, `El Salvador`, `Saint Pierre and Miquelon`, `Mali`, `Heard Island and McDonald Islands`, `Falkland Islands (Malvinas)`, `Aruba`, `Oman`, `Malta`, `Kenya`, `France`, `Germany`, `Azerbaijan`, `Carribbean Islands (retired)`, `Yemen`, `Tonga`, `Turks and Caicos Islands`, `San Marino`, `Russian Federation`, `Pakistan`, `Norfolk Island`, `Gambia`, `Dominica`, `Djibouti`, `American Somoa`, `Malaysia`, `Serbia`, `Zimbabwe`, `Montenegro`, `Ukraine`, `Greece`, `Portugal`, `Estonia`, `Korea (retired)`, `Venezuela (retired)`, `ANZ (retired)`, `Middle East & Africa`, `Wallis and Futuna`, `Vanuatu`, `Eswatini`, `Cayman Islands`, `Comoros`, `Grenada`, `Bonaire, Sint Eustatius and Saba`."
+delivery_dev,service_project_management_gld,pse_project,166,profit_center_nm,string,YES,"Name of the individual or entity, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,167,created_by_employee_nm,string,YES,"The username or ID of the employee who created the record, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,168,created_by_employee_reference_nbr,string,YES,Employee reference number for the creator of the record.
+delivery_dev,service_project_management_gld,pse_project,169,created_by_employee_email_txt,string,YES,"The email address of the employee who created the record, stored as a string."
+delivery_dev,service_project_management_gld,pse_project,170,last_modified_by_employee_nm,string,YES,Employee name who last modified the record
+delivery_dev,service_project_management_gld,pse_project,171,last_modified_by_employee_reference_nbr,string,YES,Employee reference number for the last modifier
+delivery_dev,service_project_management_gld,pse_project,172,last_modified_by_employee_email_txt,string,YES,The email address of the employee who last modified the record.
+delivery_dev,service_project_management_gld,pse_project,173,owner_employee_nm,string,YES,"Name of the owner employee, represented as a string."
+delivery_dev,service_project_management_gld,pse_project,174,owner_employee_reference_nbr,string,YES,"Employee reference number for the owner, string data type."
+delivery_dev,service_project_management_gld,pse_project,175,owner_employee_email_txt,string,YES,The email address of the owner's employee.
+delivery_dev,service_project_management_gld,pse_project,176,project_manager_nm,string,YES,"Description: Specifies the contact or resource name.
+Alias: `Contact Name`"
+delivery_dev,service_project_management_gld,pse_project,177,project_manager_employee_reference_nbr,string,YES,"Employee ID in string format
+Alias: `Person Identifier`"
+delivery_dev,service_project_management_gld,pse_project,178,project_manager_email_txt,string,YES,"Text field containing email addresses.
+Alias: `Contact Email `"
+delivery_dev,service_project_management_gld,pse_project,179,project_approver_nm,string,YES,"Description: Specifies the contact or resource name.
+Alias: `Contact Name`"
+delivery_dev,service_project_management_gld,pse_project,180,project_approver_employee_reference_nbr,string,YES,"Employee ID in string format
+Alias: `Person Identifier`"
+delivery_dev,service_project_management_gld,pse_project,181,project_approver_email_txt,string,YES,"Text field containing email addresses.
+Alias: `Contact Email `"
+delivery_dev,service_project_management_gld,pse_project,182,alternate_project_contact_nm,string,YES,"Description: Specifies the contact or resource name.
+Alias: `Contact Name`"
+delivery_dev,service_project_management_gld,pse_project,183,alternate_project_contact_employee_reference_nbr,string,YES,"Employee ID in string format
+Alias: `Person Identifier`"
+delivery_dev,service_project_management_gld,pse_project,184,alternate_project_contact_email_txt,string,YES,"Text field containing email addresses.
+Alias: `Contact Email `"
+delivery_dev,service_project_management_gld,pse_project,185,alternative_pm_1_nm,string,YES,"Description: Specifies the contact or resource name.
+Alias: `Contact Name`"
+delivery_dev,service_project_management_gld,pse_project,186,alternative_pm_1_employee_reference_nbr,string,YES,"Employee ID in string format
+Alias: `Person Identifier`"
+delivery_dev,service_project_management_gld,pse_project,187,alternative_pm_1_email_txt,string,YES,"Text field containing email addresses.
+Alias: `Contact Email `"
+delivery_dev,service_project_management_gld,pse_project,188,alternative_pm_2_nm,string,YES,"Description: Specifies the contact or resource name.
+Alias: `Contact Name`"
+delivery_dev,service_project_management_gld,pse_project,189,alternative_pm_2_employee_reference_nbr,string,YES,"Employee ID in string format
+Alias: `Person Identifier`"
+delivery_dev,service_project_management_gld,pse_project,190,alternative_pm_2_email_txt,string,YES,"Text field containing email addresses.
+Alias: `Contact Email `"
+delivery_dev,service_project_management_gld,pse_project,191,billings_usd_amt,"decimal(18,2)",YES,"Billing amounts in USD, represented as decimal values."
+delivery_dev,service_project_management_gld,pse_project,192,bookings_usd_amt,"decimal(18,2)",YES,"Represents booking amounts in USD, stored as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,193,expense_budget_usd_amt,"decimal(18,2)",YES,"Budgeted expense amount in US dollars, stored as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,194,expense_costs_usd_amt,"decimal(18,2)",YES,"Represents expense costs in USD, stored as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,195,external_costs_usd_amt,"decimal(18,2)",YES,"Represents external costs in USD, stored as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,196,internal_budget_usd_amt,"decimal(18,2)",YES,"Internal budget amount in US dollars, represented as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,197,internal_costs_usd_amt,"decimal(18,2)",YES,"Internal costs amount in US dollars, represented as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,198,invoiced_usd_amt,"decimal(18,2)",YES,Represents invoiced amount in US dollars with decimal data type.
+delivery_dev,service_project_management_gld,pse_project,199,other_costs_usd_amt,"decimal(18,2)",YES,"Represents other costs amount in USD, stored as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,200,pass_through_billings_usd_amt,"decimal(18,2)",YES,"Amount of pass-through billings in USD, stored as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,201,pre_billed_usd_amt,"decimal(18,2)",YES,"Pre-billed amount in US dollars, represented as a decimal."
+delivery_dev,service_project_management_gld,pse_project,202,total_projected_revenue_from_assignments_usd_amt,"decimal(18,2)",YES,"Total projected revenue from assignments in USD, decimal datatype"
+delivery_dev,service_project_management_gld,pse_project,203,actual_services_cost_usd_amt,"decimal(18,2)",YES,"Actual Services Cost in USD, Decimal Data Type"
+delivery_dev,service_project_management_gld,pse_project,204,planned_revenue_baseline_usd_amt,"decimal(18,2)",YES,Planned Revenue Baseline Amount in USD (Decimal)
+delivery_dev,service_project_management_gld,pse_project,205,total_billings_usd_amt,"decimal(18,2)",YES,"Total billings amount in USD, represented as a decimal."
+delivery_dev,service_project_management_gld,pse_project,206,total_projected_cost_from_assignments_usd_amt,"decimal(18,2)",YES,"Total projected cost from assignments in USD, decimal datatype"
+delivery_dev,service_project_management_gld,pse_project,207,eac_costs_usd_amt,"decimal(18,2)",YES,"Amount of EAC costs in USD, stored as a decimal."
+delivery_dev,service_project_management_gld,pse_project,208,eac_revenue_usd_amt,"decimal(18,2)",YES,"Revenue in USD, decimal data type"
+delivery_dev,service_project_management_gld,pse_project,209,total_costs_usd_amt,"decimal(18,2)",YES,"Represents total costs in USD, stored as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,210,billings_manual_usd_amt,"decimal(18,2)",YES,USD amount of manual billings in decimal format
+delivery_dev,service_project_management_gld,pse_project,211,eac_costs_manual_usd_amt,"decimal(18,2)",YES,"Manual USD amount for EAC (Estimated Actual Cost) costs, stored as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,212,eac_revenue_manual_usd_amt,"decimal(18,2)",YES,"Manual USD revenue amount for Enterprise and Above (EAC) customers, stored as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,213,non_labor_etc_costs_usd_amt,"decimal(18,2)",YES,"Non-labor miscellaneous costs in USD, decimal format"
+delivery_dev,service_project_management_gld,pse_project,214,non_labor_etc_revenue_usd_amt,"decimal(18,2)",YES,"Non-labor related revenue in USD, decimal data type"
+delivery_dev,service_project_management_gld,pse_project,215,total_costs_manual_usd_amt,"decimal(18,2)",YES,"Represents total manual costs in USD, stored as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,216,planned_initial_cost_baseline_usd_amt,"decimal(18,2)",YES,Planned initial cost baseline amount in USD (Decimal)
+delivery_dev,service_project_management_gld,pse_project,217,eac_costs_parent_usd_amt,"decimal(18,2)",YES,"EA Currency Costs (Parent) in USD, decimal data type"
+delivery_dev,service_project_management_gld,pse_project,218,revised_cost_parent_usd_amt,"decimal(18,2)",YES,"Revised cost amount in US dollars (parent), decimal data type"
+delivery_dev,service_project_management_gld,pse_project,219,eac_revenue_parent_usd_amt,"decimal(18,2)",YES,"Revenue amount in US dollars, with decimal precision, for the parent company."
+delivery_dev,service_project_management_gld,pse_project,220,revenue_usd_amt,"decimal(18,2)",YES,"Revenue amount in US dollars, stored as a decimal data type."
+delivery_dev,service_project_management_gld,pse_project,221,initial_budget_cost_lc_amt,"decimal(18,2)",YES,Initial budget cost in local currency
+delivery_dev,service_project_management_gld,pse_project,222,initial_budget_cost_usd_amt,"decimal(18,2)",YES,Initial budget cost in USD
+delivery_dev,service_project_management_gld,pse_project,223,revised_cost_baseline_usd_amt,"decimal(18,2)",YES,Revised cost baseline amount in USD
+delivery_dev,service_project_management_gld,pse_project,224,last_financials_update_dt,date,YES,Date of last financial update
+delivery_dev,service_project_management_gld,pse_project,225,opportunity_exception_id,string,YES,Unique identifier for opportunity exception
+delivery_dev,service_project_management_gld,pse_project,226,percent_complete_pct,"decimal(5,2)",YES,Percentage of task completion
+delivery_dev,service_project_management_gld,pse_project,227,do_not_sync_to_gsap_ind,boolean,YES,Indicator for not syncing to GSAP
+delivery_dev,service_project_management_gld,pse_region,0,id,string,YES,"Unique identifier, string data type.
+Alias: `Identifier`
+key constraints: This column acts as primary key for the `pse_region` table"
+delivery_dev,service_project_management_gld,pse_region,1,owner_id,string,YES,"The unique identifier for the owner, stored as a string.
+Alias: `Owner Identifier`"
+delivery_dev,service_project_management_gld,pse_region,2,is_deleted_ind,boolean,YES,Indicator flag denoting whether a record has been deleted (TRUE) or not (FALSE).
+delivery_dev,service_project_management_gld,pse_region,3,name_nm,string,YES,"Description: Specifies either the ""Region"" or ""Delivery Sub Region"" or ""Country"" depending on the hierarchy depth nbr value.
+If hierarchy_depth_nbr = 1 then this column contains Region value.
+If hierarchy_depth_nbr = 2 then this column contains ""Delivery Sub Region"" value.
+If hierarchy_depth_nbr = 3 then this column contains ""Country"" value.
+
+Currently used values are: `Indonesia`, `Myanmar`, `Ghana`, `Liechtenstein`, `Australia`, `Israel`, `Christchurch`, `NT`, `VIC`, `Kosovo (retired)`, `Czech Republic (retired)`, `Antilles (retired)`, `Togo`, `South Sudan`, `Nicaragua`, `Moldova, Republic of`, `Lao People's Democratic Republic`, `Equatorial Guinea`, `Guadeloupe`, `French Guiana`, `Cameroon`, `Congo`, `Burkina Faso`, `Romania`, `Turkey`, `Sweden`, `Thailand`, `Afghanistan`, `Croatia`, `Cambodia`, `Seychelles`, `Brunei Darussalam`, `Moldavia (retired)`, `Americas`, `Beneluce`, `APJ-MEA`, `Somalia`, `Saint Lucia`, `Christmas Island`, `Cabo Verde`, `Bermuda`, `Armenia`, `Netherlands Antilles`, `Sierra Leone`, `Sri Lanka`, `Rwanda`, `Tunisia`, `Namibia`, `Slovakia`, `Denmark`, `Bahrain`, `Tanzania (retired)`, `ASEAN`, `Samoa`, `Virgin Islands (U.S.)`, `Uzbekistan`, `French Southern Territories`, `Slovenia`, `Palestine, State of`, `North Macedonia`, `Saint Martin (French part)`, `Korea (Democratic People's Republic of)`, `Kyrgyzstan`, `CÃ´te d'Ivoire`, `Bhutan`, `Benin`, `Antarctica`, `Antigua and Barbuda`, `United States`, `Morocco`, `Lithuania`, `Switzerland`, `Bangladesh`, `United Kingdom`, `Central, Northern, & Eastern Europe`, `Syrian Arab Republic`, `Viet Nam`, `Saint Kitts and Nevis`, `Bahamas`, `Zambia`, `Bosnia and Herzegovina`, `Hungary`, `Albania`, `Austria`, `Belarus`, `North & Central Europe (retired)`, `Trinidad and Tobago`, `RÃ©union`, `Martinique`, `Macao`, `Guyana`, `Guinea`, `Gabon`, `Saudi Arabia`, `Hong Kong`, `Iraq`, `Costa Rica`, `Spain`, `Philippines`, `Belgium`, `Japan`, `UK & I, MEA (retired)`, `Taiwan, Province of China`, `Virgin Islands (British)`, `Palau`, `Jersey`, `Haiti`, `Eritrea`, `Belize`, `New Caledonia`, `Libya`, `Poland`, `Kuwait`, `Ethiopia`, `Latin America`, `Europe`, `Venezuela (Bolivarian Republic of)`, `Uganda`, `Timor-Leste`, `French Polynesia`, `Nauru`, `Northern Mariana Islands`, `Iran (Islamic Republic of)`, `British Indian Ocean Territory`, `South Georgia and the South Sandwich Islands`, `Cuba`, `American Samoa`, `Canada`, `Lebanon`, `Singapore`, `Ireland`, `Latvia`, `ACT`, `CNEE (retired)`, `Iberia`, `Pitcairn`, `Mauritania`, `Jamaica`, `Georgia`, `CuraÃ§ao`, `Senegal`, `South Africa`, `Iceland`, `Papua New Guinea`, `United Arab Emirates`, `Algeria`, `Fiji`, `Qatar`, `Ecuador`, `Czechia`, `SA`, `Taiwan (retired)`, `UKI`, `Southern Europe (retired)`, `United States of America`, `United Kingdom of Great Britain and Northern Ireland`, `Greater China`, `Australia & New Zealand`, `Sao Tome and Principe`, `Suriname`, `Niue`, `Isle of Man`, `Bolivia (Plurinational State of)`, `Saint BarthÃ©lemy`, `Luxembourg`, `Lesotho`, `Cyprus`, `Gibraltar`, `Russia (retired)`, `Asia (retired)`, `Saint Vincent and the Grenadines`, `Tuvalu`, `Tokelau`, `Chad`, `Marshall Islands`, `Guinea-Bissau`, `Guernsey`, `Micronesia (Federated States of)`, `Cocos (Keeling) Islands`, `Jordan`, `Peru`, `New Zealand`, `Bulgaria`, `Mauritius`, `Wellington`, `TAS`, `DXC Technology`, `Mayotte`, `Holy See`, `Solomon Islands`, `Paraguay`, `Niger`, `Maldives`, `Liberia`, `Kiribati`, `Faroe Islands`, `Central African Republic`, `Burundi`, `Ã…land Islands`, `Anguilla`, `Puerto Rico`, `Nigeria`, `Monaco`, `Mozambique`, `China`, `Chile`, `Colombia`, `Honduras`, `Andorra`, `India`, `Auckland`, `WA`, `Uruguay`, `United States Minor Outlying Islands`, `Tajikistan`, `Svalbard and Jan Mayen`, `Sudan`, `Mongolia`, `Guam`, `Guatemala`, `Dominican Republic`, `Barbados`, `Madagascar`, `Norway`, `Mexico`, `Malawi`, `Panama`, `Argentina`, `Brunei (retired)`, `NSW`, `Tanzania, United Republic of`, `Turkmenistan`, `Saint Helena, Ascension and Tristan da Cunha`, `Nepal`, `Montserrat`, `Korea, Republic of`, `Greenland`, `Western Sahara`, `Cook Islands`, `Congo, Democratic Republic of the`, `Bouvet Island`, `Egypt`, `Finland`, `Angola`, `Brazil`, `Netherlands`, `Kazakhstan`, `Botswana`, `Italy`, `QLD`, `Macedonia (FYROM) (retired)`, `Sint Maarten (Dutch part)`, `El Salvador`, `Saint Pierre and Miquelon`, `Mali`, `Heard Island and McDonald Islands`, `Falkland Islands (Malvinas)`, `Aruba`, `Oman`, `Malta`, `Kenya`, `France`, `Germany`, `Azerbaijan`, `Carribbean Islands (retired)`, `Yemen`, `Tonga`, `Turks and Caicos Islands`, `San Marino`, `Russian Federation`, `Pakistan`, `Norfolk Island`, `Gambia`, `Dominica`, `Djibouti`, `American Somoa`, `Malaysia`, `Serbia`, `Zimbabwe`, `Montenegro`, `Ukraine`, `Greece`, `Portugal`, `Estonia`, `Korea (retired)`, `Venezuela (retired)`, `ANZ (retired)`, `Middle East & Africa`, `Wallis and Futuna`, `Vanuatu`, `Eswatini`, `Cayman Islands`, `Comoros`, `Grenada`, `Bonaire, Sint Eustatius and Saba`."
+delivery_dev,service_project_management_gld,pse_region,4,created_dt,timestamp,YES,"Timestamp indicating when a record was created.
+Alias: `Created Date`"
+delivery_dev,service_project_management_gld,pse_region,5,created_by_id,string,YES,"Identifier for the creator of the record, stored as a string.
+Alias: `Created By Identifier`"
+delivery_dev,service_project_management_gld,pse_region,6,last_modified_dt,timestamp,YES,"Timestamp indicating the last modification of the associated record.
+Alias: `Last Modified Date`"
+delivery_dev,service_project_management_gld,pse_region,7,last_modified_by_id,string,YES,"Identifier for the user who last modified the record
+Alias: `Last Modified By Identifier`"
+delivery_dev,service_project_management_gld,pse_region,8,parent_region_id,string,YES,"Identifier for the parent region, stored as a string.
+Alias: `Parent Region Identifier`"
+delivery_dev,service_project_management_gld,pse_region,9,hierarchy_depth_nbr,int,YES,"Number of levels in the brand hierarchy
+Alias: `Hierarchy Depth Number`"
+delivery_dev,service_project_management_gld,pse_region,10,active_ind,boolean,YES,Indicator for active status; boolean data type
+delivery_dev,service_project_management_gld,pse_region,11,country_iso_cd,string,YES,"Country ISO code, string data type
+Alias: `Country Iso Code`"
+delivery_dev,service_project_management_gld,pse_region,12,country_txt,string,YES,Country name in text format
+delivery_dev,service_project_management_gld,pse_region,13,system_mod_stamp_ts,timestamp,YES,Timestamp indicating the last system modification time.
+delivery_dev,service_project_management_gld,pse_region,14,parent_region_nm,string,YES,"Name of the parent region, stored as a string.
+Alias: `Parent Region Name`"
+delivery_dev,service_project_management_gld,pse_region,15,source_update_utc_ts,timestamp,YES,"Timestamp indicating the last update of the source data in Coordinated Universal Time (UTC)
+Alias: `Source Update Utc Timestamp`"
+delivery_dev,service_project_management_gld,pse_region,16,source_create_utc_ts,timestamp,YES,"Timestamp indicating when the data was created in the source system (UTC).
+Alias: `Source Create Utc Timestamp`"
+delivery_dev,service_project_management_gld,pse_region,17,source_file_nm,string,YES,"The name of the source file from which the data was extracted.
+Alias: `Source File Name`"
+delivery_dev,service_project_management_gld,pse_region,18,source_file_ts,timestamp,YES,"Timestamp indicating the source file's creation or last modification time.
+Alias: `Source File Timestamp`"
+delivery_dev,service_project_management_gld,pse_region,19,udp_create_utc_ts,timestamp,YES,UTC timestamp of when the record was created.
+delivery_dev,service_project_management_gld,pse_region,20,udp_update_utc_ts,timestamp,YES,Timestamp of the most recent UDP update (UTC).
+delivery_dev,service_project_management_gld,pse_region,21,region_level_0_id,string,YES,"Identifier for the top-level region, stored as a string.
+Alias: `Region Level 0 Identifier`"
+delivery_dev,service_project_management_gld,pse_region,22,region_level_1_id,string,YES,"Identifier for Region Level 1, stored as a string.
+Alias: `Region Level 1 Identifier`"
+delivery_dev,service_project_management_gld,pse_region,23,region_level_2_id,string,YES,"Identifier for the second-level region, stored as a string.
+Alias: `Region Level 2 Identifier`"
+delivery_dev,service_project_management_gld,pse_region,24,region_level_3_id,string,YES,"Identifier for Region Level 3, stored as a string.
+Alias: `Region Level 3 Identifier`"
+delivery_dev,service_project_management_gld,pse_region,25,region_level_4_id,string,YES,"Identifier for Region Level 4, stored as a string.
+Alias: `Region Level 4 Identifier`"
+delivery_dev,service_project_management_gld,pse_region,26,region_level_5_id,string,YES,"Identifier for the fifth-level region, stored as a string.
+Alias: `Region Level 5 Identifier`"
+delivery_dev,service_project_management_gld,pse_region,27,region_level_0_nm,string,YES,"Region level 0 name, string data type
+Alias: `Region Level 0 Name`"
+delivery_dev,service_project_management_gld,pse_region,28,region_level_1_nm,string,YES,"Description: Region Level 1 name captures the Region name.
+Alias: `Region Level 1 Name`"
+delivery_dev,service_project_management_gld,pse_region,29,region_level_2_nm,string,YES,"Description: Region Level 2 name captures the Delivery Sub Region name.
+Alias: `Region Level 2 Name`"
+delivery_dev,service_project_management_gld,pse_region,30,region_level_3_nm,string,YES,"Description: Region Level 3 name captures the Country name.
+Alias: `Region Level 3 Name`"
+delivery_dev,service_project_management_gld,pse_region,31,region_level_4_nm,string,YES,"Name of the region at level 4, stored as a string.
+Alias: `Region Level 4 Name`"
+delivery_dev,service_project_management_gld,pse_region,32,region_level_5_nm,string,YES,"Geographic region name at level 5, data type: string
+Alias: `Region Level 5 Name`"
+delivery_dev,service_project_management_gld,pse_region,33,created_by_employee_nm,string,YES,"The username or ID of the employee who created the record, stored as a string.
+Alias: `Created By Employee Name`"
+delivery_dev,service_project_management_gld,pse_region,34,created_by_employee_reference_nbr,string,YES,"Employee reference number for the creator of the record.
+Alias: `Created By Employee Reference Number`"
+delivery_dev,service_project_management_gld,pse_region,35,created_by_employee_email_txt,string,YES,"The email address of the employee who created the record, stored as a string."
+delivery_dev,service_project_management_gld,pse_region,36,last_modified_by_employee_nm,string,YES,"Name of the employee who last modified the record, stored as a string.
+Alias: `Last Modified By Employee Name`"
+delivery_dev,service_project_management_gld,pse_region,37,last_modified_by_employee_reference_nbr,string,YES,"Employee reference number for the last modifier
+Alias: `Last Modified By Employee Reference Number`"
+delivery_dev,service_project_management_gld,pse_region,38,last_modified_by_employee_email_txt,string,YES,"The email address of the employee who last modified the record.
+Alias: `Last Modified By Employee Email Text`"
+delivery_dev,service_project_management_gld,pse_region,39,default_work_calendar_id,string,YES,Default work calendar identifier
+delivery_dev,service_project_management_gld,pse_resource_request,0,id,string,YES,"Description: Unique identifier, string data type.
+Alias: `Identifier`
+key constraints: This column acts as primary key for the `pse_resource_request` table."
+delivery_dev,service_project_management_gld,pse_resource_request,1,owner_id,string,YES,"The unique identifier for the owner, stored as a string.
+Alias: `Owner Identifier`"
+delivery_dev,service_project_management_gld,pse_resource_request,2,is_deleted_ind,boolean,YES,Indicator flag denoting whether a record has been deleted (TRUE) or not (FALSE).
+delivery_dev,service_project_management_gld,pse_resource_request,3,name_nm,string,YES,Description: Specifies the resource request name.
+delivery_dev,service_project_management_gld,pse_resource_request,4,currency_iso_cd,string,YES,The ISO 4217 currency code represented as a string.
+delivery_dev,service_project_management_gld,pse_resource_request,5,created_dt,timestamp,YES,"Timestamp indicating when a record was created.
+Alias: `Created Date`"
+delivery_dev,service_project_management_gld,pse_resource_request,6,created_by_id,string,YES,"Identifier for the creator of the record, stored as a string.
+Alias: `Created By Identifier`"
+delivery_dev,service_project_management_gld,pse_resource_request,7,last_modified_dt,timestamp,YES,"Timestamp indicating the last modification of the respective data entry.
+Alias: `Last Modified Date`"
+delivery_dev,service_project_management_gld,pse_resource_request,8,last_modified_by_id,string,YES,"Identifier for the user who last modified the record
+Alias: `Last Modified By Identifier`"
+delivery_dev,service_project_management_gld,pse_resource_request,9,assignment_id,string,YES,"Description: Identifier for assignments, stored as a string.
+Alias: `Assignment Identifier`
+key constraints: `assignment_id` is a foreign key column in this table which refers to `pse_assignment` table where the primary key column is `id`."
+delivery_dev,service_project_management_gld,pse_resource_request,10,end_dt,date,YES,"End date of a business event or period, stored in DATE data type.
+Alias: `End Date`"
+delivery_dev,service_project_management_gld,pse_resource_request,11,group_id,string,YES,"Identifier for a specific group, stored as a string.
+Alias: `Group Identifier`"
+delivery_dev,service_project_management_gld,pse_resource_request,12,notes_txt,string,YES,Text notes related to business data
+delivery_dev,service_project_management_gld,pse_resource_request,13,opportunity_id,string,YES,"Unique identifier for an opportunity, stored as a string.
+Alias: `Opportunity Identifier`"
+delivery_dev,service_project_management_gld,pse_resource_request,14,percent_allocated_pct,"decimal(18,2)",YES,"Percentage of allocated resources, with decimal precision.
+Alias: `Percent Allocated Percent`"
+delivery_dev,service_project_management_gld,pse_resource_request,15,practice_id,string,YES,"Description: Unique identifier for a practice, stored as a string.
+Alias: `Practice Identifier`
+key constraints: `practice_id` is a foreign key column in this table which refers to `pse_practice` table where the primary key column is `id`."
+delivery_dev,service_project_management_gld,pse_resource_request,16,preferred_schedule_id,string,YES,"Identifier for preferred schedule, stored as a string.
+Alias: `Preferred Schedule Identifier`"
+delivery_dev,service_project_management_gld,pse_resource_request,17,primary_skill_certification_id,string,YES,"Identifier for primary skill certification, stored as a string.
+Alias: `Primary Skill Certification Identifier`"
+delivery_dev,service_project_management_gld,pse_resource_request,18,primary_skill_minimum_rating_txt,string,YES,Text field containing the minimum rating for an individual's primary skill.
+delivery_dev,service_project_management_gld,pse_resource_request,19,project_id,string,YES,"Description: A string representing the unique identifier for a project.
+Alias: `Project Identifier`
+key constraints: `project_id` is a foreign key column in this table which refers to `pse_project` table where the primary key column is `id`."
+delivery_dev,service_project_management_gld,pse_resource_request,20,region_id,string,YES,"Description: The region identifier, stored as a string. 
+Alias: `Region Identifier`
+key constraints: `region_id` is a foreign key column in this table which refers to `pse_region` table where the primary key column is `id`."
+delivery_dev,service_project_management_gld,pse_resource_request,21,request_priority_cd,string,YES,"Indicates the priority level of a request, represented as a string code.
+Alias: `Request Priority Code`"
+delivery_dev,service_project_management_gld,pse_resource_request,22,requested_bill_rate_lc_amt,"decimal(38,18)",YES,"Requested Bill Rate (Lower Limit) Amount, decimal data type"
+delivery_dev,service_project_management_gld,pse_resource_request,23,resource_held_ind,boolean,YES,Indicates if a resource is currently held (TRUE) or not (FALSE)
+delivery_dev,service_project_management_gld,pse_resource_request,24,resource_role_nm,string,YES,"Role name of the resource, string data type.
+Alias: `Resource Role Name`"
+delivery_dev,service_project_management_gld,pse_resource_request,25,resource_id,string,YES,"Description: Unique identifier for a resource, stored as a string.
+Alias: `Resource Identifier`
+key constraints: `resource_id` is a foreign key column in this table which refers to `contact` table where the primary key column is `id`."
+delivery_dev,service_project_management_gld,pse_resource_request,26,suggested_bill_rate_currency_cd,string,YES,"Currency code for the suggested bill rate, stored as a string."
+delivery_dev,service_project_management_gld,pse_resource_request,27,suggested_bill_rate_lc_amt,"decimal(38,18)",YES,"Suggested bill rate low currency amount, decimal data type"
+delivery_dev,service_project_management_gld,pse_resource_request,28,start_dt,date,YES,"Start date of the event or transaction, stored in DATE data type.
+Alias: `Start Date`"
+delivery_dev,service_project_management_gld,pse_resource_request,29,status_nm,string,YES,"User status code in string format
+Alias: `Status Name`"
+delivery_dev,service_project_management_gld,pse_resource_request,30,system_mod_stamp_ts,timestamp,YES,Timestamp indicating the last system modification time.
+delivery_dev,service_project_management_gld,pse_resource_request,31,staffer_resource_id,string,YES,"Description: Identifier for a staffer resource, stored as a string.
+Alias: `Staffer Resource Identifier`
+key constraints: `staffer_resource_id` is a foreign key column in this table which refers to `contact` table where the primary key column is `id`."
+delivery_dev,service_project_management_gld,pse_resource_request,32,sow_hours_nbr,"decimal(38,18)",YES,"Own hours worked, decimal data type.
+Alias: `Sow Hours Number`"
+delivery_dev,service_project_management_gld,pse_resource_request,33,time_of_assigned_status_ts,timestamp,YES,"Timestamp of assigned status change
+Alias: `Time Of Assigned Status Timestamp`"
+delivery_dev,service_project_management_gld,pse_resource_request,34,source_update_utc_ts,timestamp,YES,"Timestamp of the source's last update in Coordinated Universal Time (UTC).
+Alias: `Source Update Utc Timestamp`"
+delivery_dev,service_project_management_gld,pse_resource_request,35,source_create_utc_ts,timestamp,YES,"Timestamp indicating when the data was created in the source system (UTC).
+Alias: `Source Create Utc Timestamp`"
+delivery_dev,service_project_management_gld,pse_resource_request,36,source_file_nm,string,YES,"The name of the source file from which the data was extracted.
+Alias: `Source File Name`"
+delivery_dev,service_project_management_gld,pse_resource_request,37,source_file_ts,timestamp,YES,"Timestamp indicating the source file's creation or modification time.
+Alias: `Source File Timestamp`"
+delivery_dev,service_project_management_gld,pse_resource_request,38,udp_create_utc_ts,timestamp,YES,UTC timestamp of when the record was created.
+delivery_dev,service_project_management_gld,pse_resource_request,39,delivery_role_id,string,YES,"Identifier for the delivery role, stored as a string.
+Alias: `Delivery Role Identifier`"
+delivery_dev,service_project_management_gld,pse_resource_request,40,labor_type_id,string,YES,"Identifier for the type of labor, stored as a string.
+Alias: `Labor Type Identifier`"
+delivery_dev,service_project_management_gld,pse_resource_request,41,resource_request_nm,string,YES,"The name of the resource request, represented as a string.
+Alias: `Resource Request Name`"
+delivery_dev,service_project_management_gld,pse_resource_request,42,average_cost_rate_currency_cd,string,YES,"The currency code for the average cost rate, stored as a string.
+Alias: `Average Cost Rate Currency Code`"
+delivery_dev,service_project_management_gld,pse_resource_request,43,average_cost_rate_nbr,"decimal(18,2)",YES,"Represents the average cost rate for non-branded items, stored as a decimal value.
+Alias: `Average Cost Rate Number`"
+delivery_dev,service_project_management_gld,pse_resource_request,44,average_cost_rate_lc_amt,"decimal(18,2)",YES,Represents the average cost rate in the lowest common currency amount (LC_amt)
+delivery_dev,service_project_management_gld,pse_resource_request,45,estimated_avg_weekly_hrs_nbr,"decimal(18,2)",YES,"Estimated average weekly hours for non-branded tasks, decimal data type.
+Alias: `Estimated Average Weekly Hours Number`"
+delivery_dev,service_project_management_gld,pse_resource_request,46,number_of_initial_request_days_nbr,"decimal(18,2)",YES,"Number of days since initial request for nbrand
+Alias: `Number Of Initial Request Days Number`"
+delivery_dev,service_project_management_gld,pse_resource_request,47,rate_card_id,string,YES,"A unique identifier for a payment card, stored as a string.
+Alias: `Rate Card Identifier`"
+delivery_dev,service_project_management_gld,pse_resource_request,48,gdn_rsrc_ind,boolean,YES,"Indicator for garden resource, boolean data type"
+delivery_dev,service_project_management_gld,pse_resource_request,49,udp_update_utc_ts,timestamp,YES,Timestamp of the most recent UDP update (UTC).
+delivery_dev,service_project_management_gld,pse_resource_request,50,delivery_role_nm,string,YES,"Role related to order delivery, string value.
+Alias: `Delivery Role Name`"
+delivery_dev,service_project_management_gld,pse_resource_request,51,primary_skill_certification_nm,string,YES,"Description of the primary skill certification name, stored as a string.
+Alias: `Primary Skill Certification Name`"
+delivery_dev,service_project_management_gld,pse_resource_request,52,labor_type_nm,string,YES,"Type of labor, categorized as string values.
+Alias: `Labor Type Name`"
+delivery_dev,service_project_management_gld,pse_resource_request,53,labor_type_erp_system_nm,string,YES,"Type of labor in ERP system, represented as a string."
+delivery_dev,service_project_management_gld,pse_resource_request,54,created_by_employee_nm,string,YES,"The username or ID of the employee who created the record, stored as a string.
+Alias: `Created By Employee Name`"
+delivery_dev,service_project_management_gld,pse_resource_request,55,created_by_employee_reference_nbr,string,YES,"Employee reference number for the creator of the record.
+Alias: `Created By Employee Reference Number`"
+delivery_dev,service_project_management_gld,pse_resource_request,56,created_by_employee_email_txt,string,YES,"The email address of the employee who created the record, stored as a string."
+delivery_dev,service_project_management_gld,pse_resource_request,57,last_modified_by_employee_nm,string,YES,"Name of the employee who last modified the data
+Alias: `Last Modified By Employee Name`"
+delivery_dev,service_project_management_gld,pse_resource_request,58,last_modified_by_employee_reference_nbr,string,YES,"Employee reference number for the last modifier
+Alias: `Last Modified By Employee Reference Number`"
+delivery_dev,service_project_management_gld,pse_resource_request,59,last_modified_by_employee_email_txt,string,YES,"The email address of the employee who last modified the record.
+Alias: `Last Modified By Employee Email Text`"
+delivery_dev,service_project_management_gld,pse_resource_request,60,resource_nm,string,YES,"Business unit or department name
+Alias: `Resource Name`"
+delivery_dev,service_project_management_gld,pse_resource_request,61,resource_employee_reference_nbr,string,YES,"Employee reference number, string format
+Alias: `Resource Employee Reference Number`"
+delivery_dev,service_project_management_gld,pse_resource_request,62,resource_email_txt,string,YES,"The email address of the resource, stored as a string.
+Alias: `Resource Email Text`"
+delivery_dev,service_project_management_gld,pse_resource_request,63,staffer_resource_nm,string,YES,"Staff resource name, stored as a string.
+Alias: `Staffer Resource Name`"
+delivery_dev,service_project_management_gld,pse_resource_request,64,staffer_resource_employee_reference_nbr,string,YES,"Employee reference number for Staffer Resource, stored as a string.
+Alias: `Staffer Resource Employee Reference Number`"
+delivery_dev,service_project_management_gld,pse_resource_request,65,staffer_resource_email_txt,string,YES,"Staff resource email addresses, stored as strings."
+delivery_dev,service_project_management_gld,pse_resource_request,66,requested_bill_rate_usd_amt,"decimal(18,2)",YES,"Requested Bill Rate in USD, decimal datatype"
+delivery_dev,service_project_management_gld,pse_resource_request,67,suggested_bill_rate_usd_amt,"decimal(18,2)",YES,"Suggested Bill Rate in USD, Decimal Data Type"
+delivery_dev,service_project_management_gld,pse_resource_request,68,average_cost_rate_usd_amt,"decimal(18,2)",YES,Average cost rate in US dollars (decimal)
+delivery_dev,service_project_management_gld,pse_resource_request,69,time_of_cancelled_status_ts,timestamp,YES,"Timestamp of cancelled status
+Alias: `Time Of Cancelled Status Timestamp`"
+delivery_dev,service_project_management_gld,pse_resource_request,70,time_of_hold_status_ts,timestamp,YES,"Timestamp indicating the time of hold status.
+Alias: `Time Of Hold Status Timestamp`"
+delivery_dev,service_project_management_gld,pse_resource_request,71,time_of_ready_to_staff_ts,timestamp,YES,"Timestamp of when the item was ready for staff review, data type TIMESTAMP"
+delivery_dev,service_project_management_gld,pse_resource_request,72,time_to_approve_nbr,"decimal(10,1)",YES,"Average time taken to approve new brand requests (decimal data type)
+Alias: `Time To Approve Number`"
+delivery_dev,service_project_management_gld,pse_resource_request,73,time_to_hold_nbr,"decimal(10,1)",YES,"Time to hold new brand (decimal)
+Alias: `Time To Hold Number`"
+delivery_dev,service_project_management_gld,pse_resource_request,74,time_to_tentative_status_ts,timestamp,YES,"Timestamp representing the time to tentative status
+Alias: `Time To Tentative Status Timestamp`"
+delivery_dev,service_project_management_gld,pse_resource_request,75,total_lifespan_nbr,"decimal(10,1)",YES,"Represents the total lifespan of nbrand products in decimal format.
+Alias: `Total Lifespan Number`"
+delivery_dev,service_project_management_gld,pse_resource_request,76,bill_rate_is_daily_rate_ind,boolean,YES,Indicates if the bill rate is a daily rate (TRUE) or not (FALSE)
+delivery_dev,service_project_management_gld,pse_resource_request,77,time_of_draft_status_ts,timestamp,YES,Timestamp of draft status update
+delivery_dev,service_project_management_gld,pse_resource_request,78,time_of_external_hiring_status_ts,timestamp,YES,Timestamp of external hiring status update
+delivery_dev,service_project_management_gld,pse_resource_request,79,time_of_internal_search_status_ts,timestamp,YES,Timestamp of internal search status update
+delivery_dev,service_project_management_gld,pse_resource_request,80,time_of_ready_to_staff_status_ts,timestamp,YES,Timestamp when staff status became ready
+delivery_dev,service_project_management_gld,pse_resource_request,81,time_of_subco_engagement_status_ts,timestamp,YES,Timestamp of subco engagement status
+delivery_dev,service_project_management_gld,pse_resource_request,82,time_of_submitted_for_approval_status_ts,timestamp,YES,Timestamp when submitted for approval
+delivery_dev,service_project_management_gld,pse_resource_request,83,resource_manager_id,string,YES,ID of the resource manager
+delivery_dev,service_project_management_gld,pse_resource_request,84,staffing_manager_id,string,YES,Identifier of the staffing manager
+delivery_dev,service_project_management_gld,pse_resource_request,85,resource_manager_employee_nm,string,YES,Name of the resource manager employee
+delivery_dev,service_project_management_gld,pse_resource_request,86,resource_manager_employee_reference_nbr,string,YES,Employee reference number for resource manager
+delivery_dev,service_project_management_gld,pse_resource_request,87,resource_manager_employee_email_txt,string,YES,Email address of the resource manager
+delivery_dev,service_project_management_gld,pse_resource_request,88,staffing_manager_nm,string,YES,Name of the staffing manager
+delivery_dev,service_project_management_gld,pse_resource_request,89,staffing_manager_employee_reference_nbr,string,YES,Staffing manager's employee reference number
+delivery_dev,service_project_management_gld,pse_resource_request,90,staffing_manager_email_txt,string,YES,Staffing manager's email address
+delivery_dev,service_project_management_gld,pse_resource_request,91,reference_assignment_nbr,string,YES,Brand assigned to the reference
+delivery_dev,service_project_management_gld,pse_resource_request,92,exclude_from_planners_ind,boolean,YES,Indicator for exclusion from planners
+delivery_dev,service_project_management_gld,pse_resource_request,93,account_id,string,YES,Unique identifier for the account as a string
+delivery_dev,service_project_management_gld,pse_resource_request,94,account_nm,string,YES,Account name
+delivery_dev,service_project_management_gld,pse_resource_request,95,wpn_id,string,YES,Unique identifier as a string
+delivery_dev,service_project_management_gld,pse_resource_request,96,external_sourcing_system_nm,string,YES,Name of the external sourcing system
+delivery_dev,service_project_management_gld,pse_resource_request,97,external_sourcing_status_nm,string,YES,Status of external sourcing
+delivery_dev,service_project_management_gld,pse_resource_request,98,external_sourcing_system_id,string,YES,Identifier from external sourcing system
+delivery_dev,service_project_management_gld,pse_resource_request,99,billing_key_id,string,YES,Unique identifier for billing key as a string
+delivery_dev,service_project_management_gld,pse_resource_request,100,opty_id,string,YES,Unique opportunity identifier
+delivery_dev,service_project_management_gld,pse_resource_request,101,psn_dn,string,YES,Downstream partner name
+delivery_dev,service_project_management_gld,pse_resource_request,102,rsn_for_subco_hre_txt,string,YES,Subco HRE text
+delivery_dev,service_project_management_gld,pse_resource_request,103,allow_candidates_to_self_nominate_ind,boolean,YES,Flag indicating if candidates can self-nominate
+delivery_dev,service_project_management_gld,pse_resource_request,104,job_level_nm,string,YES,Job level name
+delivery_dev,service_project_management_gld,pse_resource_request,105,job_title_nm,string,YES,Job title name
+delivery_dev,service_project_management_gld,pse_resource_request,106,primary_quote_txt,string,YES,Primary quote text
+delivery_dev,service_project_management_gld,pse_resource_request,107,cpq_iteration_id,"decimal(6,2)",YES,Unique identifier for the CPQ iteration
+delivery_dev,service_project_management_gld,pse_resource_request,108,updated_by_cpq_iteration_ts,timestamp,YES,Timestamp of last update by CPQ iteration
+delivery_dev,service_project_management_gld,pse_resource_request,109,estimate_from_cpq_nm,string,YES,Estimated value from CPQ in non-monetary currency
+delivery_dev,service_project_management_gld,pse_resource_request,110,cpq_role_id,string,YES,CPQ role identifier
+delivery_dev,service_project_management_gld,pse_resource_request,111,ffscpq_estimate_id,string,YES,Unique identifier for the FFS CPQ estimate
+delivery_dev,service_project_management_gld,pse_resource_request,112,specialization_id,string,YES,Unique identifier for a specialization
+delivery_dev,service_project_management_gld,pse_resource_request,113,specialization_skill_nm,string,YES,Specialization or skill name
+delivery_dev,service_project_management_gld,pse_resource_request,114,reason_for_split_nm,string,YES,Reason for split transaction
+delivery_dev,service_project_management_gld,pse_resource_skill_request,0,id,string,YES,"Unique identifier, string data type.
+Alias: `Identifier`
+key constraints: This column acts as primary key for the `pse_resource_skill_request` table"
+delivery_dev,service_project_management_gld,pse_resource_skill_request,1,is_deleted_ind,boolean,YES,Indicator flag denoting whether a record has been deleted (TRUE) or not (FALSE).
+delivery_dev,service_project_management_gld,pse_resource_skill_request,2,name_nm,string,YES,Description: Specifies the resource skill request name.
+delivery_dev,service_project_management_gld,pse_resource_skill_request,3,created_dt,timestamp,YES,"Timestamp indicating when a record was created.
+Alias: `Created Date`"
+delivery_dev,service_project_management_gld,pse_resource_skill_request,4,created_by_id,string,YES,"Identifier for the creator of the record, stored as a string.
+Alias: `Created By Identifier`"
+delivery_dev,service_project_management_gld,pse_resource_skill_request,5,last_modified_dt,timestamp,YES,"Timestamp indicating the last modification of the respective data entry.
+Alias: `Last Modified Date`"
+delivery_dev,service_project_management_gld,pse_resource_skill_request,6,last_modified_by_id,string,YES,"Identifier for the user who last modified the record
+Alias: `Last Modified By Identifier`"
+delivery_dev,service_project_management_gld,pse_resource_skill_request,7,system_mod_stamp_ts,timestamp,YES,Timestamp indicating the last system modification time.
+delivery_dev,service_project_management_gld,pse_resource_skill_request,8,skill_certification_id,string,YES,Identifier for skill certification.
+delivery_dev,service_project_management_gld,pse_resource_skill_request,9,is_primary_ind,boolean,YES,"Indicator flag denoting if the record is a primary entity, with boolean data type."
+delivery_dev,service_project_management_gld,pse_resource_skill_request,10,match_all_ind,boolean,YES,Indicates if all criteria are matched (Boolean).
+delivery_dev,service_project_management_gld,pse_resource_skill_request,11,minimum_rating_txt,string,YES,"The minimum rating as text, represented as a string."
+delivery_dev,service_project_management_gld,pse_resource_skill_request,12,resource_request_id,string,YES,"Unique identifier for a resource request, stored as a string.
+key constraints: `resource_request_id` is a foreign key column in this table which refers to `pse_resource_request` table where the primary key column is `id`."
+delivery_dev,service_project_management_gld,pse_resource_skill_request,13,skill_record_type_dsc,string,YES,Description of the skill record type.
+delivery_dev,service_project_management_gld,pse_resource_skill_request,14,skill_or_certification_dsc,string,YES,"Description of skill or certification, string data type."
+delivery_dev,service_project_management_gld,pse_resource_skill_request,15,source_update_utc_ts,timestamp,YES,"Timestamp of the source's last update in Coordinated Universal Time (UTC).
+Alias: `Source Update Utc Timestamp`"
+delivery_dev,service_project_management_gld,pse_resource_skill_request,16,source_create_utc_ts,timestamp,YES,"Timestamp indicating when the data was created in the source system (UTC).
+Alias: `Source Create Utc Timestamp`"
+delivery_dev,service_project_management_gld,pse_resource_skill_request,17,source_file_nm,string,YES,"The name of the source file from which the data was extracted.
+Alias: `Source File Name`"
+delivery_dev,service_project_management_gld,pse_resource_skill_request,18,source_file_ts,timestamp,YES,"Timestamp indicating the source file's creation or modification time.
+Alias: `Source File Timestamp`"
+delivery_dev,service_project_management_gld,pse_resource_skill_request,19,udp_create_utc_ts,timestamp,YES,UTC timestamp of when the record was created.
+delivery_dev,service_project_management_gld,pse_resource_skill_request,20,udp_update_utc_ts,timestamp,YES,Timestamp of the most recent UDP update (UTC).
+delivery_dev,service_project_management_gld,pse_resource_skill_request,21,skill_certification_nm,string,YES,"The name of the skill certification, stored as a string."
+delivery_dev,service_project_management_gld,pse_resource_skill_request,22,skill_certification_external_id,string,YES,A string representing the external ID for a skill certification.
+delivery_dev,service_project_management_gld,pse_resource_skill_request,23,created_by_employee_nm,string,YES,"The username or ID of the employee who created the record, stored as a string.
+Alias: `Created By Employee Name`"
+delivery_dev,service_project_management_gld,pse_resource_skill_request,24,created_by_employee_reference_nbr,string,YES,"Employee reference number for the creator of the record.
+Alias: `Created By Employee Reference Number`"
+delivery_dev,service_project_management_gld,pse_resource_skill_request,25,created_by_employee_email_txt,string,YES,"The email address of the employee who created the record, stored as a string."
+delivery_dev,service_project_management_gld,pse_resource_skill_request,26,last_modified_by_employee_nm,string,YES,"Name of the employee who last modified the record, stored as a string.
+Alias: `Last Modified By Employee Name`"
+delivery_dev,service_project_management_gld,pse_resource_skill_request,27,last_modified_by_employee_reference_nbr,string,YES,"Employee reference number for the last modifier
+Alias: `Last Modified By Employee Reference Number`"
+delivery_dev,service_project_management_gld,pse_resource_skill_request,28,last_modified_by_employee_email_txt,string,YES,"The email address of the employee who last modified the record.
+Alias: `Last Modified By Employee Email Text`"
+delivery_dev,service_project_management_gld,pse_skill,0,id,string,YES,"Unique identifier, string data type.
+Alias: `Identifier`
+key constraints: This column acts as primary key for the `pse_skill` table"
+delivery_dev,service_project_management_gld,pse_skill,1,owner_id,string,YES,"The unique identifier for the owner, stored as a string.
+Alias: `Owner Identifier`"
+delivery_dev,service_project_management_gld,pse_skill,2,is_deleted_ind,boolean,YES,Indicator flag denoting whether a record has been deleted (TRUE) or not (FALSE).
+delivery_dev,service_project_management_gld,pse_skill,3,name_nm,string,YES,Description: Specifies the skill name.
+delivery_dev,service_project_management_gld,pse_skill,4,currency_iso_cd,string,YES,The ISO 4217 currency code represented as a string.
+delivery_dev,service_project_management_gld,pse_skill,5,record_type_id,string,YES,"Identifier for the type of record, stored as a string.
+Alias: `Record Type Identifier`"
+delivery_dev,service_project_management_gld,pse_skill,6,created_dt,timestamp,YES,"Timestamp indicating when a record was created.
+Alias: `Created Date`"
+delivery_dev,service_project_management_gld,pse_skill,7,created_by_id,string,YES,"The unique identifier of the user who created the record, stored as a string.
+Alias: `Created By Identifier`"
+delivery_dev,service_project_management_gld,pse_skill,8,last_modified_dt,timestamp,YES,"Timestamp indicating the last modification of the respective data entry.
+Alias: `Last Modified Date`"
+delivery_dev,service_project_management_gld,pse_skill,9,last_modified_by_id,string,YES,"Identifier for the user who last modified the record
+Alias: `Last Modified By Identifier`"
+delivery_dev,service_project_management_gld,pse_skill,10,system_mod_stamp_ts,timestamp,YES,Timestamp indicating the last system modification.
+delivery_dev,service_project_management_gld,pse_skill,11,certification_source_txt,string,YES,Text field containing certification source information.
+delivery_dev,service_project_management_gld,pse_skill,12,description_txt,string,YES,Brief description of the business column
+delivery_dev,service_project_management_gld,pse_skill,13,external_id,string,YES,"A string representing the external ID for a given record.
+Alias: `External Identifier`"
+delivery_dev,service_project_management_gld,pse_skill,14,group_txt,string,YES,"Group name or identifier, represented as a string."
+delivery_dev,service_project_management_gld,pse_skill,15,hierarchy_key_path_txt,string,YES,"Text representation of the hierarchy key path, stored as a string."
+delivery_dev,service_project_management_gld,pse_skill,16,hierarchy_level_nbr,int,YES,"Integer representation of the hierarchy level for the corresponding brand.
+Alias: `Hierarchy Level Number`"
+delivery_dev,service_project_management_gld,pse_skill,17,hierarchy_path_txt,string,YES,"Text representation of the hierarchy path
+Alias: `Hierarchy Path Text`"
+delivery_dev,service_project_management_gld,pse_skill,18,parent_category_id,string,YES,"Identifier for the parent category of an item or service.
+Alias: `Parent Category Identifier`"
+delivery_dev,service_project_management_gld,pse_skill,19,parent_hierarchy_level_nbr,int,YES,"Integer representation of the hierarchy level for the parent brand.
+Alias: `Parent Hierarchy Level Number`"
+delivery_dev,service_project_management_gld,pse_skill,20,parent_record_type_dsc,string,YES,"Description of the parent record type, string data type.
+Alias: `Parent Record Type Description`"
+delivery_dev,service_project_management_gld,pse_skill,21,record_type_nm,string,YES,"Type of record, represented as a string
+Alias: `Record Type Name`"
+delivery_dev,service_project_management_gld,pse_skill,22,skill_or_certification_dsc,string,YES,"Description of skill or certification, string data type."
+delivery_dev,service_project_management_gld,pse_skill,23,type_txt,string,YES,Text representation of the business column type.
+delivery_dev,service_project_management_gld,pse_skill,24,unique_name_txt,string,YES,"Unique name of the business, stored as a string."
+delivery_dev,service_project_management_gld,pse_skill,25,snow_sys_id,string,YES,"A string representing the system ID for snow.
+Alias: `Snow System Identifier`"
+delivery_dev,service_project_management_gld,pse_skill,26,source_update_utc_ts,timestamp,YES,"Timestamp of the source's last update in Coordinated Universal Time (UTC).
+Alias: `Source Update Utc Timestamp`"
+delivery_dev,service_project_management_gld,pse_skill,27,source_create_utc_ts,timestamp,YES,"Timestamp indicating when the data was created in the source system (UTC).
+Alias: `Source Create Utc Timestamp`"
+delivery_dev,service_project_management_gld,pse_skill,28,udp_create_utc_ts,timestamp,YES,UTC timestamp indicating when a record was created.
+delivery_dev,service_project_management_gld,pse_skill,29,source_file_nm,string,YES,"The name of the source file from which the data was extracted.
+Alias: `Source File Name`"
+delivery_dev,service_project_management_gld,pse_skill,30,source_file_ts,timestamp,YES,"Timestamp indicating the source file's creation or modification time.
+Alias: `Source File Timestamp`"
+delivery_dev,service_project_management_gld,pse_skill,31,udp_update_utc_ts,timestamp,YES,Timestamp of the most recent UDP update (UTC).
+delivery_dev,service_project_management_gld,pse_skill,32,created_by_employee_nm,string,YES,"The username or ID of the employee who created the record, stored as a string.
+Alias: `Created By Employee Name`"
+delivery_dev,service_project_management_gld,pse_skill,33,created_by_employee_reference_nbr,string,YES,"Employee reference number for the creator of the record, stored as a string.
+Alias: `Created By Employee Reference Number`"
+delivery_dev,service_project_management_gld,pse_skill,34,created_by_employee_email_txt,string,YES,"The email address of the employee who created the record, stored as a string."
+delivery_dev,service_project_management_gld,pse_skill,35,last_modified_by_employee_nm,string,YES,"Name of the employee who last modified the record, stored as a string.
+Alias: `Last Modified By Employee Name`"
+delivery_dev,service_project_management_gld,pse_skill,36,last_modified_by_employee_reference_nbr,string,YES,"Employee reference number for the last modifier
+Alias: `Last Modified By Employee Reference Number`"
+delivery_dev,service_project_management_gld,pse_skill,37,last_modified_by_employee_email_txt,string,YES,"The email address of the employee who last modified the record.
+Alias: `Last Modified By Employee Email Text`"
+delivery_dev,service_project_management_gld,pse_work_calendar,0,id,string,YES,"Unique identifier, string data type."
+delivery_dev,service_project_management_gld,pse_work_calendar,1,owner_id,string,YES,"The unique identifier for the owner, stored as a string."
+delivery_dev,service_project_management_gld,pse_work_calendar,2,is_deleted_ind,boolean,YES,Indicator flag denoting whether a record has been deleted (TRUE) or not (FALSE).
+delivery_dev,service_project_management_gld,pse_work_calendar,3,name_nm,string,YES,"Name of the individual or entity, stored as a string."
+delivery_dev,service_project_management_gld,pse_work_calendar,4,created_dt,timestamp,YES,Timestamp indicating when a record was created.
+delivery_dev,service_project_management_gld,pse_work_calendar,5,created_by_id,string,YES,"The unique identifier of the user who created the record, stored as a string."
+delivery_dev,service_project_management_gld,pse_work_calendar,6,last_modified_dt,timestamp,YES,Timestamp indicating the last modification of the respective data entry.
+delivery_dev,service_project_management_gld,pse_work_calendar,7,last_modified_by_id,string,YES,Identifier for the user who last modified the record
+delivery_dev,service_project_management_gld,pse_work_calendar,8,system_mod_stamp_ts,timestamp,YES,Timestamp indicating the last system modification.
+delivery_dev,service_project_management_gld,pse_work_calendar,9,monday_end_hour_txt,string,YES,Textual description of the end hour on Mondays
+delivery_dev,service_project_management_gld,pse_work_calendar,10,monday_hours_nbr,"decimal(38,18)",YES,"Represents the number of hours for the nbrand on Mondays, stored as a decimal value."
+delivery_dev,service_project_management_gld,pse_work_calendar,11,monday_start_hour_txt,string,YES,Textual representation of the start hour on Mondays.
+delivery_dev,service_project_management_gld,pse_work_calendar,12,tuesday_end_hour_txt,string,YES,Textual representation of end hour for Tuesday's business operations.
+delivery_dev,service_project_management_gld,pse_work_calendar,13,tuesday_hours_nbr,"decimal(38,18)",YES,"Represents the operating hours of the non-branded businesses on Tuesdays, stored in decimal format."
+delivery_dev,service_project_management_gld,pse_work_calendar,14,tuesday_start_hour_txt,string,YES,Textual representation of the start hour on Tuesdays.
+delivery_dev,service_project_management_gld,pse_work_calendar,15,wednesday_end_hour_txt,string,YES,Textual representation of the ending hour of a Wednesday event or time frame.
+delivery_dev,service_project_management_gld,pse_work_calendar,16,wednesday_hours_nbr,"decimal(38,18)",YES,"Represents the number of hours a business is open on Wednesdays, stored as a decimal data type."
+delivery_dev,service_project_management_gld,pse_work_calendar,17,wednesday_start_hour_txt,string,YES,Textual representation of the starting hour on Wednesdays
+delivery_dev,service_project_management_gld,pse_work_calendar,18,thursday_end_hour_txt,string,YES,Textual representation of the ending hour of Thursday's business hours.
+delivery_dev,service_project_management_gld,pse_work_calendar,19,thursday_hours_nbr,"decimal(38,18)",YES,Represents the number of hours for Thursday in decimal format.
+delivery_dev,service_project_management_gld,pse_work_calendar,20,thursday_start_hour_txt,string,YES,Textual representation of the starting hour on Thursdays
+delivery_dev,service_project_management_gld,pse_work_calendar,21,friday_end_hour_txt,string,YES,Textual representation of the ending hour of Friday operations
+delivery_dev,service_project_management_gld,pse_work_calendar,22,friday_hours_nbr,"decimal(38,18)",YES,"Represents the number of hours open on Fridays, stored as a decimal value."
+delivery_dev,service_project_management_gld,pse_work_calendar,23,friday_start_hour_txt,string,YES,Textual representation of the starting hour on Fridays.
+delivery_dev,service_project_management_gld,pse_work_calendar,24,saturday_end_hour_txt,string,YES,Textual representation of the ending hour of business on Saturdays.
+delivery_dev,service_project_management_gld,pse_work_calendar,25,saturday_hours_nbr,"decimal(38,18)",YES,"Represents the number of hours a business is open on Saturdays, with a decimal data type."
+delivery_dev,service_project_management_gld,pse_work_calendar,26,saturday_start_hour_txt,string,YES,Textual representation of the starting hour of Saturday operations.
+delivery_dev,service_project_management_gld,pse_work_calendar,27,sunday_end_hour_txt,string,YES,Textual representation of the ending hour on Sundays
+delivery_dev,service_project_management_gld,pse_work_calendar,28,sunday_hours_nbr,"decimal(38,18)",YES,"Sunday operating hours for new brand locations, represented as a decimal number."
+delivery_dev,service_project_management_gld,pse_work_calendar,29,sunday_start_hour_txt,string,YES,Textual representation of the starting hour on Sundays
+delivery_dev,service_project_management_gld,pse_work_calendar,30,week_start_day_txt,string,YES,Text label indicating the start day of the week
+delivery_dev,service_project_management_gld,pse_work_calendar,31,week_total_hours_nbr,"decimal(38,18)",YES,Total number of hours spent on non-branded activities for the week (decimal).
+delivery_dev,service_project_management_gld,pse_work_calendar,32,weekends_are_workdays_ind,boolean,YES,Indicator for whether weekends are considered workdays (Boolean)
+delivery_dev,service_project_management_gld,pse_work_calendar,33,standard_hours_per_day_nbr,"decimal(38,18)",YES,"Usual number of hours worked per day by brand, stored as a decimal."
+delivery_dev,service_project_management_gld,pse_work_calendar,34,external_id,string,YES,A string representing a unique external identifier.
+delivery_dev,service_project_management_gld,pse_work_calendar,35,source_update_utc_ts,timestamp,YES,Timestamp indicating the last update of the source in Coordinated Universal Time (UTC).
+delivery_dev,service_project_management_gld,pse_work_calendar,36,source_create_utc_ts,timestamp,YES,Timestamp indicating when the data was created in the source system (UTC).
+delivery_dev,service_project_management_gld,pse_work_calendar,37,source_file_nm,string,YES,The name of the source file from which the data was extracted.
+delivery_dev,service_project_management_gld,pse_work_calendar,38,source_file_ts,timestamp,YES,Timestamp indicating the source file's creation or modification time.
+delivery_dev,service_project_management_gld,pse_work_calendar,39,udp_create_utc_ts,timestamp,YES,UTC timestamp of when the record was created.
+delivery_dev,service_project_management_gld,pse_work_calendar,40,udp_update_utc_ts,timestamp,YES,Timestamp of the most recent UDP update (UTC).
+delivery_dev,service_project_management_gld,pse_work_calendar,41,created_by_employee_nm,string,YES,"The username or ID of the employee who created the record, stored as a string."
+delivery_dev,service_project_management_gld,pse_work_calendar,42,created_by_employee_reference_nbr,string,YES,Employee reference number for the creator of the record.
+delivery_dev,service_project_management_gld,pse_work_calendar,43,created_by_employee_email_txt,string,YES,"The email address of the employee who created the record, stored as a string."
+delivery_dev,service_project_management_gld,pse_work_calendar,44,last_modified_by_employee_nm,string,YES,Employee name who last modified the record
+delivery_dev,service_project_management_gld,pse_work_calendar,45,last_modified_by_employee_reference_nbr,string,YES,Employee reference number for the last modifier
+delivery_dev,service_project_management_gld,pse_work_calendar,46,last_modified_by_employee_email_txt,string,YES,The email address of the employee who last modified the record.
+workforce_management_dev,workforce_gld,employee_skills,0,emp_id,string,YES,"Employee ID, string datatype"
+workforce_management_dev,workforce_gld,employee_skills,1,skill_id,string,YES,"Identifier for a specific skill, stored as a string."
+workforce_management_dev,workforce_gld,employee_skills,2,src_skill_nm,string,YES,"Source skill name, string data type"
+workforce_management_dev,workforce_gld,employee_skills,3,company_id,string,YES,"Identifier for a company, stored as a string."
+workforce_management_dev,workforce_gld,employee_skills,4,email_primary_work,string,YES,"Primary work email address, stored as a string."
+workforce_management_dev,workforce_gld,employee_skills,5,skill_nm,string,YES,Job skill or qualification name --- Definition generated by Databricks AI on 2025-01-15
+workforce_management_dev,workforce_gld,employee_skills,6,prof_rating,string,YES,Professional rating as a string
+workforce_management_dev,workforce_gld,employee_skills,7,native_lang,string,YES,The native language of an individual or a group.
+workforce_management_dev,workforce_gld,employee_skills,8,cert_issuer,string,YES,"The name of the entity that issued the certificate, stored as a string."
+workforce_management_dev,workforce_gld,employee_skills,9,cert_expiry_dt,timestamp,YES,Certificate expiration date and time
+workforce_management_dev,workforce_gld,employee_skills,10,org_l04_cd,string,YES,"Organization level 4 code, string data type"
+workforce_management_dev,workforce_gld,employee_skills,11,src_sys_crt_ts,timestamp,YES,"Source system creation timestamp, data type TIMESTAMP"
+workforce_management_dev,workforce_gld,employee_skills,12,src_sys_upd_ts,timestamp,YES,"Source system update timestamp, data type TIMESTAMP"
+workforce_management_dev,workforce_gld,employee_skills,13,source_file_nm,string,YES,The name of the source file from which the data was extracted.
+workforce_management_dev,workforce_gld,employee_skills,14,source_file_ts,timestamp,YES,Timestamp indicating the source file's creation or modification time.
+workforce_management_dev,workforce_gld,employee_skills,15,udp_create_utc_ts,timestamp,YES,UTC timestamp indicating when a record was created.
+workforce_management_dev,workforce_gld,employee_skills,16,udp_update_utc_ts,timestamp,YES,Timestamp indicating the last update in Coordinated Universal Time (UTC) for a record.
+workforce_management_dev,workforce_gld,employee_skills,17,load_cd,string,YES,"Represents the load status of a data object, with string values such as 'success' or 'failed'."
+workforce_management_dev,workforce_gld,employee_skills,18,lgcl_del_ind,string,YES,"Indicator for global or local deletion status, represented as a string."
+workforce_management_dev,workforce_gld,employee_skills,19,employment_status,string,YES,"Employee employment status, string data type."
+workforce_management_dev,workforce_gld,employee_skills,20,prof_id,string,YES,"Identifier for a professional profile, stored as a string."
+workforce_management_dev,workforce_gld,employee_skills,21,prof_nm,string,YES,"Professional name, data type STRING"
+workforce_management_dev,workforce_gld,employee_skills,22,cert_issue_dt,timestamp,YES,Certificate Issue Timestamp
+workforce_management_dev,workforce_gld,workermaster,0,action,string,YES,
+workforce_management_dev,workforce_gld,workermaster,1,first_name,string,YES,
+workforce_management_dev,workforce_gld,workermaster,2,middle_name,string,YES,
+workforce_management_dev,workforce_gld,workermaster,3,last_name,string,YES,
+workforce_management_dev,workforce_gld,workermaster,4,full_name,string,YES,
+workforce_management_dev,workforce_gld,workermaster,5,alternate_personnel_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,6,personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,7,user_type,string,YES,
+workforce_management_dev,workforce_gld,workermaster,8,work_location_code,string,YES,
+workforce_management_dev,workforce_gld,workermaster,9,manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,10,orgunit1,string,YES,
+workforce_management_dev,workforce_gld,workermaster,11,orgunit2,string,YES,
+workforce_management_dev,workforce_gld,workermaster,12,hire_dt,date,YES,
+workforce_management_dev,workforce_gld,workermaster,13,country,string,YES,
+workforce_management_dev,workforce_gld,workermaster,14,state_province,string,YES,
+workforce_management_dev,workforce_gld,workermaster,15,city,string,YES,
+workforce_management_dev,workforce_gld,workermaster,16,street,string,YES,
+workforce_management_dev,workforce_gld,workermaster,17,region,string,YES,
+workforce_management_dev,workforce_gld,workermaster,18,postal_code,string,YES,
+workforce_management_dev,workforce_gld,workermaster,19,company_code,string,YES,
+workforce_management_dev,workforce_gld,workermaster,20,mail_service,string,YES,
+workforce_management_dev,workforce_gld,workermaster,21,external_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,22,company_name,string,YES,
+workforce_management_dev,workforce_gld,workermaster,23,mws_acct_sync,string,YES,
+workforce_management_dev,workforce_gld,workermaster,24,display_name,string,YES,
+workforce_management_dev,workforce_gld,workermaster,25,preferred_name,string,YES,
+workforce_management_dev,workforce_gld,workermaster,26,preferred_first_name,string,YES,
+workforce_management_dev,workforce_gld,workermaster,27,preferred_last_name,string,YES,
+workforce_management_dev,workforce_gld,workermaster,28,job_level,string,YES,
+workforce_management_dev,workforce_gld,workermaster,29,job_title,string,YES,
+workforce_management_dev,workforce_gld,workermaster,30,work_phone,string,YES,
+workforce_management_dev,workforce_gld,workermaster,31,core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,32,short_name,string,YES,
+workforce_management_dev,workforce_gld,workermaster,33,email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,34,termination_dt,date,YES,
+workforce_management_dev,workforce_gld,workermaster,35,sailpt_create_ts,timestamp,YES,
+workforce_management_dev,workforce_gld,workermaster,36,sailpt_update_ts,timestamp,YES,
+workforce_management_dev,workforce_gld,workermaster,37,alt_company_code,string,YES,
+workforce_management_dev,workforce_gld,workermaster,38,originating_source_system,string,YES,
+workforce_management_dev,workforce_gld,workermaster,39,source_creation_ts,timestamp,YES,
+workforce_management_dev,workforce_gld,workermaster,40,source_update_ts,timestamp,YES,
+workforce_management_dev,workforce_gld,workermaster,41,cost_center_code,string,YES,
+workforce_management_dev,workforce_gld,workermaster,42,cost_center_name,string,YES,
+workforce_management_dev,workforce_gld,workermaster,43,supy_org_code,string,YES,
+workforce_management_dev,workforce_gld,workermaster,44,manager_full_name,string,YES,
+workforce_management_dev,workforce_gld,workermaster,45,manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,46,manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,47,manager_short_name,string,YES,
+workforce_management_dev,workforce_gld,workermaster,48,layer_2_mgr_bsn_mgr_emp_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,49,layer_3_mgr_bsn_mgr_emp_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,50,layer_4_mgr_bsn_mgr_emp_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,51,layer_5_mgr_bsn_mgr_emp_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,52,layer_6_mgr_bsn_mgr_emp_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,53,layer_7_mgr_bsn_mgr_emp_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,54,layer_8_mgr_bsn_mgr_emp_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,55,bsn_org_lvl_02_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,56,bsn_org_lvl_03_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,57,bsn_org_lvl_04_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,58,bsn_org_lvl_05_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,59,bsn_org_lvl_06_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,60,bsn_org_lvl_07_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,61,bsn_org_lvl_08_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,62,bsn_org_lvl_02_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,63,bsn_org_lvl_03_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,64,bsn_org_lvl_04_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,65,bsn_org_lvl_05_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,66,bsn_org_lvl_06_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,67,bsn_org_lvl_07_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,68,bsn_org_lvl_08_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,69,bsn_org_lvl_02_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,70,bsn_org_lvl_03_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,71,bsn_org_lvl_04_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,72,bsn_org_lvl_05_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,73,bsn_org_lvl_06_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,74,bsn_org_lvl_07_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,75,bsn_org_lvl_08_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,76,bsn_org_lvl_02_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,77,bsn_org_lvl_03_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,78,bsn_org_lvl_04_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,79,bsn_org_lvl_05_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,80,bsn_org_lvl_06_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,81,bsn_org_lvl_07_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,82,bsn_org_lvl_08_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,83,bsn_org_lvl_02_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,84,bsn_org_lvl_03_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,85,bsn_org_lvl_04_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,86,bsn_org_lvl_05_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,87,bsn_org_lvl_06_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,88,bsn_org_lvl_07_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,89,bsn_org_lvl_08_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,90,supy_org_lvl_01_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,91,supy_org_lvl_02_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,92,supy_org_lvl_03_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,93,supy_org_lvl_04_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,94,supy_org_lvl_05_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,95,supy_org_lvl_06_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,96,supy_org_lvl_07_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,97,supy_org_lvl_08_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,98,supy_org_lvl_09_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,99,supy_org_lvl_10_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,100,supy_org_lvl_11_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,101,supy_org_lvl_01_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,102,supy_org_lvl_02_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,103,supy_org_lvl_03_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,104,supy_org_lvl_04_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,105,supy_org_lvl_05_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,106,supy_org_lvl_06_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,107,supy_org_lvl_07_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,108,supy_org_lvl_08_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,109,supy_org_lvl_09_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,110,supy_org_lvl_10_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,111,supy_org_lvl_11_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,112,supy_org_lvl_01_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,113,supy_org_lvl_02_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,114,supy_org_lvl_03_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,115,supy_org_lvl_04_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,116,supy_org_lvl_05_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,117,supy_org_lvl_06_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,118,supy_org_lvl_07_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,119,supy_org_lvl_08_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,120,supy_org_lvl_09_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,121,supy_org_lvl_10_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,122,supy_org_lvl_11_mgr_full_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,123,supy_org_lvl_01_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,124,supy_org_lvl_02_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,125,supy_org_lvl_03_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,126,supy_org_lvl_04_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,127,supy_org_lvl_05_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,128,supy_org_lvl_06_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,129,supy_org_lvl_07_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,130,supy_org_lvl_08_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,131,supy_org_lvl_09_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,132,supy_org_lvl_10_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,133,supy_org_lvl_11_mgr_eml,string,YES,
+workforce_management_dev,workforce_gld,workermaster,134,supy_org_lvl_01_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,135,supy_org_lvl_02_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,136,supy_org_lvl_03_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,137,supy_org_lvl_04_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,138,supy_org_lvl_05_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,139,supy_org_lvl_06_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,140,supy_org_lvl_07_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,141,supy_org_lvl_08_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,142,supy_org_lvl_09_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,143,supy_org_lvl_10_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,144,supy_org_lvl_11_mgr_core_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,145,is_mgr_ind,string,YES,
+workforce_management_dev,workforce_gld,workermaster,146,is_ppl_mgr_1_ind,string,YES,
+workforce_management_dev,workforce_gld,workermaster,147,yrs_of_srv_qty,string,YES,
+workforce_management_dev,workforce_gld,workermaster,148,jb_pfl_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,149,jb_cd,string,YES,
+workforce_management_dev,workforce_gld,workermaster,150,jb_fmly_grp_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,151,jb_fmly_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,152,jb_catg_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,153,mgmt_lvl_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,154,work_location_type,string,YES,
+workforce_management_dev,workforce_gld,workermaster,155,work_location,string,YES,
+workforce_management_dev,workforce_gld,workermaster,156,work_location_percentage,string,YES,
+workforce_management_dev,workforce_gld,workermaster,157,name_suffix,string,YES,
+workforce_management_dev,workforce_gld,workermaster,158,ee_company,string,YES,
+workforce_management_dev,workforce_gld,workermaster,159,service_line,string,YES,
+workforce_management_dev,workforce_gld,workermaster,160,corporate_region,string,YES,
+workforce_management_dev,workforce_gld,workermaster,161,wrk_shft_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,162,dflt_wkly_hrs_qty,"decimal(10,5)",YES,
+workforce_management_dev,workforce_gld,workermaster,163,schdld_wkly_hrs_qty,"decimal(10,5)",YES,
+workforce_management_dev,workforce_gld,workermaster,164,finance_system,string,YES,
+workforce_management_dev,workforce_gld,workermaster,165,fte_pct,"decimal(10,5)",YES,
+workforce_management_dev,workforce_gld,workermaster,166,work_contract,string,YES,
+workforce_management_dev,workforce_gld,workermaster,167,grp_sb_grp_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,168,prsnl_ar_sb_ar_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,169,business_title,string,YES,
+workforce_management_dev,workforce_gld,workermaster,170,finance_product_technical_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,171,finance_product_name,string,YES,
+workforce_management_dev,workforce_gld,workermaster,172,is_gdn_resource_flag,int,YES,
+workforce_management_dev,workforce_gld,workermaster,173,product_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,174,is_international_assignee,string,YES,
+workforce_management_dev,workforce_gld,workermaster,175,international_assignment_type,string,YES,
+workforce_management_dev,workforce_gld,workermaster,176,ia_start_date,string,YES,
+workforce_management_dev,workforce_gld,workermaster,177,ia_end_date,string,YES,
+workforce_management_dev,workforce_gld,workermaster,178,host_country,string,YES,
+workforce_management_dev,workforce_gld,workermaster,179,host_location,string,YES,
+workforce_management_dev,workforce_gld,workermaster,180,host_loc_desc,string,YES,
+workforce_management_dev,workforce_gld,workermaster,181,host_manager_id,string,YES,
+workforce_management_dev,workforce_gld,workermaster,182,host_job_code,string,YES,
+workforce_management_dev,workforce_gld,workermaster,183,host_job_profile,string,YES,
+workforce_management_dev,workforce_gld,workermaster,184,host_jlevel_code,string,YES,
+workforce_management_dev,workforce_gld,workermaster,185,host_cc_code,string,YES,
+workforce_management_dev,workforce_gld,workermaster,186,host_companycode,string,YES,
+workforce_management_dev,workforce_gld,workermaster,187,host_suporg,string,YES,
+workforce_management_dev,workforce_gld,workermaster,188,host_location_state_province,string,YES,
+workforce_management_dev,workforce_gld,workermaster,189,host_default_weekly_hours,string,YES,
+workforce_management_dev,workforce_gld,workermaster,190,first_day_of_leave,date,YES,
+workforce_management_dev,workforce_gld,workermaster,191,estimated_lastdayof_leave,date,YES,
+workforce_management_dev,workforce_gld,workermaster,192,hire_completed_date,string,YES,
+workforce_management_dev,workforce_gld,workermaster,193,source_sys_ky,string,YES,
+workforce_management_dev,workforce_gld,workermaster,194,src_sys_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,195,source_file_nm,string,YES,
+workforce_management_dev,workforce_gld,workermaster,196,source_file_ts,timestamp,YES,
+workforce_management_dev,workforce_gld,workermaster,197,udp_create_utc_ts,timestamp,YES,
+workforce_management_dev,workforce_gld,workermaster,198,udp_update_utc_ts,timestamp,YES,
+workforce_management_dev,workforce_gld,workermaster,199,sp_ind,int,YES,
+workforce_management_dev,workforce_gld,workermaster,200,coreid_match_ind,int,YES,
+workforce_management_dev,workforce_gld,workermaster,201,email_match_ind,int,YES,
+workforce_management_dev,workforce_gld,workermaster,202,shortname_match_ind,int,YES,
+workforce_management_dev,workforce_gld,workermaster,203,reporting_manager_level,int,YES,
+workforce_management_dev,workforce_gld,workermaster,204,level_01_reporting_manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,205,level_01_reporting_manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,206,level_01_reporting_manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,207,level_02_reporting_manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,208,level_02_reporting_manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,209,level_02_reporting_manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,210,level_03_reporting_manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,211,level_03_reporting_manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,212,level_03_reporting_manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,213,level_04_reporting_manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,214,level_04_reporting_manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,215,level_04_reporting_manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,216,level_05_reporting_manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,217,level_05_reporting_manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,218,level_05_reporting_manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,219,level_06_reporting_manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,220,level_06_reporting_manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,221,level_06_reporting_manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,222,level_07_reporting_manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,223,level_07_reporting_manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,224,level_07_reporting_manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,225,level_08_reporting_manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,226,level_08_reporting_manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,227,level_08_reporting_manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,228,level_09_reporting_manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,229,level_09_reporting_manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,230,level_09_reporting_manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,231,level_10_reporting_manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,232,level_10_reporting_manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,233,level_10_reporting_manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,234,level_11_reporting_manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,235,level_11_reporting_manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,236,level_11_reporting_manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,237,level_12_reporting_manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,238,level_12_reporting_manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,239,level_12_reporting_manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,240,level_13_reporting_manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,241,level_13_reporting_manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,242,level_13_reporting_manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,243,level_14_reporting_manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,244,level_14_reporting_manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,245,level_14_reporting_manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,246,level_15_reporting_manager_email,string,YES,
+workforce_management_dev,workforce_gld,workermaster,247,level_15_reporting_manager_coreid,string,YES,
+workforce_management_dev,workforce_gld,workermaster,248,level_15_reporting_manager_personnel_number,string,YES,
+workforce_management_dev,workforce_gld,workermaster,249,psa_enabled_flag,string,YES,
+workforce_management_dev,workforce_gld,workermaster,250,employment_status,string,YES,
+workforce_management_dev,workforce_gld,workermaster,251,worker_type,string,YES,
