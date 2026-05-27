@@ -42,12 +42,13 @@ def _find_repo_env() -> Path:
 _ENV_PATH = _find_repo_env()
 _REPO_ROOT = _ENV_PATH.parent.parent
 if _ENV_PATH.exists():
-    load_dotenv(_ENV_PATH, override=True)
+    load_dotenv(_ENV_PATH, override=False)
 
 
 @dataclass(frozen=True)
 class DatabaseConfig:
     host: str = field(default_factory=lambda: os.getenv("PGHOST", "localhost"))
+    hostaddr: str = field(default_factory=lambda: os.getenv("PGHOSTADDR", ""))
     port: int = field(default_factory=lambda: int(os.getenv("PGPORT", "5432")))
     database: str = field(default_factory=lambda: os.getenv("PGDATABASE", "postgres"))
     user: str = field(default_factory=lambda: os.getenv("PGUSER", ""))
@@ -78,6 +79,8 @@ class DatabaseConfig:
         }
         if self.sslmode:
             d["sslmode"] = self.sslmode
+        if self.hostaddr:
+            d["hostaddr"] = self.hostaddr
         if self.connect_timeout:
             d["connect_timeout"] = self.connect_timeout
         return d

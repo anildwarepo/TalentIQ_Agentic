@@ -16,7 +16,7 @@ import {
 } from "./telemetry";
 import "./App.css";
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
 const AF_BACKEND_URL = import.meta.env.VITE_AF_BACKEND_URL ?? "/af";
 const AGENT_NAME = import.meta.env.VITE_AGENT_NAME ?? "talentiq-agent";
 const UPLOAD_ACCEPT = ".pdf,.docx,.doc,.txt,.rtf";
@@ -381,6 +381,8 @@ const QUICK_QUESTION_CATEGORIES = [
   },
 ];
 
+const RFP_CONTEXT_REQUIRED_MESSAGE = "Please upload an RFP or paste the RFP requirements before I match candidates to it.";
+
 // ——— Main App ———————————————————————————————————————————————
 
 export default function App() {
@@ -568,6 +570,14 @@ export default function App() {
   };
 
   const handleQuickQuestion = (q) => {
+    if (/match candidates.*rfp|this rfp/i.test(q) && !uploadedFile) {
+      setMessages((m) => [
+        ...m,
+        { role: "user", text: q },
+        { role: "assistant", text: RFP_CONTEXT_REQUIRED_MESSAGE },
+      ]);
+      return;
+    }
     sendMessage(q);
   };
 
@@ -681,7 +691,11 @@ export default function App() {
                 { role: "assistant", speaker: "system", text: `*Routing to ${data.target}...*` },
               ]);
             } else if (eventType === "done") {
-              if (data.session_id) setAfSessionId(data.session_id);
+              if (data.session_id) {
+                setAfSessionId(data.session_id);
+                setActiveThreadId(data.session_id);
+                loadThreads();
+              }
               lastResponseId = data.id || lastResponseId;
             } else if (eventType === "error") {
               throw new Error(data.message || "Workflow error");
@@ -762,7 +776,11 @@ export default function App() {
 
           if (msg.type === "done") {
             finalResult = msg.result;
-            if (msg.session_id) setAfSessionId(msg.session_id);
+            if (msg.session_id) {
+              setAfSessionId(msg.session_id);
+              setActiveThreadId(msg.session_id);
+              loadThreads();
+            }
             apiTracker.complete(200);
             trackQueryResponseTime(graphBody.input, "graph-search", Date.now() - startTime, true);
           } else if (msg.type === "error") {
@@ -1033,7 +1051,8 @@ export default function App() {
         const data = await res.json();
         setMessages(data.messages || []);
         setPreviousResponseId(data.last_response_id || null);
-        setActiveThreadId(data.id);
+        setAfSessionId(data.session_id || threadId);
+        setActiveThreadId(data.session_id || data.id || threadId);
         setPendingApprovals(null);
         setPendingApprovalResponseId(null);
         setOauthConsentLink(null);

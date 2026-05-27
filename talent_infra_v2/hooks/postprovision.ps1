@@ -344,6 +344,20 @@ function Register-PgUamiAsEntraAdmin {
     $savedEAP = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
+        $existingJson = & az postgres flexible-server microsoft-entra-admin list `
+            --resource-group $ResourceGroup `
+            --server-name $ServerName `
+            --only-show-errors `
+            --output json 2>$null
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrEmpty($existingJson)) {
+            $existing = $existingJson | ConvertFrom-Json
+            $match = @($existing | Where-Object { $_.principalName -eq $UamiName -or $_.name -eq $UamiName -or $_.name -eq $ObjectId } | Select-Object -First 1)
+            if ($match.Count -gt 0) {
+                Write-Host "    OK ($UamiName): already registered as PG Entra admin" -ForegroundColor Green
+                return $true
+            }
+        }
+
         $out = & az postgres flexible-server microsoft-entra-admin create `
             --resource-group $ResourceGroup `
             --server-name $ServerName `
@@ -584,7 +598,8 @@ function Initialize-PostgresqlAgeAndData {
         [string]$ResourceGroup, [string]$ServerName, [string]$AdminUser,
         [string]$EntraAdminUpn, [string]$EntraAdminObjectId,
         [string]$ServerFqdn, [string]$GraphName,
-        [string]$ConnectFqdn = ''
+        [string]$ConnectFqdn = '',
+        [string]$ConnectHostAddress = ''
     )
     if ([string]::IsNullOrEmpty($ServerName) -or [string]::IsNullOrEmpty($ResourceGroup)) {
         Write-Host "Skipping PostgreSQL AGE/data initialization (no server provisioned)."
@@ -607,14 +622,26 @@ function Initialize-PostgresqlAgeAndData {
     # but the hook is safe to re-run against an existing server that may
     # have been provisioned before the Entra changes landed).
     Write-Host "Ensuring Microsoft Entra ID authentication is enabled..."
-    Invoke-NativeCommand {
-        az postgres flexible-server update `
+    $currentEntraAuth = Invoke-NativeCommand {
+        az postgres flexible-server show `
             --resource-group $ResourceGroup `
             --name $ServerName `
-            --microsoft-entra-auth Enabled `
-            --output none 2>&1 | Out-Null
+            --query "authConfig.activeDirectoryAuth" `
+            -o tsv 2>&1 | Where-Object { $_ -notmatch '^WARNING' }
     }
-    Wait-PostgresqlReady -ResourceGroup $ResourceGroup -ServerName $ServerName
+    if ($currentEntraAuth -ne "Enabled") {
+        Invoke-WithRetry -Operation "PostgreSQL Entra authentication enablement" -Action {
+            az postgres flexible-server update `
+                --resource-group $ResourceGroup `
+                --name $ServerName `
+                --microsoft-entra-auth Enabled `
+                --output none 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "az postgres flexible-server update exited with code $LASTEXITCODE" }
+        } -MaxAttempts 6 -DelaySeconds 10
+        Wait-PostgresqlReady -ResourceGroup $ResourceGroup -ServerName $ServerName
+    } else {
+        Write-Host "  Microsoft Entra ID authentication already enabled."
+    }
 
     # Ensure the deploying user is registered as an Entra administrator.
     # Bicep already creates this when `postgresqlEntraAdminObjectId` is set,
@@ -622,14 +649,26 @@ function Initialize-PostgresqlAgeAndData {
     # `preprovision` still get a working admin.
     if (-not [string]::IsNullOrEmpty($EntraAdminObjectId) -and -not [string]::IsNullOrEmpty($EntraAdminUpn)) {
         Write-Host "Ensuring '$EntraAdminUpn' is a PostgreSQL Entra administrator..."
-        Invoke-NativeCommand {
-            az postgres flexible-server microsoft-entra-admin create `
-                --resource-group $ResourceGroup `
-                --server-name $ServerName `
-                --display-name $EntraAdminUpn `
-                --object-id $EntraAdminObjectId `
-                --type User `
-                --output none 2>&1 | Out-Null
+        $adminExists = $false
+        $adminsJson = Invoke-NativeCommand { az postgres flexible-server microsoft-entra-admin list --resource-group $ResourceGroup --server-name $ServerName --only-show-errors --output json 2>$null }
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrEmpty($adminsJson)) {
+            $admins = $adminsJson | ConvertFrom-Json
+            $adminExists = @($admins | Where-Object { $_.principalName -eq $EntraAdminUpn -or $_.name -eq $EntraAdminUpn -or $_.name -eq $EntraAdminObjectId }).Count -gt 0
+        }
+        if ($adminExists) {
+            Write-Host "  PostgreSQL Entra administrator already present."
+        } else {
+            Invoke-WithRetry -Operation "PostgreSQL Entra administrator registration" -Action {
+                Wait-PostgresqlReady -ResourceGroup $ResourceGroup -ServerName $ServerName
+                az postgres flexible-server microsoft-entra-admin create `
+                    --resource-group $ResourceGroup `
+                    --server-name $ServerName `
+                    --display-name $EntraAdminUpn `
+                    --object-id $EntraAdminObjectId `
+                    --type User `
+                    --output none 2>&1 | Out-Null
+                if ($LASTEXITCODE -ne 0) { throw "az postgres flexible-server microsoft-entra-admin create exited with code $LASTEXITCODE" }
+            } -MaxAttempts 12 -DelaySeconds 10
         }
     } else {
         Write-Host "  WARNING: POSTGRESQL_ENTRA_ADMIN_OBJECT_ID / _PRINCIPAL_NAME not set  -  data load may fail." -ForegroundColor Yellow
@@ -645,8 +684,16 @@ function Initialize-PostgresqlAgeAndData {
 
     Write-Host "Preparing PostgreSQL connection for data loading..."
     Write-Host "  Connecting via: $effectiveConnectFqdn"
+    if (-not [string]::IsNullOrEmpty($ConnectHostAddress)) {
+        Write-Host "  PGHOSTADDR: $ConnectHostAddress"
+    }
     Write-Host "  PGUSER (Entra): $EntraAdminUpn"
     $env:PGHOST = $effectiveConnectFqdn
+    if (-not [string]::IsNullOrEmpty($ConnectHostAddress)) {
+        $env:PGHOSTADDR = $ConnectHostAddress
+    } else {
+        Remove-Item Env:PGHOSTADDR -ErrorAction SilentlyContinue
+    }
     $env:PGPORT = "5432"
     $env:PGDATABASE = "postgres"
     # PGUSER must be the Entra principal name (UPN for users). The data
@@ -1058,17 +1105,30 @@ if (-not [string]::IsNullOrEmpty($postgresqlServerName) -and $initializePostgres
     # Prefer private endpoint when one was provisioned
     $peInfo = Get-PostgresqlPrivateEndpointInfo -ResourceGroup $resourceGroup -ServerName $postgresqlServerName
     $connectFqdn = $postgresqlServerFqdn
+    $connectHostAddress = ''
     $usingPrivateEndpoint = $false
     if ($null -ne $peInfo) {
         $usingPrivateEndpoint = $true
-        # Wait-ForPrivateEndpointReachable returns whichever FQDN (public or privatelink) the user mapped in hosts.
-        $connectFqdn = Show-HostsFileInstructions -PeInfo $peInfo
+        $tcp = New-Object System.Net.Sockets.TcpClient
+        try {
+            $connectTask = $tcp.ConnectAsync($peInfo.PrivateIp, 5432)
+            if ($connectTask.Wait(3000) -and $tcp.Connected) {
+                $connectFqdn = $peInfo.PublicFqdn
+                $connectHostAddress = $peInfo.PrivateIp
+                Write-Host "PostgreSQL private endpoint IP $($peInfo.PrivateIp):5432 is reachable; using PGHOSTADDR instead of requiring a hosts-file entry." -ForegroundColor Green
+            } else {
+                # Wait-ForPrivateEndpointReachable returns whichever FQDN (public or privatelink) the user mapped in hosts.
+                $connectFqdn = Show-HostsFileInstructions -PeInfo $peInfo
+            }
+        } finally {
+            $tcp.Close()
+        }
     } else {
         # No PE  -  fall back to public access + broad firewall
         Ensure-PostgresqlAllowAllIps -ResourceGroup $resourceGroup -ServerName $postgresqlServerName
     }
 
-    Initialize-PostgresqlAgeAndData -ResourceGroup $resourceGroup -ServerName $postgresqlServerName -AdminUser $postgresqlAdminLogin -EntraAdminUpn $entraAdminUpn -EntraAdminObjectId $entraAdminObjectId -ServerFqdn $postgresqlServerFqdn -GraphName $graphName -ConnectFqdn $connectFqdn
+    Initialize-PostgresqlAgeAndData -ResourceGroup $resourceGroup -ServerName $postgresqlServerName -AdminUser $postgresqlAdminLogin -EntraAdminUpn $entraAdminUpn -EntraAdminObjectId $entraAdminObjectId -ServerFqdn $postgresqlServerFqdn -GraphName $graphName -ConnectFqdn $connectFqdn -ConnectHostAddress $connectHostAddress
 
     if (-not $usingPrivateEndpoint) {
         # Remove the broad firewall rule
@@ -1146,6 +1206,10 @@ if ($buildWebappContainer -ne "false") {
         $buildArgs = @()
         if (-not [string]::IsNullOrEmpty($backendFqdn)) {
             $buildArgs += "VITE_API_BASE_URL=https://${backendFqdn}"
+        }
+        $viteDisableAuth = Get-AzdEnvValue "VITE_DISABLE_AUTH"
+        if (-not [string]::IsNullOrEmpty($viteDisableAuth)) {
+            $buildArgs += "VITE_DISABLE_AUTH=$viteDisableAuth"
         }
 
         if ($useDockerDesktop) {

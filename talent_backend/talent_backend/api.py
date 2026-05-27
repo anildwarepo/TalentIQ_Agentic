@@ -83,6 +83,51 @@ class ChatRequest(BaseModel):
     file_context: FileContext | None = None
 
 
+class ThreadRenameRequest(BaseModel):
+    title: str
+
+
+RFP_CONTEXT_REQUIRED_MESSAGE = "Please upload an RFP or paste the RFP requirements before I match candidates to it."
+
+
+_RFP_MATCH_PATTERNS = [
+    re.compile(r"\b(match|score|rank|recommend|shortlist)\b.*\b(rfp|tender|bid|proposal)\b", re.IGNORECASE),
+    re.compile(r"\b(rfp|tender|bid|proposal)\b.*\b(match|score|rank|recommend|shortlist)\b", re.IGNORECASE),
+    re.compile(r"\b(this|the)\s+(rfp|tender|bid|proposal)\b", re.IGNORECASE),
+    re.compile(r"\b(rfp|tender|bid|proposal)'?s\s+requirements\b", re.IGNORECASE),
+]
+
+
+def _is_rfp_match_request(user_input: str) -> bool:
+    """Return True when the user asks to match candidates to an RFP-like document."""
+    return any(pattern.search(user_input or "") for pattern in _RFP_MATCH_PATTERNS)
+
+
+def _history_has_rfp_context(session_id: str | None) -> bool:
+    """Check whether previous turns already contain uploaded or extracted RFP requirements."""
+    if not session_id or not _history:
+        return False
+
+    for msg in _history.get_history(session_id, limit=20):
+        text = (msg.get("text") or "").lower()
+        if "[document context" in text or "---begin document---" in text:
+            return True
+        if ("| # | role |" in text or "| role |" in text) and "key skills" in text:
+            return True
+        if "required roles" in text and "required skills" in text:
+            return True
+    return False
+
+
+def _missing_rfp_context(req: ChatRequest) -> bool:
+    """Guard RFP matching requests that do not have document context yet."""
+    return (
+        _is_rfp_match_request(req.input)
+        and req.file_context is None
+        and not _history_has_rfp_context(req.session_id)
+    )
+
+
 # ── SSE helpers ──────────────────────────────────────────────
 
 def _sse(event: str, data: dict) -> str:
@@ -90,15 +135,30 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+async def _stream_static_chat_response(response_id: str, session_id: str, text: str):
+    """Emit a fixed SSE response without invoking the agent."""
+    yield _sse("start", {"id": response_id, "session_id": session_id})
+    yield _sse("message", {"id": response_id, "role": "assistant", "text": text})
+    _record_response(session_id, text)
+    yield _sse("done", {"id": response_id, "session_id": session_id})
+
+
+async def _stream_static_graph_response(response_id: str, session_id: str, text: str):
+    """Emit a fixed NDJSON graph response without invoking the agent."""
+    _record_response(session_id, text)
+    yield json.dumps({"response_message": {"type": "WorkflowOutputEvent", "delta": text}}, ensure_ascii=False) + "\n"
+    yield json.dumps({"response_message": {"type": "done", "result": text, "session_id": session_id}}, ensure_ascii=False) + "\n"
+
+
 # ── Session history ──────────────────────────────────────────
 
-def _build_chat_history(session_id: str, user_message: str) -> tuple[list[Message], str]:
+def _build_chat_history(session_id: str, user_message: str, user_id: str | None = None) -> tuple[list[Message], str]:
     """Build agent_framework Message list from Cosmos history + new user message."""
     if not session_id:
         session_id = uuid.uuid4().hex[:16]
 
     # Store user message in Cosmos
-    _history.add_message(session_id, "user", user_message)
+    _history.add_message(session_id, "user", user_message, user_id=user_id)
 
     # Retrieve full history (capped at 20 messages)
     history = _history.get_history(session_id, limit=20)
@@ -109,6 +169,34 @@ def _build_chat_history(session_id: str, user_message: str) -> tuple[list[Messag
 def _record_response(session_id: str, text: str):
     """Store assistant response in Cosmos."""
     _history.add_message(session_id, "assistant", text)
+
+
+def _user_id(user: dict) -> str:
+    """Return the stable owner id for chat-history filtering."""
+    return user.get("oid") or user.get("email") or user.get("name") or ""
+
+
+def _format_thread(meta: dict) -> dict:
+    """Shape session_meta for the frontend thread list."""
+    title = meta.get("title") or "Untitled conversation"
+    return {
+        "id": meta.get("session_id"),
+        "session_id": meta.get("session_id"),
+        "title": title,
+        "preview": title,
+        "created_at": meta.get("created_at"),
+        "last_active_at": meta.get("last_active_at"),
+        "message_count": meta.get("message_count", 0),
+    }
+
+
+def _owns_thread(session_id: str, user: dict) -> bool:
+    """Return True when the current user owns the thread."""
+    meta = _history.get_thread_meta(session_id)
+    if not meta or meta.get("is_deleted"):
+        return False
+    owner = meta.get("user_id")
+    return not owner or owner == _user_id(user)
 
 
 # ── CV template choice augmentation ──────────────────────────
@@ -183,7 +271,16 @@ async def chat(req: ChatRequest, user: dict = Depends(get_current_user)):
     """Stream agent response as Server-Sent Events."""
     logger.info("Chat request from %s (%s)", user.get("email"), user.get("oid"))
     response_id = f"msg_{uuid.uuid4().hex[:16]}"
-    messages, session_id = _build_chat_history(req.session_id, req.input)
+
+    if _missing_rfp_context(req):
+        _, session_id = _build_chat_history(req.session_id, req.input, user_id=_user_id(user))
+        return StreamingResponse(
+            _stream_static_chat_response(response_id, session_id, RFP_CONTEXT_REQUIRED_MESSAGE),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    messages, session_id = _build_chat_history(req.session_id, req.input, user_id=_user_id(user))
 
     return StreamingResponse(
         _stream_agent(messages, response_id, session_id),
@@ -271,6 +368,14 @@ async def graph_responses(req: ChatRequest, user: dict = Depends(get_current_use
     logger.info("Graph request from %s (%s): %s", user.get("email"), user.get("oid"), req.input[:100])
     response_id = f"msg_{uuid.uuid4().hex[:16]}"
 
+    if _missing_rfp_context(req):
+        _, session_id = _build_chat_history(req.session_id, req.input, user_id=_user_id(user))
+        return StreamingResponse(
+            _stream_static_graph_response(response_id, session_id, RFP_CONTEXT_REQUIRED_MESSAGE),
+            media_type="application/x-ndjson",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
     user_input = req.input
     if req.file_context:
         logger.info("File context present: filename=%s, content_len=%d", req.file_context.filename, len(req.file_context.content))
@@ -289,7 +394,7 @@ async def graph_responses(req: ChatRequest, user: dict = Depends(get_current_use
     # so the triage agent can construct a proper handoff.
     user_input = _augment_cv_template_choice(req.session_id, user_input)
 
-    messages, session_id = _build_chat_history(req.session_id, user_input)
+    messages, session_id = _build_chat_history(req.session_id, user_input, user_id=_user_id(user))
 
     return StreamingResponse(
         _stream_graph(messages, response_id, session_id),
@@ -529,3 +634,62 @@ async def delete_session(session_id: str, user: dict = Depends(get_current_user)
     logger.info("Delete session %s by %s", session_id, user.get("email"))
     _history.delete_session(session_id)
     return {"deleted": session_id}
+
+
+# ── Thread management ───────────────────────────────────────
+
+@app.get("/api/threads")
+async def list_threads(limit: int = 20, user: dict = Depends(get_current_user)):
+    """List chat threads owned by the current user."""
+    bounded_limit = min(max(limit, 1), 100)
+    threads = [_format_thread(t) for t in _history.list_threads(_user_id(user), limit=bounded_limit)]
+    return {"threads": threads}
+
+
+@app.get("/api/threads/{session_id}")
+async def get_thread(session_id: str, user: dict = Depends(get_current_user)):
+    """Get a thread and its messages."""
+    if not _owns_thread(session_id, user):
+        raise HTTPException(status_code=404, detail="Thread not found")
+
+    meta = _history.get_thread_meta(session_id) or {}
+    messages = _history.get_thread_messages(session_id, limit=200)
+    return {
+        **_format_thread(meta),
+        "messages": messages,
+        "last_response_id": None,
+    }
+
+
+@app.get("/api/threads/{session_id}/messages")
+async def get_thread_messages(session_id: str, limit: int = 50, user: dict = Depends(get_current_user)):
+    """Get messages for a thread."""
+    if not _owns_thread(session_id, user):
+        raise HTTPException(status_code=404, detail="Thread not found")
+
+    bounded_limit = min(max(limit, 1), 200)
+    return {"messages": _history.get_thread_messages(session_id, limit=bounded_limit)}
+
+
+@app.delete("/api/threads/{session_id}")
+async def delete_thread(session_id: str, user: dict = Depends(get_current_user)):
+    """Soft-delete a thread owned by the current user."""
+    if not _owns_thread(session_id, user):
+        raise HTTPException(status_code=404, detail="Thread not found")
+
+    _history.soft_delete_thread(session_id)
+    return {"status": "deleted", "session_id": session_id}
+
+
+@app.patch("/api/threads/{session_id}")
+async def rename_thread(session_id: str, req: ThreadRenameRequest, user: dict = Depends(get_current_user)):
+    """Rename a thread owned by the current user."""
+    if not _owns_thread(session_id, user):
+        raise HTTPException(status_code=404, detail="Thread not found")
+
+    title = req.title.strip()[:120]
+    if not title:
+        raise HTTPException(status_code=400, detail="Title is required")
+    if not _history.rename_thread(session_id, title):
+        raise HTTPException(status_code=404, detail="Thread not found")
+    return {"session_id": session_id, "title": title}
