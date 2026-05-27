@@ -1,0 +1,6 @@
+scribe: log Bishop's .ps1 byte-level resweep; supersede prior substitution rule
+
+- Merge bishop-ps1-sweep-byte-level-fix decision into decisions.md (new canonical substitution rule: codepoint >= 0x80 only, ASCII passthrough mandatory, regex over ASCII range FORBIDDEN).
+- Cross-agent notes propagated to ripley/lambert/kane/brett histories.
+- Bishop history summarized; entry archived.
+- 12 .ps1 files remain unstaged for Anil.
